@@ -151,8 +151,8 @@
         "destination": "Bridge/Plugins/manager.py"
       },
       {
-        "source": "LICENSE-STATUS.md",
-        "destination": "LICENSE-STATUS.md"
+        "source": "docs/PROJECT-RIGHTS.md",
+        "destination": "docs/PROJECT-RIGHTS.md"
       },
       {
         "source": "LICENSE.txt",
@@ -407,8 +407,8 @@
         "destination": "UI/Shared/Web/workflow-ui.js"
       },
       {
-        "source": "docs/LICENSE-GITHUB-OPTION.md",
-        "destination": "docs/LICENSE-GITHUB-OPTION.md"
+        "source": "docs/GITHUB-NOTES.md",
+        "destination": "docs/GITHUB-NOTES.md"
       },
       {
         "source": "docs/PLUGINS.md",
