@@ -25,7 +25,8 @@ class PublicationTests(unittest.TestCase):
             self.assertTrue({'plugin.json', 'Trainer/trainer.pyw', 'requirements-ai.txt', 'requirements-gpu.txt'} <= inspector)
         for name, files in repositories.items():
             destinations = {f['destination'] for f in files}
-            self.assertTrue({'README.md', 'LICENSE-STATUS.md', '.gitignore'} <= destinations)
+            rights_document = 'docs/PROJECT-RIGHTS.md' if name == 'astro-archive' else 'LICENSE-STATUS.md'
+            self.assertTrue({'README.md', rights_document, '.gitignore'} <= destinations)
             if name != 'astro-archive':
                 self.assertIn('plugin.json', destinations)
 
