@@ -1,0 +1,28 @@
+/* Validated theme colors are applied by preferences.js. Declarative additions share these tokens. */
+:root {
+  color-scheme: only dark;
+  --background: #0c111a;
+  --surface: #131c29;
+  --surface-raised: #192536;
+  --surface-hover: #1e2e43;
+  --border: #29384c;
+  --text: #e7edf7;
+  --muted: #91a3bd;
+  --accent: #74c1ff;
+  --accent-surface: #203b54;
+  --on-accent: #081626;
+  --success: #6de0bb;
+  --warning: #ffcf89;
+  --error: #ff9eaa;
+  --error-surface: #38202a;
+  --font-family: "Segoe UI Variable", "Segoe UI", sans-serif;
+  --font-size: 14px;
+  --line-height: 1.5;
+  --space: 8px;
+  --radius: 12px;
+  --motion-duration: 160ms;
+  --motion-easing: cubic-bezier(.2,.8,.2,1);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion-duration: 0ms; }
+}

@@ -1,0 +1,1041 @@
+{
+  "format": 1,
+  "repositories": {
+    "astro-archive": [
+      {
+        "source": ".gitattributes",
+        "destination": ".gitattributes"
+      },
+      {
+        "source": ".gitignore",
+        "destination": ".gitignore"
+      },
+      {
+        "source": "Backend/Analysis/alignment.py",
+        "destination": "Backend/Analysis/alignment.py"
+      },
+      {
+        "source": "Backend/Analysis/coverage_products.py",
+        "destination": "Backend/Analysis/coverage_products.py"
+      },
+      {
+        "source": "Backend/Analysis/psf.py",
+        "destination": "Backend/Analysis/psf.py"
+      },
+      {
+        "source": "Backend/Analysis/quality.py",
+        "destination": "Backend/Analysis/quality.py"
+      },
+      {
+        "source": "Backend/Analysis/timeseries.py",
+        "destination": "Backend/Analysis/timeseries.py"
+      },
+      {
+        "source": "Backend/Archive/browse.py",
+        "destination": "Backend/Archive/browse.py"
+      },
+      {
+        "source": "Backend/Archive/catalog.py",
+        "destination": "Backend/Archive/catalog.py"
+      },
+      {
+        "source": "Backend/Archive/editing.py",
+        "destination": "Backend/Archive/editing.py"
+      },
+      {
+        "source": "Backend/Archive/formulas.py",
+        "destination": "Backend/Archive/formulas.py"
+      },
+      {
+        "source": "Backend/Archive/structure.py",
+        "destination": "Backend/Archive/structure.py"
+      },
+      {
+        "source": "Backend/Fits/images.py",
+        "destination": "Backend/Fits/images.py"
+      },
+      {
+        "source": "Backend/Foundation/branding.py",
+        "destination": "Backend/Foundation/branding.py"
+      },
+      {
+        "source": "Backend/Foundation/resources.py",
+        "destination": "Backend/Foundation/resources.py"
+      },
+      {
+        "source": "Backend/Foundation/runtime.py",
+        "destination": "Backend/Foundation/runtime.py"
+      },
+      {
+        "source": "Backend/Imaging/display.py",
+        "destination": "Backend/Imaging/display.py"
+      },
+      {
+        "source": "Backend/Imaging/viewer.py",
+        "destination": "Backend/Imaging/viewer.py"
+      },
+      {
+        "source": "Backend/Preparation/artifacts.py",
+        "destination": "Backend/Preparation/artifacts.py"
+      },
+      {
+        "source": "Backend/Preparation/exchange.py",
+        "destination": "Backend/Preparation/exchange.py"
+      },
+      {
+        "source": "Backend/Preparation/provenance.py",
+        "destination": "Backend/Preparation/provenance.py"
+      },
+      {
+        "source": "Backend/Preparation/workflow.py",
+        "destination": "Backend/Preparation/workflow.py"
+      },
+      {
+        "source": "Bridge/Core/appearance.py",
+        "destination": "Bridge/Core/appearance.py"
+      },
+      {
+        "source": "Bridge/Core/commands.py",
+        "destination": "Bridge/Core/commands.py"
+      },
+      {
+        "source": "Bridge/Core/protocol.py",
+        "destination": "Bridge/Core/protocol.py"
+      },
+      {
+        "source": "Bridge/Core/service.py",
+        "destination": "Bridge/Core/service.py"
+      },
+      {
+        "source": "Bridge/Core/session.py",
+        "destination": "Bridge/Core/session.py"
+      },
+      {
+        "source": "Bridge/Core/viewer_state.py",
+        "destination": "Bridge/Core/viewer_state.py"
+      },
+      {
+        "source": "Bridge/Desktop/dialogs.py",
+        "destination": "Bridge/Desktop/dialogs.py"
+      },
+      {
+        "source": "Bridge/Desktop/host.py",
+        "destination": "Bridge/Desktop/host.py"
+      },
+      {
+        "source": "Bridge/Desktop/restart_wait.py",
+        "destination": "Bridge/Desktop/restart_wait.py"
+      },
+      {
+        "source": "Bridge/Desktop/single_instance.py",
+        "destination": "Bridge/Desktop/single_instance.py"
+      },
+      {
+        "source": "Bridge/Plugins/archive_services.py",
+        "destination": "Bridge/Plugins/archive_services.py"
+      },
+      {
+        "source": "Bridge/Plugins/contracts.py",
+        "destination": "Bridge/Plugins/contracts.py"
+      },
+      {
+        "source": "Bridge/Plugins/host_services.py",
+        "destination": "Bridge/Plugins/host_services.py"
+      },
+      {
+        "source": "Bridge/Plugins/inspection_services.py",
+        "destination": "Bridge/Plugins/inspection_services.py"
+      },
+      {
+        "source": "Bridge/Plugins/manager.py",
+        "destination": "Bridge/Plugins/manager.py"
+      },
+      {
+        "source": "LICENSE-STATUS.md",
+        "destination": "LICENSE-STATUS.md"
+      },
+      {
+        "source": "LICENSE.txt",
+        "destination": "LICENSE.txt"
+      },
+      {
+        "source": "Plugins/.examples/sample-tools/main.py",
+        "destination": "Plugins/.examples/sample-tools/main.py"
+      },
+      {
+        "source": "Plugins/.examples/sample-tools/plugin.json",
+        "destination": "Plugins/.examples/sample-tools/plugin.json"
+      },
+      {
+        "source": "Plugins/API-reference.json",
+        "destination": "Plugins/API-reference.json"
+      },
+      {
+        "source": "Plugins/API.md",
+        "destination": "Plugins/API.md"
+      },
+      {
+        "source": "Plugins/Прочети ме.txt",
+        "destination": "Plugins/Прочети ме.txt"
+      },
+      {
+        "source": "README.md",
+        "destination": "README.md"
+      },
+      {
+        "source": "Setup.cmd",
+        "destination": "Setup.cmd"
+      },
+      {
+        "source": "Start.cmd",
+        "destination": "Start.cmd"
+      },
+      {
+        "source": "Tools/prepare_publication.py",
+        "destination": "Tools/prepare_publication.py"
+      },
+      {
+        "source": "Tools/publication-files.json",
+        "destination": "Tools/publication-files.json"
+      },
+      {
+        "source": "UI/Analysis/Web/analysis.css",
+        "destination": "UI/Analysis/Web/analysis.css"
+      },
+      {
+        "source": "UI/Analysis/Web/analysis.js",
+        "destination": "UI/Analysis/Web/analysis.js"
+      },
+      {
+        "source": "UI/Analysis/Web/coverage-view.js",
+        "destination": "UI/Analysis/Web/coverage-view.js"
+      },
+      {
+        "source": "UI/Analysis/Web/frame-list.js",
+        "destination": "UI/Analysis/Web/frame-list.js"
+      },
+      {
+        "source": "UI/Analysis/Web/metrics.js",
+        "destination": "UI/Analysis/Web/metrics.js"
+      },
+      {
+        "source": "UI/Analysis/Web/quality-chart.js",
+        "destination": "UI/Analysis/Web/quality-chart.js"
+      },
+      {
+        "source": "UI/Analysis/Web/quality-score.js",
+        "destination": "UI/Analysis/Web/quality-score.js"
+      },
+      {
+        "source": "UI/Analysis/Web/viewer.css",
+        "destination": "UI/Analysis/Web/viewer.css"
+      },
+      {
+        "source": "UI/Analysis/Web/viewer.js",
+        "destination": "UI/Analysis/Web/viewer.js"
+      },
+      {
+        "source": "UI/Analysis/Web/workbench.js",
+        "destination": "UI/Analysis/Web/workbench.js"
+      },
+      {
+        "source": "UI/Archive/Web/navigation.css",
+        "destination": "UI/Archive/Web/navigation.css"
+      },
+      {
+        "source": "UI/Archive/Web/navigation.js",
+        "destination": "UI/Archive/Web/navigation.js"
+      },
+      {
+        "source": "UI/Processing/Web/preparation.js",
+        "destination": "UI/Processing/Web/preparation.js"
+      },
+      {
+        "source": "UI/Shared/Web/Assets/AstroArchive.ico",
+        "destination": "UI/Shared/Web/Assets/AstroArchive.ico"
+      },
+      {
+        "source": "UI/Shared/Web/Assets/plugin-gears.svg",
+        "destination": "UI/Shared/Web/Assets/plugin-gears.svg"
+      },
+      {
+        "source": "UI/Shared/Web/activity.css",
+        "destination": "UI/Shared/Web/activity.css"
+      },
+      {
+        "source": "UI/Shared/Web/activity.js",
+        "destination": "UI/Shared/Web/activity.js"
+      },
+      {
+        "source": "UI/Shared/Web/app.css",
+        "destination": "UI/Shared/Web/app.css"
+      },
+      {
+        "source": "UI/Shared/Web/app.js",
+        "destination": "UI/Shared/Web/app.js"
+      },
+      {
+        "source": "UI/Shared/Web/appearance.css",
+        "destination": "UI/Shared/Web/appearance.css"
+      },
+      {
+        "source": "UI/Shared/Web/appearance.js",
+        "destination": "UI/Shared/Web/appearance.js"
+      },
+      {
+        "source": "UI/Shared/Web/archive-rows.js",
+        "destination": "UI/Shared/Web/archive-rows.js"
+      },
+      {
+        "source": "UI/Shared/Web/charts.js",
+        "destination": "UI/Shared/Web/charts.js"
+      },
+      {
+        "source": "UI/Shared/Web/controls.css",
+        "destination": "UI/Shared/Web/controls.css"
+      },
+      {
+        "source": "UI/Shared/Web/controls.js",
+        "destination": "UI/Shared/Web/controls.js"
+      },
+      {
+        "source": "UI/Shared/Web/customization-layout.js",
+        "destination": "UI/Shared/Web/customization-layout.js"
+      },
+      {
+        "source": "UI/Shared/Web/customization.css",
+        "destination": "UI/Shared/Web/customization.css"
+      },
+      {
+        "source": "UI/Shared/Web/customization.js",
+        "destination": "UI/Shared/Web/customization.js"
+      },
+      {
+        "source": "UI/Shared/Web/declarative.css",
+        "destination": "UI/Shared/Web/declarative.css"
+      },
+      {
+        "source": "UI/Shared/Web/extensions.css",
+        "destination": "UI/Shared/Web/extensions.css"
+      },
+      {
+        "source": "UI/Shared/Web/extensions.js",
+        "destination": "UI/Shared/Web/extensions.js"
+      },
+      {
+        "source": "UI/Shared/Web/functions.css",
+        "destination": "UI/Shared/Web/functions.css"
+      },
+      {
+        "source": "UI/Shared/Web/functions.js",
+        "destination": "UI/Shared/Web/functions.js"
+      },
+      {
+        "source": "UI/Shared/Web/header.css",
+        "destination": "UI/Shared/Web/header.css"
+      },
+      {
+        "source": "UI/Shared/Web/header.js",
+        "destination": "UI/Shared/Web/header.js"
+      },
+      {
+        "source": "UI/Shared/Web/i18n.js",
+        "destination": "UI/Shared/Web/i18n.js"
+      },
+      {
+        "source": "UI/Shared/Web/icons.js",
+        "destination": "UI/Shared/Web/icons.js"
+      },
+      {
+        "source": "UI/Shared/Web/index.html",
+        "destination": "UI/Shared/Web/index.html"
+      },
+      {
+        "source": "UI/Shared/Web/islands.css",
+        "destination": "UI/Shared/Web/islands.css"
+      },
+      {
+        "source": "UI/Shared/Web/islands.js",
+        "destination": "UI/Shared/Web/islands.js"
+      },
+      {
+        "source": "UI/Shared/Web/monitoring.css",
+        "destination": "UI/Shared/Web/monitoring.css"
+      },
+      {
+        "source": "UI/Shared/Web/monitoring.js",
+        "destination": "UI/Shared/Web/monitoring.js"
+      },
+      {
+        "source": "UI/Shared/Web/plugin-browser.js",
+        "destination": "UI/Shared/Web/plugin-browser.js"
+      },
+      {
+        "source": "UI/Shared/Web/preferences.js",
+        "destination": "UI/Shared/Web/preferences.js"
+      },
+      {
+        "source": "UI/Shared/Web/python/archive-editor.js",
+        "destination": "UI/Shared/Web/python/archive-editor.js"
+      },
+      {
+        "source": "UI/Shared/Web/python/dashboard.js",
+        "destination": "UI/Shared/Web/python/dashboard.js"
+      },
+      {
+        "source": "UI/Shared/Web/python/python.css",
+        "destination": "UI/Shared/Web/python/python.css"
+      },
+      {
+        "source": "UI/Shared/Web/python/transport.js",
+        "destination": "UI/Shared/Web/python/transport.js"
+      },
+      {
+        "source": "UI/Shared/Web/session.js",
+        "destination": "UI/Shared/Web/session.js"
+      },
+      {
+        "source": "UI/Shared/Web/tokens.css",
+        "destination": "UI/Shared/Web/tokens.css"
+      },
+      {
+        "source": "UI/Shared/Web/workflow-ui.css",
+        "destination": "UI/Shared/Web/workflow-ui.css"
+      },
+      {
+        "source": "UI/Shared/Web/workflow-ui.js",
+        "destination": "UI/Shared/Web/workflow-ui.js"
+      },
+      {
+        "source": "docs/LICENSE-GITHUB-OPTION.md",
+        "destination": "docs/LICENSE-GITHUB-OPTION.md"
+      },
+      {
+        "source": "docs/PLUGINS.md",
+        "destination": "docs/PLUGINS.md"
+      },
+      {
+        "source": "docs/PUBLISHING.md",
+        "destination": "docs/PUBLISHING.md"
+      },
+      {
+        "source": "docs/VALIDATION.md",
+        "destination": "docs/VALIDATION.md"
+      },
+      {
+        "source": "requirements-lock.txt",
+        "destination": "requirements-lock.txt"
+      },
+      {
+        "source": "requirements.txt",
+        "destination": "requirements.txt"
+      },
+      {
+        "source": "start.pyw",
+        "destination": "start.pyw"
+      },
+      {
+        "source": "tests/test_plugins.py",
+        "destination": "tests/test_plugins.py"
+      },
+      {
+        "source": "tests/test_publication.py",
+        "destination": "tests/test_publication.py"
+      }
+    ],
+    "astro-archive-plugin-ai-training": [
+      {
+        "source": "Plugins/ai-training/.gitignore",
+        "destination": ".gitignore"
+      },
+      {
+        "source": "Plugins/ai-training/accelerator.py",
+        "destination": "accelerator.py"
+      },
+      {
+        "source": "Plugins/ai-training/learning.py",
+        "destination": "learning.py"
+      },
+      {
+        "source": "Plugins/ai-training/legacy_main.py",
+        "destination": "legacy_main.py"
+      },
+      {
+        "source": "Plugins/ai-training/LICENSE-STATUS.md",
+        "destination": "LICENSE-STATUS.md"
+      },
+      {
+        "source": "Plugins/ai-training/logo.png",
+        "destination": "logo.png"
+      },
+      {
+        "source": "Plugins/ai-training/main.py",
+        "destination": "main.py"
+      },
+      {
+        "source": "Plugins/ai-training/plugin.json",
+        "destination": "plugin.json"
+      },
+      {
+        "source": "Plugins/ai-training/README.md",
+        "destination": "README.md"
+      },
+      {
+        "source": "Plugins/ai-training/Прочети ме.md",
+        "destination": "Прочети ме.md"
+      }
+    ],
+    "astro-archive-plugin-archive-overview": [
+      {
+        "source": "Plugins/archive-overview/.gitignore",
+        "destination": ".gitignore"
+      },
+      {
+        "source": "Plugins/archive-overview/LICENSE-STATUS.md",
+        "destination": "LICENSE-STATUS.md"
+      },
+      {
+        "source": "Plugins/archive-overview/main.py",
+        "destination": "main.py"
+      },
+      {
+        "source": "Plugins/archive-overview/plugin.json",
+        "destination": "plugin.json"
+      },
+      {
+        "source": "Plugins/archive-overview/README.md",
+        "destination": "README.md"
+      }
+    ],
+    "astro-archive-plugin-frame-inspector-ai": [
+      {
+        "source": "Plugins/frame-inspector-ai/.gitignore",
+        "destination": ".gitignore"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/AI-ARCHITECTURE.md",
+        "destination": "AI-ARCHITECTURE.md"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/ai_host.py",
+        "destination": "ai_host.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/ai_service.py",
+        "destination": "ai_service.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/analysis_features.py",
+        "destination": "analysis_features.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/analyzers/__init__.py",
+        "destination": "analyzers/__init__.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/analyzers/artifacts.py",
+        "destination": "analyzers/artifacts.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/analyzers/audit.py",
+        "destination": "analyzers/audit.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/analyzers/base.py",
+        "destination": "analyzers/base.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/analyzers/dataset.py",
+        "destination": "analyzers/dataset.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/analyzers/defects.py",
+        "destination": "analyzers/defects.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/analyzers/legacy.py",
+        "destination": "analyzers/legacy.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/analyzers/light.py",
+        "destination": "analyzers/light.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/analyzers/neural.py",
+        "destination": "analyzers/neural.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/analyzers/noise.py",
+        "destination": "analyzers/noise.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/analyzers/objects.py",
+        "destination": "analyzers/objects.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/analyzers/registry.py",
+        "destination": "analyzers/registry.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/analyzers/stars.py",
+        "destination": "analyzers/stars.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/analyzers/storage.py",
+        "destination": "analyzers/storage.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/analyzers/trails.py",
+        "destination": "analyzers/trails.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/ARCHITECTURE-MLP-HISTORICAL.md",
+        "destination": "ARCHITECTURE-MLP-HISTORICAL.md"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/contracts/__init__.py",
+        "destination": "contracts/__init__.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/contracts/ai-dataset.schema.json",
+        "destination": "contracts/ai-dataset.schema.json"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/contracts/ai-example.schema.json",
+        "destination": "contracts/ai-example.schema.json"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/contracts/ai-model.schema.json",
+        "destination": "contracts/ai-model.schema.json"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/contracts/ai-resnet.schema.json",
+        "destination": "contracts/ai-resnet.schema.json"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/contracts/ai-result.schema.json",
+        "destination": "contracts/ai-result.schema.json"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/contracts/README.md",
+        "destination": "contracts/README.md"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/engine.py",
+        "destination": "engine.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/evaluator.py",
+        "destination": "evaluator.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/geometry.py",
+        "destination": "geometry.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/heuristic.py",
+        "destination": "heuristic.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/label_fields.py",
+        "destination": "label_fields.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/labeling.py",
+        "destination": "labeling.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/LICENSE-STATUS.md",
+        "destination": "LICENSE-STATUS.md"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/local_pipeline.py",
+        "destination": "local_pipeline.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/logo.png",
+        "destination": "logo.png"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/main.py",
+        "destination": "main.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/MODEL-CARD.md",
+        "destination": "MODEL-CARD.md"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/model.json",
+        "destination": "model.json"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/model.py",
+        "destination": "model.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/pipeline.py",
+        "destination": "pipeline.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/plugin.json",
+        "destination": "plugin.json"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/quality.py",
+        "destination": "quality.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/README-legacy.md",
+        "destination": "README-legacy.md"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/README.md",
+        "destination": "README.md"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/requirements-ai.txt",
+        "destination": "requirements-ai.txt"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/requirements-gpu.txt",
+        "destination": "requirements-gpu.txt"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/RESNET-VALIDATION.md",
+        "destination": "RESNET-VALIDATION.md"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/resnet_model.py",
+        "destination": "resnet_model.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/SAFETY-ACCEPTANCE.md",
+        "destination": "SAFETY-ACCEPTANCE.md"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/tests/test_analyzers.py",
+        "destination": "tests/test_analyzers.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/tests/test_dataset.py",
+        "destination": "tests/test_dataset.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/tests/test_labeling.py",
+        "destination": "tests/test_labeling.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/tests/test_neural.py",
+        "destination": "tests/test_neural.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/tests/test_registry.py",
+        "destination": "tests/test_registry.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/tests/test_resnet.py",
+        "destination": "tests/test_resnet.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/tests/test_service.py",
+        "destination": "tests/test_service.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/Trainer/client.py",
+        "destination": "Trainer/client.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/Trainer/legacy_mlp_training.py",
+        "destination": "Trainer/legacy_mlp_training.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/Trainer/legacy_trainer.pyw",
+        "destination": "Trainer/legacy_trainer.pyw"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/Trainer/resnet_runtime.py",
+        "destination": "Trainer/resnet_runtime.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/Trainer/Start AI Trainer.cmd",
+        "destination": "Trainer/Start AI Trainer.cmd"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/Trainer/trainer.pyw",
+        "destination": "Trainer/trainer.pyw"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/Trainer/training_core.py",
+        "destination": "Trainer/training_core.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/Trainer/training_job.py",
+        "destination": "Trainer/training_job.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/Trainer/training_metrics.py",
+        "destination": "Trainer/training_metrics.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/Trainer/workspace.py",
+        "destination": "Trainer/workspace.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/Trainer/Прочети ме legacy.txt",
+        "destination": "Trainer/Прочети ме legacy.txt"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/Trainer/Прочети ме.txt",
+        "destination": "Trainer/Прочети ме.txt"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/trainer_bridge.py",
+        "destination": "trainer_bridge.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/training_api.py",
+        "destination": "training_api.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/visual_data.py",
+        "destination": "visual_data.py"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/Прочети ме.md",
+        "destination": "Прочети ме.md"
+      }
+    ],
+    "astro-archive-plugin-iasc-campaigns": [
+      {
+        "source": "Plugins/iasc-campaigns/.gitignore",
+        "destination": ".gitignore"
+      },
+      {
+        "source": "Plugins/iasc-campaigns/continuity.py",
+        "destination": "continuity.py"
+      },
+      {
+        "source": "Plugins/iasc-campaigns/downloads.py",
+        "destination": "downloads.py"
+      },
+      {
+        "source": "Plugins/iasc-campaigns/Install Login Support.cmd",
+        "destination": "Install Login Support.cmd"
+      },
+      {
+        "source": "Plugins/iasc-campaigns/LICENSE-STATUS.md",
+        "destination": "LICENSE-STATUS.md"
+      },
+      {
+        "source": "Plugins/iasc-campaigns/login.py",
+        "destination": "login.py"
+      },
+      {
+        "source": "Plugins/iasc-campaigns/logo.png",
+        "destination": "logo.png"
+      },
+      {
+        "source": "Plugins/iasc-campaigns/main.py",
+        "destination": "main.py"
+      },
+      {
+        "source": "Plugins/iasc-campaigns/mpc_export.py",
+        "destination": "mpc_export.py"
+      },
+      {
+        "source": "Plugins/iasc-campaigns/plugin.json",
+        "destination": "plugin.json"
+      },
+      {
+        "source": "Plugins/iasc-campaigns/README.md",
+        "destination": "README.md"
+      },
+      {
+        "source": "Plugins/iasc-campaigns/reports.py",
+        "destination": "reports.py"
+      },
+      {
+        "source": "Plugins/iasc-campaigns/requirements-export.txt",
+        "destination": "requirements-export.txt"
+      },
+      {
+        "source": "Plugins/iasc-campaigns/requirements.txt",
+        "destination": "requirements.txt"
+      },
+      {
+        "source": "Plugins/iasc-campaigns/servers.py",
+        "destination": "servers.py"
+      },
+      {
+        "source": "Plugins/iasc-campaigns/site.py",
+        "destination": "site.py"
+      },
+      {
+        "source": "Plugins/iasc-campaigns/state.py",
+        "destination": "state.py"
+      },
+      {
+        "source": "Plugins/iasc-campaigns/workflows.py",
+        "destination": "workflows.py"
+      },
+      {
+        "source": "Plugins/iasc-campaigns/Прочети ме.md",
+        "destination": "Прочети ме.md"
+      }
+    ],
+    "astro-archive-plugin-remote-operation": [
+      {
+        "source": "Plugins/remote-operation/.gitignore",
+        "destination": ".gitignore"
+      },
+      {
+        "source": "Plugins/remote-operation/gateway.py",
+        "destination": "gateway.py"
+      },
+      {
+        "source": "Plugins/remote-operation/LICENSE-STATUS.md",
+        "destination": "LICENSE-STATUS.md"
+      },
+      {
+        "source": "Plugins/remote-operation/logo.ico",
+        "destination": "logo.ico"
+      },
+      {
+        "source": "Plugins/remote-operation/logo.png",
+        "destination": "logo.png"
+      },
+      {
+        "source": "Plugins/remote-operation/logo.svg",
+        "destination": "logo.svg"
+      },
+      {
+        "source": "Plugins/remote-operation/main.py",
+        "destination": "main.py"
+      },
+      {
+        "source": "Plugins/remote-operation/plugin.json",
+        "destination": "plugin.json"
+      },
+      {
+        "source": "Plugins/remote-operation/README.md",
+        "destination": "README.md"
+      },
+      {
+        "source": "Plugins/remote-operation/server.py",
+        "destination": "server.py"
+      },
+      {
+        "source": "Plugins/remote-operation/tls.py",
+        "destination": "tls.py"
+      },
+      {
+        "source": "Plugins/remote-operation/tray.py",
+        "destination": "tray.py"
+      },
+      {
+        "source": "Plugins/remote-operation/Web/login.css",
+        "destination": "Web/login.css"
+      },
+      {
+        "source": "Plugins/remote-operation/Web/login.html",
+        "destination": "Web/login.html"
+      },
+      {
+        "source": "Plugins/remote-operation/Web/login.js",
+        "destination": "Web/login.js"
+      },
+      {
+        "source": "Plugins/remote-operation/Web/remote.css",
+        "destination": "Web/remote.css"
+      },
+      {
+        "source": "Plugins/remote-operation/Web/remote.js",
+        "destination": "Web/remote.js"
+      },
+      {
+        "source": "Plugins/remote-operation/Web/transport.js",
+        "destination": "Web/transport.js"
+      }
+    ],
+    "astro-archive-plugin-shared-archives": [
+      {
+        "source": "Plugins/shared-archives/.gitignore",
+        "destination": ".gitignore"
+      },
+      {
+        "source": "Plugins/shared-archives/host.ps1",
+        "destination": "host.ps1"
+      },
+      {
+        "source": "Plugins/shared-archives/LICENSE-STATUS.md",
+        "destination": "LICENSE-STATUS.md"
+      },
+      {
+        "source": "Plugins/shared-archives/logo.png",
+        "destination": "logo.png"
+      },
+      {
+        "source": "Plugins/shared-archives/main.py",
+        "destination": "main.py"
+      },
+      {
+        "source": "Plugins/shared-archives/plugin.json",
+        "destination": "plugin.json"
+      },
+      {
+        "source": "Plugins/shared-archives/README.md",
+        "destination": "README.md"
+      },
+      {
+        "source": "Plugins/shared-archives/validation.py",
+        "destination": "validation.py"
+      },
+      {
+        "source": "Plugins/shared-archives/windows.py",
+        "destination": "windows.py"
+      }
+    ],
+    "astro-archive-plugin-siril-auto": [
+      {
+        "source": "Plugins/siril-auto/.gitignore",
+        "destination": ".gitignore"
+      },
+      {
+        "source": "Plugins/siril-auto/engine.py",
+        "destination": "engine.py"
+      },
+      {
+        "source": "Plugins/siril-auto/LICENSE-STATUS.md",
+        "destination": "LICENSE-STATUS.md"
+      },
+      {
+        "source": "Plugins/siril-auto/logo.png",
+        "destination": "logo.png"
+      },
+      {
+        "source": "Plugins/siril-auto/logo.svg",
+        "destination": "logo.svg"
+      },
+      {
+        "source": "Plugins/siril-auto/main.py",
+        "destination": "main.py"
+      },
+      {
+        "source": "Plugins/siril-auto/NOTICE.txt",
+        "destination": "NOTICE.txt"
+      },
+      {
+        "source": "Plugins/siril-auto/plugin.json",
+        "destination": "plugin.json"
+      },
+      {
+        "source": "Plugins/siril-auto/README.md",
+        "destination": "README.md"
+      },
+      {
+        "source": "Plugins/siril-auto/Siril-GPLv3.txt",
+        "destination": "Siril-GPLv3.txt"
+      }
+    ]
+  }
+}

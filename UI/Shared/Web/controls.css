@@ -1,0 +1,172 @@
+/* Shared controls. Theme tokens and native semantics stay authoritative. */
+:root {
+  --control-radius: 11px;
+  --control-ease: cubic-bezier(.2,.8,.2,1);
+}
+:where(.aa-button) {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.aa-button:not(.activity-button):not(.island-resize):not(.island-move) {
+  border-radius: var(--control-radius);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent),
+    0 2px 6px color-mix(in srgb, var(--background) 24%, transparent);
+  transition: background-color 180ms var(--control-ease), border-color 180ms var(--control-ease),
+    color 180ms var(--control-ease), box-shadow 220ms var(--control-ease),
+    translate 220ms var(--control-ease), scale 160ms var(--control-ease);
+}
+.aa-button::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(125deg, color-mix(in srgb, var(--accent) 10%, transparent), transparent 64%);
+  opacity: 0;
+  transition: opacity 180ms var(--control-ease);
+}
+.aa-button:is(.quiet-button,.icon-button):not(.activity-button) {
+  background-image: linear-gradient(150deg, var(--surface-raised), var(--surface));
+}
+.aa-button.primary-button {
+  background-image: linear-gradient(145deg, color-mix(in srgb, var(--accent) 88%, var(--text)), var(--accent));
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--text));
+  font-weight: 650;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 20%, transparent),
+    0 4px 15px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.aa-button:is(.theme-card,.flow-card,.archive-nav-item) { border-radius: 14px; }
+.aa-button:is(.text-button,.row-action,.flow-back), #breadcrumbs .aa-button {
+  box-shadow: none;
+  border-radius: 5px;
+}
+.aa-button:is([aria-pressed="true"],[aria-selected="true"]) {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.aa-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.aa-button:not(:disabled):not([aria-disabled="true"]):not(.island-move):not(.island-resize):active {
+  scale: .97;
+  translate: 0 1px;
+}
+.aa-button:disabled, .aa-button[aria-disabled="true"] {
+  box-shadow: none;
+  scale: none;
+  translate: none;
+}
+.aa-button:disabled::before, .aa-button[aria-disabled="true"]::before { opacity: 0; }
+.aa-button .app-icon, .aa-button.archive-refresh-button svg {
+  transition: scale 220ms var(--control-ease), rotate 260ms var(--control-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .aa-button:not(:disabled):not([aria-disabled="true"]):not(.island-move):not(.island-resize):hover {
+    translate: 0 -1px;
+    border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 9%, transparent),
+      0 5px 15px color-mix(in srgb, var(--background) 30%, transparent);
+  }
+  .aa-button:not(:disabled):hover::before { opacity: 1; }
+  .aa-button:not(:disabled):hover .app-icon { scale: 1.07; }
+  .aa-button.archive-refresh-button:not(:disabled):hover svg { rotate: 22deg; }
+  .aa-button.primary-button:not(:disabled):hover {
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 20%, transparent),
+      0 5px 19px color-mix(in srgb, var(--accent) 23%, transparent);
+  }
+  .aa-button[data-tone="error"]:not(:disabled):hover {
+    border-color: var(--error); color: var(--error); background-color: var(--error-surface);
+  }
+}
+.aa-button-ripple {
+  position: absolute; pointer-events: none; z-index: 2;
+  width: var(--ripple-size); height: var(--ripple-size);
+  left: var(--ripple-left); top: var(--ripple-top);
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, currentColor 22%, transparent), transparent 70%);
+  opacity: 0;
+}
+/* One real indicator per group, independent of the labels and active state. */
+.aa-slider-group { position: relative; isolation: isolate; }
+.aa-route-indicator {
+  position: absolute; pointer-events: none; z-index: 0;
+  border-radius: 11px;
+  border: 1px solid color-mix(in srgb, var(--accent) 36%, var(--border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 13%, var(--accent-surface)), var(--accent-surface));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 10%, transparent),
+    0 3px 10px color-mix(in srgb, var(--background) 24%, transparent);
+  transform-origin: 0 50%;
+}
+.aa-slider-group > .aa-button {
+  position: relative; z-index: 1;
+  box-shadow: none !important; border-color: transparent !important; translate: none !important;
+}
+.aa-slider-group > .aa-button:not(.activity-button) {
+  background: transparent; box-shadow: none; border-color: transparent;
+}
+.aa-slider-group > .aa-button:is([aria-current="page"],[aria-selected="true"],[aria-pressed="true"]) {
+  color: var(--accent); background: transparent; box-shadow: none; border-color: transparent;
+}
+.aa-slider-group > .aa-button:hover:not(:disabled) {
+  translate: none; box-shadow: none; border-color: transparent;
+}
+.aa-slider-group > .aa-button:not(:disabled):active { translate: none; scale: .985; }
+.navigation.aa-slider-group {
+  gap: 4px; padding: 5px; border-radius: 16px;
+  background: linear-gradient(150deg, var(--surface), var(--background));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 5%, transparent);
+}
+.navigation.aa-slider-group > button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 42px; min-width: 0; padding: 9px 18px;
+  border-radius: 11px; font-weight: 600;
+}
+.navigation.aa-slider-group > button::before {
+  position: static; inset: auto; flex: none; content: ""; display: block;
+  width: 18px; height: 18px; border-radius: 0; opacity: .78;
+  background: currentColor; mask: var(--route-icon) center / contain no-repeat;
+}
+.navigation [data-route="archive"] { --route-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='5' rx='1.5'/%3E%3Cpath d='M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9m-10 4h6'/%3E%3C/svg%3E"); }
+.navigation [data-route="analysis"] { --route-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 4v16h16M7 14l4-5 4 3 5-7'/%3E%3Ccircle cx='11' cy='9' r='1'/%3E%3C/svg%3E"); }
+.navigation [data-route="preparation"] { --route-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m12 3 9 5-9 5-9-5Zm-8 9 8 5 8-5M4 16l8 5 8-5'/%3E%3C/svg%3E"); }
+/* A short, distinct gesture for each section; the existing slider keeps its own motion. */
+@keyframes aa-archive-gesture {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  35% { transform: translateY(-2px) rotate(-7deg); }
+  65% { transform: translateY(1px) rotate(4deg); }
+}
+@keyframes aa-analysis-gesture {
+  0% { transform: scale(.82) translateY(2px); opacity: .55; }
+  60% { transform: scale(1.16) translateY(-1px); opacity: 1; }
+  100% { transform: scale(1) translateY(0); }
+}
+@keyframes aa-preparation-gesture {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  35% { transform: translateY(-3px) rotate(6deg); }
+  70% { transform: translateY(1px) rotate(-3deg); }
+}
+.navigation [data-route="archive"][aria-current="page"]::before { animation: aa-archive-gesture .58s cubic-bezier(.2,.7,.2,1); }
+.navigation [data-route="analysis"][aria-current="page"]::before { animation: aa-analysis-gesture .58s cubic-bezier(.2,.7,.2,1); }
+.navigation [data-route="preparation"][aria-current="page"]::before { animation: aa-preparation-gesture .65s cubic-bezier(.2,.7,.2,1); }
+@media (hover: hover) {
+  .navigation [data-route="archive"]:not([aria-current]):hover::before { animation: aa-archive-gesture .58s cubic-bezier(.2,.7,.2,1); }
+  .navigation [data-route="analysis"]:not([aria-current]):hover::before { animation: aa-analysis-gesture .58s cubic-bezier(.2,.7,.2,1); }
+  .navigation [data-route="preparation"]:not([aria-current]):hover::before { animation: aa-preparation-gesture .65s cubic-bezier(.2,.7,.2,1); }
+}
+.activity-button.aa-button { overflow: visible; }
+.activity-button.aa-button::before { content: none; }
+@media (max-width: 760px) { .navigation.aa-slider-group > button { padding: 9px 10px; gap: 6px; } }
+@media (max-width: 450px) {
+  .navigation.aa-slider-group > button { padding-inline: 7px; font-size: 12px; }
+  .navigation.aa-slider-group > button::before { display: none; }
+}
+:root[data-animations="off"] .aa-button { translate: none !important; scale: none !important; }
+:root[data-animations="off"] .aa-button .app-icon,
+:root[data-animations="off"] .aa-button.archive-refresh-button svg { scale: none !important; rotate: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .aa-button { translate: none !important; scale: none !important; }
+  .aa-button .app-icon, .aa-button.archive-refresh-button svg { scale: none !important; rotate: none !important; }
+}

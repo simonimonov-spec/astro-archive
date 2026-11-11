@@ -1,0 +1,17 @@
+{
+  "apiVersion": 1,
+  "id": "sample-tools",
+  "name": "Sample Tools",
+  "version": "1.0.0",
+  "description": "Пример за отделен плъгин с полета, таблица, диаграма и запазени настройки.",
+  "author": "Astro Archive SDK",
+  "entry": "main.py",
+  "permissions": [],
+  "contributions": [
+    {
+      "id": "sample-panel",
+      "slot": "analysis",
+      "title": "Примерен плъгин"
+    }
+  ]
+}

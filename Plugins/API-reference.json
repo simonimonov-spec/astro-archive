@@ -1,0 +1,101 @@
+{
+  "apiVersion": 1,
+  "entry": "setup(context) -> cleanup",
+  "slots": [
+    "archive",
+    "analysis",
+    "analysis-tools",
+    "preparation",
+    "settings",
+    "customization",
+    "header",
+    "viewer-tools",
+    "preparation-activity"
+  ],
+  "clients": [
+    "desktop",
+    "remote"
+  ],
+  "controls": [
+    "text",
+    "metric",
+    "input",
+    "number",
+    "checkbox",
+    "select",
+    "button",
+    "group",
+    "table",
+    "list",
+    "chart",
+    "console",
+    "image",
+    "textarea"
+  ],
+  "tones": [
+    "normal",
+    "primary",
+    "success",
+    "warning",
+    "error"
+  ],
+  "sdk": [
+    "command",
+    "publish",
+    "settings",
+    "save_settings",
+    "storage",
+    "host",
+    "capability",
+    "task",
+    "processing",
+    "remote",
+    "archives",
+    "inspection"
+  ],
+  "example": ".examples/sample-tools",
+  "documentation": "API.md",
+  "archiveAdapter": {
+    "permission": "archive.manage",
+    "operations": [
+      "list",
+      "register",
+      "choose",
+      "attach",
+      "detach",
+      "refresh",
+      "hold",
+      "choose-file"
+    ]
+  },
+  "inspectionAdapter": {
+    "permission": "analysis.inspect",
+    "operations": [
+      "source",
+      "archives",
+      "selection",
+      "prepare",
+      "register",
+      "sample",
+      "warp",
+      "limits",
+      "show",
+      "annotate"
+    ]
+  },
+  "viewerContext": {
+    "ids": "Current catalog ID, when archived",
+    "viewerId": "Opaque ID of an already opened viewer",
+    "stage": "viewer"
+  },
+  "preparationNavigation": {
+    "openContribution": "Same-plugin approved preparation contribution ID",
+    "returnToPreparation": "true plus taskId: return to initial picker only after successful task completion",
+    "order": "Contribution integer -1000..1000; preparation cards sorted ascending"
+  },
+  "textArea": {
+    "maxLength": 64000,
+    "plainTextOnly": true,
+    "autosave": true
+  }
+}

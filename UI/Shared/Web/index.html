@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="only dark">
+  <meta name="theme-color" content="#0c111a">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'self'">
+  <title>Astro Archive</title>
+  <link rel="icon" type="image/x-icon" href="Assets/AstroArchive.ico">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="appearance.css">
+  <link rel="stylesheet" href="activity.css">
+  <link rel="stylesheet" href="functions.css">
+  <link rel="stylesheet" href="extensions.css">
+  <link rel="stylesheet" href="declarative.css">
+  <link rel="stylesheet" href="monitoring.css">
+  <link rel="stylesheet" href="customization.css">
+  <link rel="stylesheet" href="Archive/navigation.css">
+  <link rel="stylesheet" href="Analysis/analysis.css">
+  <link rel="stylesheet" href="Analysis/viewer.css">
+  <link rel="stylesheet" href="python/python.css">
+  <link rel="stylesheet" href="islands.css">
+  <link rel="stylesheet" href="workflow-ui.css">
+  <link rel="stylesheet" href="controls.css">
+  <link rel="stylesheet" href="header.css">
+  <script src="python/transport.js"></script>
+  <script src="i18n.js" defer></script>
+  <script src="icons.js" defer></script>
+  <script src="plugin-browser.js" defer></script>
+  <script src="activity.js" defer></script>
+  <script src="preferences.js" defer></script>
+  <script src="appearance.js" defer></script>
+  <script src="Analysis/metrics.js" defer></script>
+  <script src="Analysis/quality-score.js" defer></script>
+  <script src="customization.js" defer></script>
+  <script src="customization-layout.js" defer></script>
+  <script src="functions.js" defer></script>
+  <script src="charts.js" defer></script>
+  <script src="session.js" defer></script>
+  <script src="workflow-ui.js" defer></script>
+  <script src="Analysis/quality-chart.js" defer></script>
+  <script src="Analysis/coverage-view.js" defer></script>
+  <script src="Analysis/analysis.js" defer></script>
+  <script src="Analysis/workbench.js" defer></script>
+  <script src="Analysis/frame-list.js" defer></script>
+  <script src="Analysis/viewer.js" defer></script>
+  <script src="Processing/preparation.js" defer></script>
+  <script src="extensions.js" defer></script>
+  <script src="monitoring.js" defer></script>
+  <script src="Archive/navigation.js" defer></script>
+  <script src="archive-rows.js" defer></script>
+  <script src="python/archive-editor.js" defer></script>
+  <script src="islands.js" defer></script>
+  <script src="controls.js" defer></script>
+  <script src="header.js" defer></script>
+  <script src="app.js" defer></script>
+  <script src="python/dashboard.js" defer></script>
+</head>
+<body>
+  <div class="background-layer" aria-hidden="true"><img id="background-image" alt="" hidden><div class="background-shade"></div></div>
+  <a class="skip-link" href="#main">Към съдържанието</a>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <button type="button" id="activity-button" class="activity-button" data-state="idle" aria-haspopup="dialog" aria-expanded="false" aria-controls="activity-popover" aria-label="Състояние и дневници">
+          <svg viewBox="0 0 72 72" aria-hidden="true"><circle class="activity-track outer" cx="36" cy="36" r="31"/><circle id="activity-total-ring" class="activity-ring outer" cx="36" cy="36" r="31"/><circle class="activity-track inner" cx="36" cy="36" r="24"/><circle id="activity-step-ring" class="activity-ring inner" cx="36" cy="36" r="24"/><circle class="activity-idle-dot" cx="36" cy="36" r="6"/><g class="activity-gear"><path d="M36.00 24.60L38.93 21.29L41.74 22.14L42.33 26.52L44.06 27.94L48.47 27.67L49.86 30.26L47.18 33.78L47.40 36.00L50.71 38.93L49.86 41.74L45.48 42.33L44.06 44.06L44.33 48.47L41.74 49.86L38.22 47.18L36.00 47.40L33.07 50.71L30.26 49.86L29.67 45.48L27.94 44.06L23.53 44.33L22.14 41.74L24.82 38.22L24.60 36.00L21.29 33.07L22.14 30.26L26.52 29.67L27.94 27.94L27.67 23.53L30.26 22.14L33.78 24.82Z"/><circle cx="36" cy="36" r="5.5"/></g><path class="activity-check" d="m25 36 8 8 15-17"/><path class="activity-cross" d="m28 28 16 16m0-16L28 44"/></svg>
+          <span class="activity-alert" aria-hidden="true">!</span>
+        </button>
+        <img class="brand-logo" src="Assets/AstroArchive.ico" alt="" width="42" height="42"><div><strong>Astro Archive</strong><small id="activity-caption">Готово за работа</small></div>
+      </div>
+      <section id="resource-monitor" class="resource-monitor" aria-label="Място на архивния диск"></section>
+      <nav class="navigation" aria-label="Основни функции">
+        <button type="button" data-route="archive" aria-current="page">Архив</button>
+        <button type="button" data-route="analysis">Анализ</button>
+        <button type="button" data-route="preparation">Подготовка</button>
+      </nav>
+      <button type="button" class="quiet-button settings-button" id="settings-open">Настройки <span aria-hidden="true">⚙</span></button>
+    </header>
+
+    <aside id="pending-archive-notice" class="pending-archive-notice" role="status" hidden><div><strong id="pending-archive-title"></strong><p id="pending-archive-description"></p><small id="pending-archive-path"></small></div><button type="button" id="pending-archive-open" class="quiet-button">Отвори запазените файлове ↗</button></aside>
+    <main id="main" tabindex="-1">
+      <section id="page-archive" class="page" aria-labelledby="archive-heading">
+        <div class="page-heading"><div><p class="eyebrow">БИБЛИОТЕКА</p><h1 id="archive-heading">Архив</h1><p class="subtitle">Кадри, стакове и готови снимки на едно място.</p></div><div class="archive-actions"><label class="checkbox-field"><input type="checkbox" id="archive-only-frames" checked><span data-i18n="archive.onlyFrames">Само кадри</span></label><button type="button" id="archive-import" class="primary-button" data-i18n="archive.import" aria-haspopup="menu" aria-expanded="false" aria-controls="archive-import-menu">Внеси… ▾</button><button type="button" id="refresh" class="quiet-button archive-refresh-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.6-2.2L20 8M4 16l2.3 3.2A7 7 0 0 0 17.9 17"/></svg><span>Обнови</span></button></div></div>
+        <div class="archive-layout">
+          <aside class="panel archive-sidebar" aria-label="Избор на архив">
+            <div class="archive-navigation-heading"><div class="archive-navigation-title"><span id="archive-nav-icon" hidden></span><h2 id="archive-nav-title">Моите архиви</h2><span id="archive-root-count" class="muted">03</span></div><p id="archive-nav-level"></p><div class="archive-navigation-controls"><button type="button" id="archive-nav-back" class="text-button" hidden>← Назад</button><button type="button" id="archive-nav-home" class="text-button" hidden>Всички архиви</button></div></div>
+            <nav id="archive-roots" class="roots archive-navigation-list" aria-label="Навигация в архивите"></nav>
+            <section id="folder-summary" class="folder-summary" aria-label="Кадри и обща експозиция на избраната папка">
+              <span class="eyebrow" id="summary-heading">ИЗБРАНА ПАПКА</span><strong id="summary-folder">Избери папка</strong>
+              <div class="summary-stat"><span id="summary-frames-label">Кадри</span><strong id="summary-frames">—</strong></div>
+              <div class="summary-stat"><div class="summary-stat-heading"><span id="summary-exposure-label">Обща експозиция</span></div><strong id="summary-exposure">—</strong></div>
+              <small id="summary-state"></small>
+            </section>
+          </aside>
+
+          <section class="panel content-panel" aria-label="Съдържание на папката">
+            <div class="content-toolbar"><nav id="breadcrumbs" aria-label="Текуща папка"></nav><label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Търси в тази папка…" maxlength="120" aria-label="Търси в текущата папка"></label></div>
+            <div id="archive-filter-summary" class="archive-filter-summary" aria-label="Избрани филтри" hidden></div>
+            <div class="folder-description"><span id="folder-path">Избери архив</span><span id="loading" class="loading-label" hidden>Зареждане…</span></div>
+            <div id="error-banner" class="error-banner" role="alert" hidden></div>
+            <div class="table-scroll">
+              <table><thead><tr><th scope="col">Име</th><th scope="col">Тип</th><th scope="col">Размер</th><th scope="col">Променен</th><th scope="col"><span class="sr-only">Действия</span></th></tr></thead><tbody id="files"></tbody></table>
+              <div id="empty" class="empty-state"><div class="empty-orbit" aria-hidden="true">◎</div><h2>Място за твоите наблюдения</h2><p id="empty-message">Зареждане на запазените места за архивите…</p><button type="button" data-storage-settings class="quiet-button" data-i18n="settings.storage">Папки и програми…</button></div>
+            </div>
+            <footer class="table-footer"><span id="folder-counts">Само съдържанието на избраната папка</span><div class="pagination"><span id="page-label"></span><button type="button" id="previous" class="icon-button" aria-label="Предишна страница" disabled>←</button><button type="button" id="next" class="icon-button" aria-label="Следваща страница" disabled>→</button></div></footer>
+          </section>
+        </div>
+      </section>
+
+      <section id="page-analysis" class="page" aria-labelledby="analysis-heading" hidden>
+        <div class="page-heading"><div><p class="eyebrow">КАЧЕСТВО НА НАБЛЮДЕНИЯТА</p><h1 id="analysis-heading">Анализ</h1><p class="subtitle">Измервания, диаграми и сравнение на вечерите.</p></div><span id="analysis-loader" class="function-loader" role="status" hidden><span class="function-spinner" aria-hidden="true"></span><span>Зареждане на изгледа…</span></span></div>
+        <div id="analysis-problem" class="error-banner function-error" role="alert" hidden></div><div id="analysis-content" class="function-content"></div>
+      </section>
+
+      <section id="page-preparation" class="page" aria-labelledby="preparation-heading" hidden>
+        <div class="page-heading"><div><p class="eyebrow">РАБОТЕН ПОТОК</p><h1 id="preparation-heading">Подготовка за обработване</h1><p class="subtitle">Подбор, опашка и връщане на резултатите.</p></div><span id="preparation-loader" class="function-loader" role="status" hidden><span class="function-spinner" aria-hidden="true"></span><span>Зареждане на изгледа…</span></span></div>
+        <div id="preparation-problem" class="error-banner function-error" role="alert" hidden></div><div id="preparation-content" class="function-content"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <dialog id="settings-dialog" aria-labelledby="settings-heading">
+    <div class="panel-heading"><h2 id="settings-heading" data-i18n="settings.title">Настройки</h2><button type="button" class="icon-button" id="settings-close" data-i18n-aria-label="settings.close" aria-label="Затвори настройките">×</button></div>
+    <nav class="settings-tabs" role="tablist" data-i18n-aria-label="settings.sections" aria-label="Раздели на настройките">
+      <button type="button" id="settings-tab-appearance" role="tab" aria-selected="true" aria-controls="settings-panel-appearance" data-settings-tab="appearance" data-i18n="settings.appearance">Външен вид</button>
+      <button type="button" id="settings-tab-customization" role="tab" aria-selected="false" aria-controls="settings-panel-customization" tabindex="-1" data-settings-tab="customization" data-i18n="settings.customization">Къстамизация</button>
+      <button type="button" id="settings-tab-plugins" role="tab" aria-selected="false" aria-controls="settings-panel-plugins" tabindex="-1" data-settings-tab="plugins" data-i18n="plugins.title">Плъгини</button>
+      <button type="button" id="settings-tab-language" role="tab" aria-selected="false" aria-controls="settings-panel-language" tabindex="-1" data-settings-tab="language" data-i18n="settings.languageTab">Език</button>
+      <button type="button" id="settings-tab-diagnostics" role="tab" aria-selected="false" aria-controls="settings-panel-diagnostics" tabindex="-1" data-settings-tab="diagnostics" data-i18n="diagnostics.title">Диагностика</button>
+    </nav>
+    <div class="settings-body">
+      <p id="settings-message" role="status" hidden></p>
+      <section id="settings-panel-appearance" class="settings-section" role="tabpanel" aria-labelledby="settings-tab-appearance">
+        <h3 id="appearance-heading" data-i18n="settings.appearance">Външен вид</h3>
+        <label class="settings-field"><span data-i18n="settings.theme">Тема</span><select id="ui-theme"></select></label>
+        <div id="appearance-themes" class="appearance-themes" aria-label="Теми"></div>
+        <p class="settings-note" id="appearance-shared-note"></p>
+        <p class="settings-note" id="appearance-browser-note" hidden></p>
+        <section id="appearance-custom" class="appearance-box" hidden><h4 id="appearance-custom-title"></h4><p class="settings-note" id="appearance-custom-note"></p><div id="appearance-colors" class="appearance-colors"></div><button type="button" class="quiet-button" id="appearance-custom-reset"></button></section>
+        <section id="appearance-red" class="appearance-box" hidden><label class="checkbox-field"><input id="appearance-tint" type="checkbox"><span id="appearance-tint-label"></span></label><p class="settings-note" id="appearance-red-note"></p></section>
+        <label class="settings-field"><span data-i18n="settings.background">Фон</span><select id="ui-background-mode"><option value="theme" data-i18n="settings.modeTheme">Фон от темата</option><option value="color" data-i18n="settings.modeColor">Собствен цвят</option><option value="image" data-i18n="settings.modeImage">Собствена снимка</option></select></label>
+        <div id="ui-color-options" hidden><label class="settings-field"><span data-i18n="settings.color">Цвят на фона</span><span class="color-fields"><input type="color" id="ui-background-color" value="#0c111a" data-i18n-aria-label="settings.color" aria-label="Цвят на фона"><input type="text" id="ui-background-hex" value="#0c111a" maxlength="7" spellcheck="false" data-i18n-aria-label="settings.color" aria-label="Цвят на фона"></span></label></div>
+        <div id="ui-image-options" hidden><div class="image-choice"><button type="button" class="quiet-button" id="ui-choose-background" data-i18n="settings.chooseImage">Избери снимка…</button><span id="ui-image-state" class="muted"></span></div><p class="settings-note" data-i18n="settings.imageNote">PNG, JPEG или BMP. Копие до 2560 px; леко оцветяване пази четимостта.</p></div>
+        <label class="checkbox-field"><input type="checkbox" id="ui-animations" checked><span data-i18n="settings.animations">Плавни анимации</span></label>
+        <p class="settings-note" data-i18n="settings.motionNote">Зачита се и системната настройка за намалено движение.</p>
+        <p class="settings-note" data-i18n="settings.preview">Промените се виждат веднага. Запазват се с „Запази“.</p>
+        <button type="button" class="quiet-button" data-storage-settings data-i18n="settings.storage">Папки и програми…</button>
+      </section>
+      <section id="settings-panel-customization" class="settings-section" role="tabpanel" aria-labelledby="settings-tab-customization" hidden><div id="customization-editor"></div><section class="custom-block"><h3>Визуални настройки на плъгините</h3><p class="settings-note">Показват се само включени плъгини с разрешение за интерфейса. Настройките им се запазват отделно от общия изглед.</p><div id="custom-plugin-panels"></div></section></section>
+      <section id="settings-panel-language" class="settings-section" role="tabpanel" aria-labelledby="settings-tab-language" hidden>
+        <h3 data-i18n="settings.languageTab">Език</h3>
+        <label class="settings-field"><span data-i18n="settings.language">Език на новия интерфейс</span><select id="ui-language"></select></label>
+        <p class="settings-note" data-i18n="settings.languageNote">Старите C# екрани и оригиналните записи в дневника запазват своя език.</p>
+        <p class="settings-note" data-i18n="settings.preview">Промените се виждат веднага. Запазват се с „Запази“.</p>
+      </section>
+      <section id="settings-panel-plugins" class="settings-section" role="tabpanel" aria-labelledby="settings-tab-plugins" hidden>
+        <div class="plugins-heading"><h3 id="plugins-heading" data-i18n="plugins.title">Плъгини</h3><button type="button" class="quiet-button" id="ui-plugin-scan" data-i18n="plugins.scan">Провери папката</button><button type="button" class="quiet-button" id="ui-plugin-folder" data-i18n="plugins.folder">Папка на плъгините</button><button type="button" class="quiet-button" id="ui-plugin-install" data-i18n="plugins.install">Добави плъгин…</button></div>
+        <p class="settings-note" data-i18n="plugins.description">Теми, преводи и функционални модули. Всеки плъгин е в собствена подпапка на Plugins.</p>
+        <p id="ui-plugin-folder-path" class="settings-note plugin-folder-path"></p>
+        <p class="settings-note" data-i18n="plugins.immediate">Инсталирането, включването и премахването се запазват веднага. Външният вид се връща към запазените настройки.</p>
+        <p id="ui-plugin-scan-status" class="settings-note" role="status"></p>
+        <div class="plugin-browser">
+          <div id="ui-plugins" class="plugin-list" role="tablist" aria-orientation="vertical" data-i18n-aria-label="plugins.list" aria-label="Намерени плъгини"></div>
+          <section id="ui-plugin-details" class="plugin-details" role="tabpanel" aria-labelledby="plugins-heading"></section>
+        </div>
+        <details id="ui-plugin-problems" hidden><summary data-i18n="plugins.problems">Проблеми при зареждането</summary><ul id="ui-plugin-problem-list"></ul></details>
+      </section>
+      <section id="settings-panel-diagnostics" class="settings-section" role="tabpanel" aria-labelledby="settings-tab-diagnostics" hidden>
+        <div id="diagnostic-resources" class="diagnostic-resources"></div>
+        <div class="plugin-actions"><button type="button" class="quiet-button" id="diagnostics-restart" data-i18n="activity.restart">Рестартирай приложението</button></div>
+        <p class="settings-note" data-i18n="diagnostics.restartHint">Затваря и стартира отново цялото приложение и услугите му.</p>
+        <section id="archive-audit" class="archive-audit"><div class="archive-audit-heading"><h3 id="archive-audit-heading">Проверка на архивите</h3><button type="button" id="archive-audit-run" class="quiet-button">Провери и обнови архива</button><button type="button" id="archive-audit-stop" class="text-button" hidden>Спри безопасно</button></div><p id="archive-audit-scope" class="settings-note">Последователна проверка на FITS хедъри, размери, PNG структура и разположение. Обновява справочните файлове; оригиналите не се променят.</p><progress id="archive-audit-progress" max="100" hidden></progress><p id="archive-audit-status" class="settings-note">Няма извършена проверка.</p><button type="button" id="archive-audit-open" class="text-button" hidden>Покажи подробния отчет ↗</button><details id="archive-audit-issues" hidden><summary id="archive-audit-issues-title"></summary><ul id="archive-audit-issue-list"></ul></details></section>
+        <div class="plugins-heading"><h3 data-i18n="diagnostics.heading">Бъгове и дневници</h3><button type="button" class="quiet-button" id="diagnostics-folder" data-i18n="diagnostics.folder">Подробни лог файлове</button><button type="button" class="text-button" id="diagnostics-clear" data-i18n="journal.clear">Изчисти изгледа</button></div>
+        <div class="diary-filters" role="radiogroup" data-i18n-aria-label="diagnostics.choose" aria-label="Избери дневник">
+          <label><input type="radio" name="diagnostic-diary" value="archive" data-log-section checked><span data-i18n="nav.archive">Архив</span></label><label><input type="radio" name="diagnostic-diary" value="analysis" data-log-section><span data-i18n="nav.analysis">Анализ</span></label><label><input type="radio" name="diagnostic-diary" value="preparation" data-log-section><span data-i18n="nav.preparation">Подготовка</span></label>
+        </div>
+        <ol id="diagnostics-entries" class="activity-log-list" aria-label="Записи в избрания дневник"></ol>
+        <details class="legacy-debug"><summary data-i18n="diagnostics.legacy">Стар интерфейс · само за диагностика</summary><p class="settings-note" data-i18n="diagnostics.legacyNote">Помощен изглед за откриване на проблеми. Основните функции работят независимо от него.</p><div class="plugin-actions"><button type="button" class="quiet-button" data-debug-section="archive" data-i18n="nav.archive">Архив</button><button type="button" class="quiet-button" data-debug-section="analysis" data-i18n="nav.analysis">Анализ</button><button type="button" class="quiet-button" data-debug-section="preparation" data-i18n="nav.preparation">Подготовка</button></div></details>
+      </section>
+    </div>
+    <footer class="settings-footer"><button type="button" class="text-button" id="ui-reset" data-i18n="settings.reset">По подразбиране</button><button type="button" class="text-button" id="ui-layout-reset">Върни оригиналните места и размери</button><button type="button" class="quiet-button" id="ui-cancel" data-i18n="settings.cancel">Отказ</button><button type="button" class="primary-button" id="ui-save" data-i18n="settings.save">Запази</button></footer>
+  </dialog>
+  <aside id="activity-popover" class="activity-popover" role="dialog" aria-modal="false" aria-labelledby="activity-popover-title" hidden>
+    <header class="activity-popover-header"><div><p id="activity-popover-kind" class="eyebrow"></p><h2 id="activity-popover-title">Състояние и дневници</h2></div><button type="button" class="icon-button" id="activity-close" aria-label="Затвори балона">×</button></header>
+    <section id="activity-queue" class="activity-queue" hidden><h3 data-i18n="activity.queue">Активни задачи</h3><ol id="activity-task-list" class="activity-task-list"></ol></section>
+    <section id="activity-task" class="activity-task"><p id="activity-phase"></p><div class="activity-progress-row"><progress id="activity-progress" max="100"></progress><span id="activity-percent"></span></div><div id="activity-overall" hidden><div class="activity-progress-row"><progress id="activity-overall-progress" max="100"></progress><span id="activity-overall-percent"></span></div></div><small id="activity-time" class="muted"></small><p id="activity-detail" class="activity-detail"></p><p id="activity-problem" class="activity-problem" hidden></p></section>
+    <section id="activity-completion" hidden><p id="activity-completion-summary"></p><ul id="activity-completion-details"></ul></section>
+    <div id="activity-controls" class="activity-controls"><button type="button" id="activity-stop" class="quiet-button" data-i18n="activity.stop">Спри безопасно</button><button type="button" id="activity-abandon" class="quiet-button" data-i18n="activity.abandon" hidden>Прекрати задачата</button><button type="button" id="activity-restart" class="text-button" data-i18n="activity.restart" hidden>Рестартирай приложението</button></div>
+    <section id="activity-diary"><div class="diary-filters" role="radiogroup" data-i18n-aria-label="diagnostics.choose" aria-label="Избери дневник"><label><input type="radio" name="popup-diary" value="archive" data-log-section checked><span data-i18n="nav.archive">Архив</span></label><label><input type="radio" name="popup-diary" value="analysis" data-log-section><span data-i18n="nav.analysis">Анализ</span></label><label><input type="radio" name="popup-diary" value="preparation" data-log-section><span data-i18n="nav.preparation">Подготовка</span></label></div><ol id="activity-log-entries" class="activity-log-list"></ol></section>
+    <footer class="activity-popover-footer"><button type="button" class="text-button" id="activity-open-diagnostics" data-i18n="diagnostics.open">Отвори Диагностика</button><button type="button" class="text-button" id="activity-show-diary" data-i18n="activity.showDiary" hidden>Покажи дневника</button></footer>
+  </aside>
+  <div id="announcements" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>

@@ -1,0 +1,120 @@
+/* Independent registration plot and bounded detection controls. */
+.quality-detector{padding:14px 18px;margin-top:20px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.quality-detector summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--accent);padding:5px 0}
+.quality-detector-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;padding-top:18px}
+#q-plot-panel{position:relative}#q-chart{touch-action:none;cursor:crosshair}
+.quality-plot-tooltip{position:absolute;z-index:10;max-width:min(340px,80%);padding:12px 15px;pointer-events:none;border:1px solid var(--accent);border-radius:9px;background:var(--surface-raised);color:var(--text);box-shadow:0 8px 24px #0005;font-size:11px;line-height:1.7;white-space:pre-line;overflow-wrap:anywhere}
+#q-measurement-note{font-size:11px;line-height:1.7}#q-legend{gap:12px;line-height:1.7}
+@media(max-width:750px){.quality-detector-grid{grid-template-columns:1fr 1fr}.flow-analysis-plot{padding:12px}.quality-plot-tooltip{font-size:10px}}
+
+#q-result-source{display:block;margin:5px 0;line-height:1.5}#q-result-count{display:block}
+
+/* Generic plugin tools stay alongside the live chart. */
+.analysis-plugin-tool .extension-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.analysis-plugin-tool .extension-heading h2{font-size:14px;margin:0}.analysis-plugin-tool .extension-heading .eyebrow{font-size:9px}
+.analysis-plugin-tool .extension-heading p{display:none}.analysis-plugin-tool .extension-logo{width:25px;height:25px}
+.analysis-plugin-tool .extension-grid{grid-template-columns:minmax(0,1fr);gap:10px}.analysis-plugin-tool .extension-control{min-width:0}
+.analysis-plugin-tool .extension-control p{font-size:11px;line-height:1.7;margin:0}.analysis-plugin-tool button{width:100%}
+#q-return-table{margin-top:18px}#q-approve{border-color:var(--accent)}
+
+/* A compact chart workbench; each tool page has a short independent purpose. */
+#q-tools-panel{max-height:none;overflow:visible;scrollbar-gutter:auto;position:sticky;top:110px;padding:18px}
+#q-tools-panel>.flow-back{margin-bottom:12px}#q-tools-panel .flow-tool-group{margin-top:12px;padding-top:12px}
+#q-tool-tabs{display:flex;gap:3px;margin-bottom:16px;padding:4px;min-width:0;flex-wrap:wrap}
+#q-tool-tabs>button{flex:1;min-width:0;padding:8px 5px;font-size:11px;white-space:nowrap}
+.chart-tool-panels>[data-tool-panel]{display:grid;gap:12px;min-width:0}.chart-tool-panels>[hidden]{display:none!important}
+#q-chart-tools[hidden]{display:none!important}#q-chart-tools{margin:0!important;padding:0!important;border:0!important}
+.chart-scope-bar{display:flex;align-items:end;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding:14px 0;margin-bottom:12px}
+.chart-scope-bar .function-field{min-width:135px;flex:1}.chart-scope-bar .checkbox-field{padding:8px 0;font-size:11px}
+#q-plot-panel .flow-view-buttons{display:flex;gap:3px;flex-wrap:nowrap;padding:4px}
+#q-plot-panel .flow-view-buttons>button{padding:9px 13px;font-size:12px;min-width:0;white-space:nowrap}
+#q-chart{width:100%;height:auto!important;aspect-ratio:1;min-height:0!important;max-height:none;margin:0;display:block}
+.chart-zoom-controls{display:grid;grid-template-columns:1fr 1fr;gap:7px}.chart-zoom-controls h3,.chart-zoom-controls select{grid-column:1/-1}.chart-zoom-controls button{font-size:11px;padding:9px 6px}
+#q-tools-panel #q-decision-tools .function-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+#q-tools-panel #q-decision-tools button{font-size:11px;padding:9px 7px;min-width:0}
+.advanced-unlock{padding-top:14px;border-top:1px solid var(--border);margin-top:14px;font-size:11px}
+#q-workspace .analysis-finish-bar{grid-column:1/-1;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:12px}
+.analysis-finish-bar>small{flex:1;min-width:180px;font-size:10px;color:var(--muted);line-height:1.6}.analysis-finish-bar button{font-size:11px}
+#q-plot-panel.chart-maximized{position:fixed;inset:12px;z-index:80;overflow:auto;box-shadow:0 10px 90px #000b}
+#q-plot-panel.chart-maximized #q-chart{width:min(100%,calc(100vh - 160px));height:auto!important;aspect-ratio:1;margin:0 auto}
+.coverage-view-tabs{display:flex;gap:3px;flex-wrap:wrap;margin:12px 0}.coverage-view-tabs>button{font-size:11px;padding:9px 12px}
+#q-map{display:block;width:100%;height:auto;max-height:65vh;object-fit:contain;aspect-ratio:auto}
+.cover-adjustments .function-field,.cover-compare-labels{display:none}
+#q-map-area[data-mode=overlay] .cover-alpha,#q-map-area[data-mode=low] .cover-low{display:grid;max-width:480px;margin:10px 0}
+#q-map-area[data-mode=compare] .cover-compare-labels{display:grid;grid-template-columns:1fr 1fr;text-align:center;color:var(--muted);font-size:11px}
+@media(max-width:750px){#q-tools-panel{position:static;top:auto}#q-chart{width:100%;height:auto!important;aspect-ratio:1}.chart-scope-bar .function-field{min-width:100px}#q-plot-panel .flow-result-heading{align-items:start;gap:10px}#q-plot-panel .flow-view-buttons>button{padding:8px 10px;font-size:11px}#q-workspace .analysis-finish-bar{flex-direction:column;align-items:stretch}.analysis-finish-bar>small{flex:auto;min-width:0}}
+#q-tools-panel{gap:10px}#q-tools-panel p,#q-tools-panel label{margin:0}#q-tools-panel .flow-tool-group{gap:8px;padding-bottom:10px;margin-top:6px;padding-top:6px}
+#q-tools-panel .py-notice{font-size:10px;line-height:1.5;padding:8px;margin:2px 0}#q-tools-panel h3{font-size:12px;margin:0 0 5px}
+#q-tools-panel .function-field select,#q-zoom-night{height:37px;box-sizing:border-box;padding:8px 10px;background:var(--background);color:var(--text);border:1px solid var(--border);border-radius:9px;width:100%;font:inherit;font-size:11px}
+#q-tools-panel .advanced-unlock{margin-top:0;padding-top:10px;font-size:10px}.chart-tool-panels>[data-tool-panel]{gap:9px}
+#q-exit-max{display:none}#q-plot-panel.chart-maximized #q-exit-max{display:inline-flex}
+
+#q-tools-panel .function-field{gap:5px}#q-tools-panel .chart-zoom-controls{gap:6px}#q-tools-panel .function-note{font-size:10px;line-height:1.5}
+
+/* The chart fills its panel; saved analyses and comparison stay compact. */
+.flow-analysis-workspace{grid-template-columns:minmax(0,1fr) 280px;gap:10px}
+#q-workspace.flow-analysis-workspace{grid-template-columns:minmax(0,1fr) 280px;gap:10px}
+#q-plot-panel{padding:10px 12px 8px;min-width:0}
+#q-plot-panel .flow-result-heading{padding:0 0 10px;align-items:flex-start;gap:12px}
+#q-legend{padding-top:6px}
+.q-source-switch{display:flex;gap:4px;max-width:560px;margin:0 auto 16px;padding:4px;border:1px solid var(--border);border-radius:11px;background:var(--surface)}
+.q-source-switch>button{flex:1;padding:10px 14px;font-size:12px;border:0;border-radius:8px;background:transparent;color:var(--muted)}
+.q-source-switch>button[aria-pressed=true]{background:var(--accent-surface);color:var(--accent);font-weight:650}
+.q-saved-panel{display:grid;gap:10px;max-width:1180px;margin:0 auto;padding:20px 22px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.q-saved-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.q-saved-heading h2{font-size:19px;margin:0}
+.q-saved-name{display:grid;gap:4px;min-width:0}
+.q-saved-name strong{overflow-wrap:anywhere}.q-saved-name small{color:var(--muted);font-size:10px;line-height:1.4}
+.q-compare-box{display:grid;gap:12px;margin:18px 0;padding:16px 18px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.q-compare-box h3{font-size:14px;margin:0}.q-compare-box .function-note{margin:0}
+@media(max-width:1050px){#q-workspace.flow-analysis-workspace{grid-template-columns:minmax(0,1fr) 270px}}
+@media(max-width:750px){#q-workspace.flow-analysis-workspace{grid-template-columns:1fr}#q-plot-panel{padding:12px}.q-source-switch{max-width:none}}
+
+/* Analysis tools on the left; the square chart remains visible on the right. */
+#q-workspace.flow-analysis-workspace{grid-template-columns:minmax(240px,300px) minmax(0,1fr);grid-template-areas:'tools plot';align-items:start}
+#q-tools-panel{grid-area:tools;position:sticky;top:12px;max-height:max(220px,calc(100vh - 230px));overflow:hidden;min-width:0;display:flex;flex-direction:column}
+#q-tools-panel>.chart-tool-panels{min-height:0;overflow:auto;flex:1;scrollbar-gutter:stable}
+#q-tools-panel .chart-scope-bar{display:grid;grid-template-columns:1fr;align-items:stretch;gap:8px}
+#q-plot-panel{grid-area:plot;position:sticky;top:12px;min-width:0}
+#q-plot-panel #q-chart{display:block;width:min(100%,max(180px,calc(100vh - 350px)));height:auto;aspect-ratio:1;max-width:100%;margin-inline:auto}
+#q-tool-tabs{flex-wrap:nowrap}#q-tool-tabs>button{font-size:11px}
+#q-open-list{position:sticky;bottom:0;z-index:3;margin-top:14px;width:100%;background:var(--surface-raised)}
+#q-classic-quality details{display:grid;gap:7px}#q-classic-quality input{width:100%;min-width:0}
+#q-chart-tools label[hidden]{display:none!important}
+#q-plot-panel [data-q-view='table'],#q-plot-panel [data-q-view='gallery']{display:none}
+.q-frame-dialog{width:min(1000px,calc(100vw - 32px));max-height:calc(100vh - 32px)}
+.q-frame-dialog .function-dialog-body{overflow:auto;max-height:calc(100vh - 120px)}
+.q-frame-controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.q-frame-controls select,.q-frame-controls input{min-width:125px;max-width:100%;padding:8px;background:var(--background);color:var(--text);border:1px solid var(--border);border-radius:8px}
+.q-frame-items{display:grid;gap:5px;margin:12px 0}.q-frame-row{display:flex;gap:10px;align-items:center;min-width:0;padding:9px;border:1px solid var(--border);border-radius:9px;background:var(--surface);cursor:pointer}.q-frame-row:focus-visible{outline:2px solid var(--accent)}
+.q-frame-meta{display:grid;gap:4px;flex:1;min-width:0}.q-frame-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.q-frame-meta small{color:var(--muted)}.q-frame-row[data-excluded='true'] .q-frame-meta{opacity:.5}.q-frame-row[data-excluded='true'] .q-frame-name{text-decoration:line-through}.q-frame-row[data-excluded='true'] img{opacity:.5}
+.q-frame-thumbs{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}.q-frame-thumbs .q-frame-row{display:grid;grid-template-columns:auto minmax(0,1fr)}.q-frame-thumbs img{grid-column:1/-1;grid-row:1;width:100%;height:100px;object-fit:contain;background:#070b12}.q-frame-thumbs .q-frame-meta{grid-column:2}.q-frame-thumbs button{grid-column:1/-1}
+.q-frame-thumbs img:not([src]){visibility:hidden}
+#q-inspection-group{padding:12px 0;border-bottom:1px solid var(--border)}#q-inspection-group summary{cursor:pointer;color:var(--accent);font-weight:600}.q-inspection-items{display:grid;gap:2px;max-height:230px;overflow:auto;padding-top:6px}.q-inspection-items button{text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.q-inspection-items button[data-excluded='true']{opacity:.55;text-decoration:line-through}.q-inspection-items button[aria-current='true']{color:var(--accent);background:var(--accent-surface)}
+#q-inspection-action{margin-left:4px}#q-excluded-overlay{position:absolute;inset:0;pointer-events:none;z-index:1}#q-excluded-overlay[hidden]{display:none}#q-excluded-overlay::before,#q-excluded-overlay::after{content:'';position:absolute;left:50%;top:50%;width:min(42%,38vh);height:9px;border-radius:8px;background:#e8b781cc;box-shadow:0 0 7px #0009;transform:translate(-50%,-50%) rotate(45deg)}#q-excluded-overlay::after{transform:translate(-50%,-50%) rotate(-45deg)}
+@media(max-width:750px){#q-workspace.flow-analysis-workspace{grid-template-columns:1fr;grid-template-areas:'plot' 'tools'}#q-plot-panel{position:relative;top:auto}#q-tools-panel{position:relative;top:auto;max-height:none;overflow:visible}#q-tools-panel>.chart-tool-panels{overflow:visible}#q-plot-panel #q-chart{width:min(100%,max(180px,calc(100vh - 350px)));min-width:min(100%,180px)}.q-frame-controls>*{flex:1}.q-frame-row{font-size:12px}}
+
+/* Chart left, compact tools right; canvas and legend remain inside the viewport. */
+#q-workspace.flow-analysis-workspace{grid-template-columns:minmax(280px,min(50%,calc(100dvh - 180px))) minmax(0,1fr);grid-template-areas:'plot tools';align-items:start}
+#q-plot-panel{position:sticky;top:8px;max-width:min(100%,calc(100dvh - 180px));overflow:visible}
+#q-plot-panel #q-chart{width:min(100%,max(160px,calc(100dvh - 420px)));min-width:0}
+#q-plot-panel #q-legend{display:flex;flex-wrap:wrap;gap:5px 10px;font-size:10px;line-height:1.35}
+#q-tools-panel{position:sticky;top:8px;max-height:max(240px,calc(100dvh - 230px));padding:14px}
+#q-tools-panel .chart-scope-bar{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px}
+#q-tools-panel .chart-scope-bar h3,#q-tools-panel .chart-scope-bar .checkbox-field{grid-column:1/-1}
+#q-tools-panel .flow-tool-group{margin-block:8px;padding-block:8px}
+#q-tools-panel .function-field{margin-block:5px}
+#q-tools-panel .chart-tool-tabs button{min-width:0}
+#q-excluded-overlay::before,#q-excluded-overlay::after{display:none}
+.q-frame-dialog{width:min(1600px,calc(100vw - 32px))}
+.q-frame-items:not(.q-frame-thumbs){display:block;overflow-x:auto}
+.q-frame-items:not(.q-frame-thumbs) .q-frame-row,.q-frame-table-header{display:grid;grid-template-columns:44px minmax(190px,2fr) repeat(10,minmax(70px,.65fr)) minmax(220px,1.8fr) 95px;gap:8px;min-width:1360px;align-items:center}
+.q-frame-table-header{position:sticky;top:0;z-index:2;padding:8px 9px;background:var(--surface-raised);color:var(--muted);font-size:11px;font-weight:600}
+.q-frame-items:not(.q-frame-thumbs) .q-frame-row{border-radius:0;padding:6px 9px;font-size:12px}
+.q-frame-value{font-variant-numeric:tabular-nums}.q-frame-warning{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--warning)}
+@media(max-width:750px){#q-workspace.flow-analysis-workspace{grid-template-columns:1fr;grid-template-areas:'plot' 'tools'}#q-plot-panel,#q-tools-panel{position:relative;top:auto;max-width:none}#q-tools-panel{max-height:none}#q-tools-panel .chart-scope-bar{grid-template-columns:1fr}#q-plot-panel #q-chart{width:min(100%,max(160px,calc(100dvh - 350px)))}}
+
+.q-frame-items:not(.q-frame-thumbs) .q-frame-row,.q-frame-table-header{grid-template-columns:44px minmax(190px,2fr) repeat(11,minmax(70px,.65fr)) repeat(2,minmax(220px,1.8fr)) 95px;min-width:1660px}
+#q-classic-quality #q-notice{font-size:11px;margin:0}
+#q-worst{display:none!important}
+
+.flow-result-heading .chart-warning-toggle{font-size:11px;line-height:1.4;white-space:normal;max-width:250px;margin:0}

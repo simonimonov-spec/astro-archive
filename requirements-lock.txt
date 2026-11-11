@@ -1,0 +1,10 @@
+# Versions exercised with Python 3.13 on Windows x64.
+astropy==8.0.2
+astropy-iers-data==0.2026.10.19.0.52.1
+numpy==2.5.4
+packaging==26.3
+photutils==3.1.1
+pillow==12.3.0
+pyerfa==2.0.1.5
+PyYAML==6.0.3
+scipy==1.18.1
