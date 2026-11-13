@@ -5,10 +5,11 @@ from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer as StandardHT
 from urllib.parse import urlsplit,unquote,parse_qs
 from urllib.request import urlopen
 from pathlib import Path
-from Backend.Foundation.branding import APP_NAME, LEGACY_APP_NAME, KEY_HEADER, LEGACY_KEY_HEADER
+from Backend.Foundation.branding import APP_NAME, KEY_HEADER, LEGACY_KEY_HEADER
 from Backend.Foundation.runtime import ROOT,CACHE,within,atomic_json,read_json
 from Bridge.Core.service import Service
-from Bridge.Desktop.single_instance import TITLE,acquire,activate,release
+from Bridge.Desktop.single_instance import acquire,activate,release
+from Bridge.Desktop.identity import installation_id,window_title,matches,signal_ready
 
 class ThreadingHTTPServer(StandardHTTPServer):
     # Chromium loads UI resources and RPC concurrently; Windows' default backlog
@@ -52,7 +53,7 @@ class Handler(BaseHTTPRequestHandler):
             parsed=urlsplit(self.path);route=unquote(parsed.path[len(self.server.prefix):]);q=parse_qs(parsed.query)
             if route=='api/events':
                 self.server.last_seen=time.monotonic();return self.send(200,dict(events=self.server.service.events.since(int(q.get('after',['0'])[0]))))
-            if route=='api/hello':return self.send(200,dict(app=APP_NAME,key=self.server.key,protocol=1,eventSequence=self.server.service.events.sequence))
+            if route=='api/hello':return self.send(200,dict(app=APP_NAME,installation=installation_id(ROOT),key=self.server.key,protocol=1,eventSequence=self.server.service.events.sequence))
             if route.startswith('plugin-image/'):
                 parts=route.split('/')
                 if len(parts)!=3:raise ValueError('Невалиден ресурс на плъгин.')
@@ -70,7 +71,9 @@ class Handler(BaseHTTPRequestHandler):
             if not path.is_file() or path.suffix.lower() not in ('.html','.js','.css','.svg','.png','.jpg','.woff2','.ico'):return self.send(404,dict(error='Липсва UI ресурс.'))
             mime=mimetypes.guess_type(path.name)[0] or 'application/octet-stream'
             if path.suffix=='.js':mime='text/javascript'
-            self.send(200,path.read_bytes(),mime+('; charset=utf-8' if mime.startswith('text/') else ''))
+            body=path.read_bytes()
+            if route=='index.html':body=body.replace(b'<title>Astro Archive</title>',('<title>'+window_title(ROOT)+'</title>').encode('utf-8'))
+            self.send(200,body,mime+('; charset=utf-8' if mime.startswith('text/') else ''))
         except (BrokenPipeError,ConnectionResetError,ConnectionAbortedError):pass
         except Exception as error:self.send(400,dict(error=str(error)))
     def do_POST(self):
@@ -113,7 +116,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def open_browser(url):
     edge=Path(os.environ.get('ProgramFiles(x86)',r'C:\Program Files (x86)'))/'Microsoft/Edge/Application/msedge.exe'
-    if edge.is_file():subprocess.Popen([str(edge),'--app='+url],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    if edge.is_file():subprocess.Popen([str(edge),'--user-data-dir='+str(CACHE/'browser'),'--no-first-run','--app='+url],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     else:
         import webbrowser
         webbrowser.open(url)
@@ -126,30 +129,31 @@ def reuse(runtime):
         if url.startswith('http://127.0.0.1:'):
             try:
                 with urlopen(url+'api/hello',timeout=1) as stream:hello=json.load(stream)
-                if hello.get('app') in (APP_NAME,LEGACY_APP_NAME):
-                    if not activate(TITLE):open_browser(url)
-                    return
+                if matches(hello,ROOT):
+                    if not activate(window_title(ROOT)):open_browser(url)
+                    return True
             except (OSError,ValueError):pass
-        if time.monotonic()>=deadline:return
+        if time.monotonic()>=deadline:return False
         time.sleep(.25)
 
 def run():
     CACHE.mkdir(parents=True,exist_ok=True);runtime=CACHE/'desktop-session.json'
     instance=acquire(ROOT)
     if not instance:
-        reuse(runtime);return
+        if reuse(runtime):signal_ready(ROOT)
+        return
     prior=read_json(runtime,{})
     if prior.get('url','').startswith('http://127.0.0.1:'):
         try:
             with urlopen(prior['url']+'api/hello',timeout=1) as stream:hello=json.load(stream)
-            if hello.get('app') in (APP_NAME,LEGACY_APP_NAME):
-                if not activate(TITLE):open_browser(prior['url'])
-                release(instance);return
+            if matches(hello,ROOT):
+                if not activate(window_title(ROOT)):open_browser(prior['url'])
+                release(instance);signal_ready(ROOT);return
         except (OSError,ValueError):pass
     server=ThreadingHTTPServer(('127.0.0.1',0),Handler);server.daemon_threads=True
     server.service=Service(desktop_actions={'show':lambda:open_browser(server.url),'quit':server.shutdown});server.key=secrets.token_urlsafe(32);server.prefix='/s/'+server.key+'/'
     server.url=f'http://127.0.0.1:{server.server_port}'+server.prefix;server.last_seen=time.monotonic()
-    atomic_json(runtime,dict(url=server.url,pid=os.getpid()));open_browser(server.url)
+    atomic_json(runtime,dict(url=server.url,pid=os.getpid(),installation=installation_id(ROOT)));open_browser(server.url);signal_ready(ROOT)
     def idle():
         while True:
             time.sleep(10)

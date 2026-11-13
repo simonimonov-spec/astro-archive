@@ -1,4 +1,5 @@
 # Runtime state contains archive paths, credentials, observations and training data.
+/AGENTS.md
 /Backend/Cache/
 **/__pycache__/
 *.py[cod]
@@ -7,6 +8,8 @@
 /publication-review/
 /dist/
 /build/
+/.runtime/
+/AstroArchive.exe
 *.egg-info/
 .pytest_cache/
 .mypy_cache/

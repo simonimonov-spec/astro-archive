@@ -183,14 +183,6 @@
         "destination": "README.md"
       },
       {
-        "source": "Setup.cmd",
-        "destination": "Setup.cmd"
-      },
-      {
-        "source": "Start.cmd",
-        "destination": "Start.cmd"
-      },
-      {
         "source": "Tools/prepare_publication.py",
         "destination": "Tools/prepare_publication.py"
       },
@@ -441,6 +433,30 @@
       {
         "source": "tests/test_publication.py",
         "destination": "tests/test_publication.py"
+      },
+      {
+        "source": "Tools/Launcher/Launcher.cs",
+        "destination": "Tools/Launcher/Launcher.cs"
+      },
+      {
+        "source": "Tools/build_launcher.ps1",
+        "destination": "Tools/build_launcher.ps1"
+      },
+      {
+        "source": "Tools/runtime_probe.py",
+        "destination": "Tools/runtime_probe.py"
+      },
+      {
+        "source": "Bridge/Desktop/identity.py",
+        "destination": "Bridge/Desktop/identity.py"
+      },
+      {
+        "source": "tests/test_launcher.py",
+        "destination": "tests/test_launcher.py"
+      },
+      {
+        "source": "docs/LAUNCHER.md",
+        "destination": "docs/LAUNCHER.md"
       }
     ],
     "astro-archive-plugin-ai-training": [
@@ -865,6 +881,10 @@
       {
         "source": "Plugins/iasc-campaigns/servers.py",
         "destination": "servers.py"
+      },
+      {
+        "source": "Plugins/iasc-campaigns/tests/test_servers.py",
+        "destination": "tests/test_servers.py"
       },
       {
         "source": "Plugins/iasc-campaigns/site.py",

@@ -1,5 +1,6 @@
 "use strict";
 (() => {
+  const installationSuffix = document.title.match(/ · [a-f0-9]{8}$/)?.[0] || "";
   const bg = {
     "app.title": "Astro Archive", "app.brand": "Astro Archive", "app.tagline": "Твоето небе, подредено.",
     "skip": "Към съдържанието", "nav.label": "Основни функции", "nav.archive": "Архив", "nav.analysis": "Анализ", "nav.preparation": "Подготовка", "nav.settings": "Настройки ⚙",
@@ -122,7 +123,7 @@
   }
   function apply() {
     document.documentElement.lang = selected.locale;
-    document.title = t("app.title");
+    document.title = t("app.title") + installationSuffix;
     for (const [selector, key] of Object.entries(staticText)) for (const node of document.querySelectorAll(selector)) node.textContent = t(key);
     for (const node of document.querySelectorAll("[data-i18n]")) node.textContent = t(node.dataset.i18n);
     for (const node of document.querySelectorAll("[data-i18n-aria-label]")) node.setAttribute("aria-label", t(node.dataset.i18nAriaLabel));

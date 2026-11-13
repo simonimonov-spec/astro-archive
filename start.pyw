@@ -8,7 +8,7 @@ def main():
     import importlib.util
     missing=[name for name in required if importlib.util.find_spec(name) is None]
     if missing:
-        raise RuntimeError('Липсват Python зависимости: '+', '.join(missing)+'. Стартирай Setup.cmd в папката на програмата.')
+        raise RuntimeError('Липсват Python зависимости: '+', '.join(missing)+'. Отвори AstroArchive.exe за проверка и изтегляне.')
     os.environ.setdefault('OMP_NUM_THREADS','1');os.environ.setdefault('OPENBLAS_NUM_THREADS','1');os.environ.setdefault('MKL_NUM_THREADS','1')
     sys.path.insert(0,str(root))
     from Bridge.Desktop.host import run

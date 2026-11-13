@@ -14,7 +14,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = Path(__file__).with_name('publication-files.json')
 REPOSITORY = re.compile(r'^[a-z][a-z0-9-]+$')
-TEXT = {'.py', '.pyw', '.js', '.css', '.html', '.svg', '.md', '.txt', '.json', '.cmd', '.ps1'}
+TEXT = {'.py', '.pyw', '.cs', '.js', '.css', '.html', '.svg', '.md', '.txt', '.json', '.cmd', '.ps1'}
 FORBIDDEN_SUFFIXES = {'.fit', '.fts', '.fits', '.fz', '.gz', '.sqlite3', '.sqlite', '.db',
                       '.pem', '.key', '.pfx', '.p12', '.pt', '.pth', '.npz', '.npy',
                       '.log', '.tmp', '.pyc', '.zip', '.onnx', '.safetensors',
