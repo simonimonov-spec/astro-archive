@@ -157,12 +157,13 @@
         <p class="settings-note" data-i18n="settings.preview">Промените се виждат веднага. Запазват се с „Запази“.</p>
       </section>
       <section id="settings-panel-plugins" class="settings-section" role="tabpanel" aria-labelledby="settings-tab-plugins" hidden>
-        <div class="plugins-heading"><h3 id="plugins-heading" data-i18n="plugins.title">Плъгини</h3><button type="button" class="quiet-button" id="ui-plugin-scan" data-i18n="plugins.scan">Провери папката</button><button type="button" class="quiet-button" id="ui-plugin-folder" data-i18n="plugins.folder">Папка на плъгините</button><button type="button" class="quiet-button" id="ui-plugin-install" data-i18n="plugins.install">Добави плъгин…</button></div>
-        <p class="settings-note" data-i18n="plugins.description">Теми, преводи и функционални модули. Всеки плъгин е в собствена подпапка на Plugins.</p>
-          <p id="ui-plugin-folder-path" class="settings-note plugin-folder-path"></p>
-          <button type="button" class="quiet-button" id="ui-plugin-catalog">Провери каталога и версиите в GitHub</button>
+        <div class="plugins-heading"><h3 id="plugins-heading" data-i18n="plugins.title">Плъгини</h3><button type="button" class="quiet-button" id="ui-plugin-catalog">Провери каталога и версиите в GitHub</button><button type="button" class="quiet-button" id="ui-plugin-scan" data-i18n="plugins.scan">Провери папката</button><button type="button" class="quiet-button" id="ui-plugin-folder" data-i18n="plugins.folder">Папка на плъгините</button><button type="button" class="quiet-button" id="ui-plugin-install" data-i18n="plugins.install">Добави плъгин…</button></div>
+          <details class="plugin-help"><summary>За плъгините и папката им</summary>
+            <p class="settings-note" data-i18n="plugins.description">Теми, преводи и функционални модули. Всеки плъгин е в собствена подпапка на Plugins.</p>
+            <p id="ui-plugin-folder-path" class="settings-note plugin-folder-path"></p>
+            <p class="settings-note" data-i18n="plugins.immediate">Инсталирането, включването и премахването се запазват веднага. Външният вид се връща към запазените настройки.</p>
+          </details>
           <p id="ui-plugin-catalog-status" class="settings-note" role="status"></p>
-        <p class="settings-note" data-i18n="plugins.immediate">Инсталирането, включването и премахването се запазват веднага. Външният вид се връща към запазените настройки.</p>
         <p id="ui-plugin-scan-status" class="settings-note" role="status"></p>
         <div class="plugin-browser">
           <div id="ui-plugins" class="plugin-list" role="tablist" aria-orientation="vertical" data-i18n-aria-label="plugins.list" aria-label="Намерени плъгини"></div>

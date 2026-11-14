@@ -1,6 +1,8 @@
-# Astro Archive beta1
+# Astro Archive Beta 1.2
 
-Първо бета издание на основната програма за Windows. Изданието не включва плъгини или лични данни.
+Beta 1.2 за Windows включва каталог за отделно изтегляне на плъгини от GitHub
+и списък, който се разширява с прозореца. Чистият пакет няма папка `Plugins`,
+инсталирани плъгини или лични данни.
 
 Настолно приложение за локални астрономически архиви, FITS преглед, анализ на
 кадри и подготовка за обработка. Интерфейсът се отваря в браузър; основният
@@ -77,7 +79,9 @@ py -3.13 -m venv .venv
 
 ## За разработчици и публикуване
 
-- [API на плъгините](docs/plugin-api/API.md) и пример в `docs/plugin-example/`.
+Този раздел се отнася за изходния код в GitHub. Windows пакетът съдържа файловете за работа и потребителската документация, без тестове и помощни средства за компилиране.
+
+- [API на плъгините](https://github.com/simonimonov-spec/astro-archive/blob/main/docs/plugin-api/API.md) и [пример за разработчици](https://github.com/simonimonov-spec/astro-archive/tree/main/docs/plugin-example).
 - [Подготовка за GitHub](docs/PUBLISHING.md).
 - `Tools/publication-files.json` е изричният списък за чистите хранилища.
 - `py -3.13 Tools/prepare_publication.py` създава локални кандидати и пълни

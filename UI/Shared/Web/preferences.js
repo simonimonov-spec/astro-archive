@@ -143,6 +143,7 @@
     if (appearanceOnly()) tab = 'appearance';
     if (!["appearance", "customization", "language", "plugins", "diagnostics"].includes(tab)) return;
     selectedSettingsTab = tab;
+    $("settings-dialog").dataset.settingsTab = tab;
     for (const button of document.querySelectorAll("[data-settings-tab]")) {
       const selected = button.dataset.settingsTab === tab;
       button.setAttribute("aria-selected", String(selected)); button.tabIndex = selected ? 0 : -1;
