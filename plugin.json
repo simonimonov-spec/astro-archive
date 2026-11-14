@@ -1,0 +1,80 @@
+{
+  "apiVersion": 1,
+  "id": "iasc-campaigns",
+  "name": "IASC Campaigns",
+  "version": "V-1",
+  "description": "Избор на IASC кампании и екипи, известия за нови Image Sets и проверено изтегляне в отделен архив. Самостоятелен плъгин; без автоматично изпращане на отчети.",
+  "author": "Astro Archive",
+  "entry": "main.py",
+  "logo": "logo.png",
+  "permissions": [
+    "archive.manage",
+    "archive.read",
+    "processing.manage"
+  ],
+  "contributions": [
+    {
+      "id": "options",
+      "slot": "settings",
+      "title": "IASC · кампании и изтегляне",
+      "activate": "refresh",
+      "clients": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "archive-options",
+      "slot": "customization",
+      "title": "IASC · настройки на плъгин архива",
+      "archiveKey": "campaigns",
+      "activate": "archive-refresh",
+      "clients": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "sets",
+      "slot": "archive",
+      "title": "IASC · Image Sets",
+      "activate": "refresh",
+      "clients": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "status",
+      "slot": "header",
+      "title": "IASC",
+      "clients": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "astrometrica",
+      "slot": "preparation",
+      "title": "IASC · Astrometrica",
+      "description": "Работни копия → ръчни измервания → проверен MPC/ADES отчет",
+      "activate": "prepare-work",
+      "order": 100,
+      "clients": [
+        "desktop"
+      ],
+      "layout": "workbench"
+    },
+    {
+      "id": "work-sessions",
+      "slot": "preparation-activity",
+      "title": "IASC · незавършени сесии",
+      "clients": [
+        "desktop"
+      ]
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "iasc.status.v1",
+      "command": "status",
+      "name": "Състояние на IASC изтеглянията"
+    }
+  ]
+}
