@@ -1,0 +1,3 @@
+# Optional ResNet runtime/training. Install explicitly in Astro Archive's .venv.
+# No torchvision or pretrained downloads are used. Base app retains heuristic mode.
+torch==2.11.0

@@ -1,0 +1,51 @@
+{
+  "apiVersion": 1,
+  "id": "frame-inspector-ai",
+  "name": "AI оценител",
+  "version": "Beta-1",
+  "description": "AI оценител на FITS кадри: облаци, следи и препятствия. Евристичен режим без активен обучен модел; незадължителен ResNet анализ.",
+  "author": "Astro Archive",
+  "entry": "main.py",
+  "permissions": [
+    "archive.read",
+    "analysis.read",
+    "analysis.inspect"
+  ],
+  "logo": "logo.png",
+  "contributions": [
+    {
+      "id": "chart",
+      "slot": "analysis-tools",
+      "title": "AI проверка",
+      "description": "Облаци, следи и препятствия",
+      "clients": [
+        "desktop",
+        "remote"
+      ]
+    },
+    {
+      "id": "inspect",
+      "slot": "settings",
+      "title": "AI инспектор · подробни резултати",
+      "description": "Ръчна проверка и обратна връзка",
+      "clients": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "options",
+      "slot": "settings",
+      "title": "AI инспектор · настройки",
+      "clients": [
+        "desktop"
+      ]
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "inspector.ai.v1",
+      "title": "AI оценител API v1",
+      "command": "ai_api"
+    }
+  ]
+}

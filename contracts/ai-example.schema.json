@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://astro-archive.local/schemas/ai-example-v1.json",
+  "title": "Astro Archive AI training example v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "exampleId",
+    "frame",
+    "context",
+    "labels",
+    "labeler",
+    "createdAt",
+    "split"
+  ],
+  "properties": {
+    "schema": {"const": "astro-ai-example-v1"},
+    "exampleId": {"type": "string", "minLength": 1, "maxLength": 120},
+    "frame": {"$ref": "#/$defs/frame"},
+    "context": {"$ref": "#/$defs/context"},
+    "labels": {"$ref": "#/$defs/labels"},
+    "explanations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "quality": {"type": "string", "maxLength": 1000},
+        "cloud": {"type": "string", "maxLength": 1000},
+        "trail": {"type": "string", "maxLength": 1000},
+        "light": {"type": "string", "maxLength": 1000},
+        "elongation": {"type": "string", "maxLength": 1000},
+        "defocus": {"type": "string", "maxLength": 1000},
+        "defects": {"type": "string", "maxLength": 1000},
+        "artifacts": {"type": "string", "maxLength": 1000},
+        "objects": {"type": "string", "maxLength": 1000}
+      }
+    },
+    "labeler": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 120},
+        "name": {"type": "string", "maxLength": 200}
+      }
+    },
+    "createdAt": {"type": "string", "format": "date-time"},
+    "split": {"enum": ["train", "validation", "test", "unassigned"]},
+    "origin": {"enum": ["manual", "imported", "legacy"]},
+    "datasetVersion": {"type": ["string", "null"], "maxLength": 64},
+    "notes": {"type": "string", "maxLength": 2000}
+  },
+  "$defs": {
+    "frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "hash"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 120},
+        "hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "sourceSize": {"type": ["integer", "null"], "minimum": 0},
+        "sourceMtime": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "archiveId": {"type": ["string", "null"], "maxLength": 120},
+        "object": {"type": ["string", "null"], "maxLength": 200},
+        "telescope": {"type": ["string", "null"], "maxLength": 200},
+        "camera": {"type": ["string", "null"], "maxLength": 200},
+        "filter": {"type": ["string", "null"], "maxLength": 120},
+        "night": {"type": ["string", "null"], "maxLength": 64},
+        "group": {"type": ["string", "null"], "maxLength": 800},
+        "exposure": {"type": ["number", "null"], "minimum": 0},
+        "gain": {"type": ["number", "null"]},
+        "binning": {"type": ["integer", "null"], "minimum": 1},
+        "pixelScale": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "zeropoint": {"type": ["number", "null"]}
+      }
+    },
+    "labels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["quality", "cloud", "trail", "light", "elongation", "defects", "artifacts", "objects"],
+      "properties": {
+        "quality": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "cloud": {"enum": ["clear", "cloud", "uncertain", null]},
+        "trail": {"enum": ["none", "satellite", "aircraft", "uncertain", null]},
+        "light": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "elongation": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "defocus": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "defects": {"enum": ["none", "present", "uncertain", null]},
+        "artifacts": {"enum": ["none", "present", "uncertain", null]},
+        "noise": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "objectRisk": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "obstruction": {"enum": ["none", "present", "uncertain", null]},
+        "objects": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {"$ref": "#/$defs/objectLabel"}
+        }
+      }
+    },
+    "objectLabel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "bbox"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "galaxy",
+            "nebula",
+            "planetary_nebula",
+            "unknown"
+          ]
+        },
+        "bbox": {
+          "type": "array",
+          "items": {"type": "number", "minimum": 0},
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "note": {"type": "string", "maxLength": 400}
+      }
+    }
+  }
+}

@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://astro-archive.local/schemas/ai-result-v1.json",
+  "title": "Astro Archive AI result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "requestId",
+    "createdAt",
+    "frame",
+    "engine",
+    "overall",
+    "factors",
+    "events",
+    "objects",
+    "recommendation",
+    "limitations",
+    "timing"
+  ],
+  "properties": {
+    "schema": {"const": "astro-ai-result-v1"},
+    "requestId": {"type": "string", "minLength": 1, "maxLength": 120},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "frame": {"$ref": "#/$defs/frame"},
+    "engine": {"$ref": "#/$defs/engine"},
+    "overall": {"$ref": "#/$defs/overall"},
+    "factors": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {"$ref": "#/$defs/factor"}
+    },
+    "events": {"$ref": "#/$defs/events"},
+    "objects": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {"$ref": "#/$defs/object"}
+    },
+    "recommendation": {"$ref": "#/$defs/recommendation"},
+    "limitations": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {"type": "string", "maxLength": 400}
+    },
+    "timing": {"$ref": "#/$defs/timing"}
+  },
+  "$defs": {
+    "frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "hash", "width", "height"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 120},
+        "hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "width": {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1},
+        "sourceSize": {"type": ["integer", "null"], "minimum": 0},
+        "sourceMtime": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "featureSchema", "nnAvailable"],
+      "properties": {
+        "kind": {"enum": ["heuristic", "neural"]},
+        "modelId": {"type": ["string", "null"], "maxLength": 120},
+        "modelVersion": {"type": ["string", "null"], "maxLength": 64},
+        "featureSchema": {"type": "string", "minLength": 1, "maxLength": 120},
+        "nnAvailable": {"type": "boolean"},
+        "architecture": {"type": "string", "maxLength": 120}
+      }
+    },
+    "overall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["quality", "confidence", "band"],
+      "properties": {
+        "quality": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "band": {"enum": ["good", "fair", "poor", "unknown"]}
+      }
+    },
+    "factor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "risk", "confidence", "contribution", "status", "metrics", "evidence", "notes"],
+      "properties": {
+        "id": {
+          "enum": ["noise", "stars", "defects", "trails", "objects", "light", "artifacts"]
+        },
+        "version": {"type": "string", "minLength": 1, "maxLength": 32},
+        "risk": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "contribution": {"type": ["number", "null"], "minimum": -1, "maximum": 1},
+        "status": {"enum": ["measured", "estimated", "unavailable"]},
+        "metrics": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {"$ref": "#/$defs/metric"}
+        },
+        "evidence": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {"$ref": "#/$defs/evidence"}
+        },
+        "notes": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {"type": "string", "maxLength": 400}
+        }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value", "unit", "method", "measured"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 120},
+        "value": {"type": ["number", "null"]},
+        "unit": {"type": "string", "maxLength": 64},
+        "method": {"type": "string", "minLength": 1, "maxLength": 400},
+        "measured": {"type": "boolean"},
+        "note": {"type": "string", "maxLength": 400}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "severity"],
+      "properties": {
+        "kind": {"enum": ["region", "frame", "series"]},
+        "coordinateSpace": {"enum": ["native", "analysis_sample"]},
+        "bbox": {
+          "type": ["array", "null"],
+          "items": {"type": "number", "minimum": 0},
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "severity": {"type": "number", "minimum": 0, "maximum": 1},
+        "note": {"type": "string", "maxLength": 400}
+      }
+    },
+    "events": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cloud", "satellite", "obstruction"],
+      "properties": {
+        "cloud": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "satellite": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "obstruction": {"type": ["number", "null"], "minimum": 0, "maximum": 1}
+      }
+    },
+    "object": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "bbox", "confidence", "method"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "galaxy_candidate",
+            "nebula_candidate",
+            "planetary_nebula_candidate"
+          ]
+        },
+        "bbox": {
+          "type": "array",
+          "items": {"type": "number", "minimum": 0},
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "method": {"enum": ["heuristic", "model"]},
+        "coordinateSpace": {"enum": ["native", "analysis_sample"]},
+        "label": {"type": "string", "maxLength": 200}
+      }
+    },
+    "recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stack", "reasons"],
+      "properties": {
+        "stack": {"enum": ["ok", "review", "do_not_stack"]},
+        "reasons": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {"$ref": "#/$defs/reason"}
+        }
+      }
+    },
+    "reason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["factor", "code", "message"],
+      "properties": {
+        "factor": {
+          "enum": ["noise", "stars", "defects", "trails", "objects", "light", "artifacts", "overall"]
+        },
+        "code": {"type": "string", "minLength": 1, "maxLength": 120},
+        "message": {"type": "string", "minLength": 1, "maxLength": 400},
+        "value": {"type": ["number", "null"]},
+        "unit": {"type": ["string", "null"], "maxLength": 64},
+        "metric": {"type": ["string", "null"], "maxLength": 120},
+        "measured": {"type": "boolean"},
+        "risk": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "status": {"enum": ["measured", "estimated", "unavailable"]},
+        "measurements": {"type": "array", "maxItems": 8, "items": {"$ref": "#/$defs/metric"}}
+      }
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startedAt", "durationMs"],
+      "properties": {
+        "startedAt": {"type": "string", "format": "date-time"},
+        "durationMs": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}
