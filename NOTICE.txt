@@ -1,0 +1,18 @@
+Siril Auto — Astro Archive
+
+The Python controller and .ssf command generator in this folder are independent
+Astro Archive code. They launch the user's separately installed siril-cli.exe.
+No Siril executable, library, source module, or third-party automation code is
+included. Siril is not a license-free product: its own GPLv3+ terms continue to
+apply to Siril. No paid license key is requested by this integration.
+
+logo.svg is the existing application emblem requested by the user: the Siril
+icon with Astro Archive/PhotoSorter gears. logo.png is its rasterized copy.
+The underlying Siril artwork belongs to its respective authors. Its original
+SVG is retained, together with the GPL license supplied by the installed Siril
+distribution in Siril-GPLv3.txt. This attribution concerns the reused artwork
+and does not claim that it is original Astro Archive artwork or endorsement.
+
+Official interface documentation:
+https://siril.org/docs/man/
+https://siril.readthedocs.io/en/stable/Commands.html

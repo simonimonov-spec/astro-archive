@@ -1,0 +1,42 @@
+{
+  "apiVersion": 1,
+  "id": "siril-auto",
+  "name": "Автоматично стакване чрез Siril",
+  "version": "V-1",
+  "description": "Независим Siril CLI плъгин с настройваем брой паралелни процеси, отделни работни папки, общ CPU/RAM бюджет, оценка и обединяване на приетите дневни стакове.",
+  "author": "Astro Archive",
+  "entry": "main.py",
+  "logo": "logo.png",
+  "permissions": [
+    "archive.read",
+    "processing.manage"
+  ],
+  "contributions": [
+    {
+      "id": "automatic-stacking",
+      "slot": "preparation",
+      "title": "Автоматично стакване със Siril",
+      "description": "Работни копия → дневни стакове → оценка → обединяване",
+      "activate": "prepare",
+      "layout": "workbench"
+    },
+    {
+      "id": "options",
+      "slot": "settings",
+      "title": "Siril · настройки",
+      "description": "Всяка настройка се запазва автоматично в собствения кеш на плъгина."
+    },
+    {
+      "id": "sessions",
+      "slot": "preparation-activity",
+      "title": "Siril · незавършена работа"
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "processing.siril",
+      "command": "status",
+      "name": "Състояние на външния Siril процес"
+    }
+  ]
+}
