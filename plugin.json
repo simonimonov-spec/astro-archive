@@ -1,0 +1,45 @@
+{
+  "apiVersion": 1,
+  "id": "archive-overview",
+  "name": "Справка по обекти",
+  "version": "V-1",
+  "description": "Примерна независима добавка: чете постоянния индекс и добавя статистика, таблица и диаграма без промяна на приложението.",
+  "author": "Astro Archive · пример за API v1",
+  "entry": "main.py",
+  "permissions": [
+    "archive.read"
+  ],
+  "capabilities": [
+    {
+      "id": "archive.overview",
+      "command": "overview",
+      "name": "Справка по обекти"
+    }
+  ],
+  "contributions": [
+    {
+      "id": "archive-summary",
+      "slot": "archive",
+      "title": "Справка по обекти",
+      "description": "Статистика от индекса. Не променя архивните файлове."
+    },
+    {
+      "id": "analysis-summary",
+      "slot": "analysis",
+      "title": "Справка от добавка",
+      "description": "Самостоятелно поле с таблица и диаграма, създадени от отделния плъгин."
+    },
+    {
+      "id": "options",
+      "slot": "settings",
+      "title": "Настройки на справката",
+      "description": "Запазват се в собствения кеш на добавката."
+    },
+    {
+      "id": "visual-options",
+      "slot": "customization",
+      "title": "Визуални настройки · справка",
+      "description": "Цвят, вид диаграма и видими колони."
+    }
+  ]
+}
