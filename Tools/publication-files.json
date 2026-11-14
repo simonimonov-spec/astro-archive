@@ -477,6 +477,14 @@
       {
         "source": "Tools/plugin-manifests/frame-inspector-ai.json",
         "destination": "Tools/plugin-manifests/frame-inspector-ai.json"
+      },
+      {
+        "source": "Backend/Foundation/update_download.py",
+        "destination": "Backend/Foundation/update_download.py"
+      },
+      {
+        "source": "tests/test_update_download.py",
+        "destination": "tests/test_update_download.py"
       }
     ],
     "astro-archive-plugin-archive-overview": [

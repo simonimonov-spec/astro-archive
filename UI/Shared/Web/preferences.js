@@ -134,6 +134,9 @@
     if (!bindings?.desktop) for (const control of $("settings-dialog").querySelectorAll("[data-debug-section], [data-storage-settings]")) control.disabled = true;
     if (!bindings?.desktop) for (const control of $("customization-editor").querySelectorAll("button,input,select,textarea")) control.disabled = true;
     if (appearanceOnly()) $("ui-choose-background").disabled = true;
+    $('app-update-download').disabled=value||!bindings?.desktop||!updateDownloadable||updateTransfer.phase==='downloading';
+    $('app-update-stop').disabled=value||!bindings?.desktop;
+    $('app-update-folder').disabled=value||!bindings?.desktop;
     $("settings-dialog").setAttribute("aria-busy", String(value));
   }
   function drawPlugins() {
@@ -269,6 +272,9 @@
   $("ui-plugin-install").addEventListener("click", () => mutatePlugins("ui.plugins.install"));
   $("ui-plugin-catalog").addEventListener("click", () => mutatePlugins("ui.plugins.catalog"));
   $("app-update-check").addEventListener("click", () => checkUpdates());
+  $('app-update-download').addEventListener('click',startUpdateDownload);
+  $('app-update-stop').addEventListener('click',async()=>{try{await bindings.call('app.updates.cancel');}catch(error){report(error);}});
+  $('app-update-folder').addEventListener('click',async()=>{try{await bindings.call('app.updates.folder');}catch(error){report(error);}});
   $("ui-plugin-scan").addEventListener("click", scanPlugins);
   for (const button of document.querySelectorAll("[data-settings-tab]")) button.addEventListener("click", () => showTab(button.dataset.settingsTab, true));
   document.querySelector(".settings-tabs").addEventListener("keydown", event => {
@@ -290,6 +296,31 @@
     finally { setBusy(false); }
   });
   let checkingUpdates=false;
+  let updateDownloadable=false,updateTransfer={phase:'idle'},pollingDownload=false;
+  function drawUpdateDownload(value){
+    updateTransfer=value;
+    const active=value.phase==='downloading',complete=value.phase==='complete';
+    $('app-update-download').hidden=!updateDownloadable;
+    $('app-update-stop').hidden=!active;
+    $('app-update-folder').hidden=!complete;
+    $('app-update-progress').hidden=!active;
+    $('app-update-progress').value=value.percent||0;
+    $('app-update-download-status').textContent=active?'Изтегляне: '+(value.percent||0)+'% · '+Math.round((value.received||0)/1024)+' / '+Math.round((value.total||0)/1024)+' KB':complete?'Изтеглен и проверен ZIP: '+value.path+'. Разархивирай го в отделна папка, за да използваш новата версия.':value.phase==='error'?'Изтеглянето не завърши: '+value.problem:value.phase==='cancelled'?'Изтеглянето е спряно. Можеш да опиташ отново.':'';
+    setBusy(busy);
+  }
+  async function monitorUpdateDownload(){
+    if(pollingDownload||!bindings?.desktop)return;
+    pollingDownload=true;
+    try{
+      do{drawUpdateDownload(await bindings.call('app.updates.status'));if(updateTransfer.phase==='downloading')await new Promise(resolve=>setTimeout(resolve,500));}while(updateTransfer.phase==='downloading');
+    }catch(error){$('app-update-download-status').textContent=error.message;}
+    finally{pollingDownload=false;}
+  }
+  async function startUpdateDownload(){
+    if(!bindings?.desktop||updateTransfer.phase==='downloading')return;
+    try{drawUpdateDownload(await bindings.call('app.updates.download'));await monitorUpdateDownload();}
+    catch(error){$('app-update-download-status').textContent=error.message;}
+  }
   async function checkUpdates(startup=false){
     if(checkingUpdates||!bindings?.desktop)return;
     checkingUpdates=true;
@@ -297,9 +328,11 @@
     status.textContent='Проверка за нова версия…';
     try{
       const result=await bindings.call('app.updates.check');
+      updateDownloadable=!!result.downloadable&&(result.available||!result.currentKnown);
+      drawUpdateDownload(updateTransfer);
       status.textContent=result.problem || (result.available?'Налична е нова версия: '+result.latest:!result.currentKnown?'Последна публикувана версия: '+(result.latest||'няма')+'. Това копие няма идентификатор на издание.':'Текуща версия: '+result.current+'. Няма по-ново публикувано издание.');
       link.hidden=!result.latest||!!result.problem;
-      if(result.available&&startup)window.AstroArchiveFunctions.modal('Нова версия на Astro Archive',body=>{const p=document.createElement('p');p.textContent='Налична е '+result.latest+'.';const a=document.createElement('a');a.href='https://github.com/simonimonov-spec/astro-archive/releases';a.target='_blank';a.rel='noopener noreferrer';a.textContent='Отвори изданията в GitHub';body.append(p,a);});
+      if(result.available&&startup)window.AstroArchiveFunctions.modal('Нова версия на Astro Archive',(body,box)=>{const p=document.createElement('p');p.textContent='Налична е '+result.latest+'.';body.append(p);if(result.downloadable){const button=document.createElement('button');button.type='button';button.className='primary-button';button.textContent='Изтегли новата версия';button.onclick=async()=>{box.close();await open('diagnostics');await startUpdateDownload();};body.append(button);}});
     }catch(error){status.textContent='Проверката за версии е недостъпна. Опитай отново.';link.hidden=true;}
     finally{checkingUpdates=false;}
   }
@@ -307,7 +340,7 @@
     connect(value) { bindings = value; window.AstroArchiveCustomization?.connect(value); },
     customizationChanged: preview,
     addIcon(icon) { configuration.icons ||= []; if (!configuration.icons.some(i => i.fileName === icon.fileName)) configuration.icons.push(icon); },
-    initialize(data) { accept(data); if(bindings?.desktop&&!window.AstroArchiveRemote)setTimeout(()=>{checkUpdates(true);bindings.call('ui.plugins.catalog').then(result=>{configuration.pluginCatalog=result.pluginCatalog;configuration.catalogProblem=result.catalogProblem;drawPlugins();$('ui-plugin-catalog-status').textContent=result.catalogProblem||'Каталогът в GitHub е проверен.';}).catch(()=>{});},500); },
+    initialize(data) { accept(data); if(bindings?.desktop&&!window.AstroArchiveRemote)setTimeout(()=>{checkUpdates(true);monitorUpdateDownload();bindings.call('ui.plugins.catalog').then(result=>{configuration.pluginCatalog=result.pluginCatalog;configuration.catalogProblem=result.catalogProblem;drawPlugins();$('ui-plugin-catalog-status').textContent=result.catalogProblem||'Каталогът в GitHub е проверен.';}).catch(()=>{});},500); },
     close, open, showTab, refreshAppearance,
     get isOpen() { return $("settings-dialog").open; }
   };

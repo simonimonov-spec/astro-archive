@@ -34,7 +34,7 @@ class Service:
         self.session=SharedSession(self)
         from Bridge.Plugins.downloads import Downloads
         from Backend.Foundation.updates import Updates
-        self.downloads=Downloads(self.plugins);self.updates=Updates()
+        self.downloads=Downloads(self.plugins);self.updates=Updates(self.store.folder/'Updates')
         self._register_bridge();self.plugins.scan()
     def _register_bridge(self):
         self._core_handlers = {
@@ -72,6 +72,10 @@ class Service:
             'ui.plugins.catalog':lambda p:self.plugin_catalog(),
             'ui.plugins.download':lambda p:self.download_plugin(p['id']),
             'app.updates.check':lambda p:self.updates.check(),
+            'app.updates.download':lambda p:self.updates.start(self.task),
+            'app.updates.status':lambda p:self.updates.status(),
+            'app.updates.cancel':lambda p:self.jobs.cancel(self.updates.task_id) if self.updates.task_id else dict(requested=False),
+            'app.updates.folder':lambda p:self.updates.open_folder(),
             'ui.plugins.remove':lambda p:self.remove_plugin(p),
             'ui.plugins.archive':lambda p:self.plugin_archive(p),
             'plugin.call':lambda p:self.plugins.invoke(p['pluginId'],p.get('command',p.get('method')),p.get('parameters',p.get('params',p.get('payload',{})))),

@@ -1,4 +1,4 @@
-// Windows .NET Framework launcher; no machine-wide Python or administrator rights.
+﻿// Windows .NET Framework launcher; no machine-wide Python or administrator rights.
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -70,7 +70,7 @@ internal sealed class Launcher : Form
                 if (args.Contains("--update"))
                 {
                     window.ShowUpdate("Astro Archive — нови възможности", "Примерно издание", "2026-11-14");
-                    window.AddButton("Виж новата версия", delegate { }); window.AddButton("Пропусни сега", delegate { }); window.AddButton("Пропусни версията", delegate { });
+                    window.AddButton("Изтегли новата версия", delegate { }); window.AddButton("Пропусни сега", delegate { }); window.AddButton("Пропусни версията", delegate { });
                 }
                 window.ShowInTaskbar = false; window.Opacity = 0; window.Show(); window.Refresh();
                 using (var bitmap = new Bitmap(window.Width, window.Height))
@@ -190,13 +190,13 @@ internal sealed class Launcher : Form
             BorderStyle = BorderStyle.FixedSingle, HorizontalScrollbar = true, Font = new Font("Segoe UI", 9) };
         issues.Items.AddRange(lines.Cast<object>().ToArray()); Controls.Add(issues);
     }
-    void AddButton(string text, Action action)
+    void AddButton(string text, Action action, bool whileBusy = false)
     {
         var b = new Button { Text = text, AutoSize = false, Height = 34, Width = 174,
             Top = 532, Left = 24 + buttons.Count * 187, FlatStyle = FlatStyle.Flat,
             BackColor = Color.FromArgb(23, 42, 61), ForeColor = Color.FromArgb(205, 234, 244), Cursor = Cursors.Hand };
         b.FlatAppearance.BorderColor = Color.FromArgb(48, 81, 100);
-        b.Click += delegate { if (!busy) action(); }; buttons.Add(b); Controls.Add(b);
+        b.Click += delegate { if (!busy || whileBusy) action(); }; buttons.Add(b); Controls.Add(b);
     }
     async Task Guard(Func<Task> action)
     {
@@ -361,9 +361,10 @@ internal sealed class Launcher : Form
             var release = releases.FirstOrDefault(x => Convert.ToInt64(x["id"]) != currentID && Str(x, "tag_name") != Str(manifest, "release_tag") && DateTime.Parse(Str(x, "published_at"), null, System.Globalization.DateTimeStyles.RoundtripKind) > built);
             if (release != null && Str(ReadState(), "skipped_release") != Str(release, "id"))
             {
-                string page = Str(release, "html_url"); ValidateReleaseURL(page);
+                var package = UpdatePackage(release);
                 ShowUpdate(Str(release, "name"), Str(release, "tag_name"), Str(release, "published_at"));
-                AddButton("Виж новата версия", () => { OpenRelease(page); AddContinue(); });
+                if (package != null) AddButton("Изтегли новата версия", async () => await Guard(() => DownloadUpdate(package)));
+                else Update("Няма проверим Windows пакет", "Можеш да продължиш с текущата версия", .86f);
                 AddButton("Пропусни сега", async () => await Guard(() => Launch("Версията е пропусната за това стартиране")));
                 AddButton("Пропусни версията", async () => await Guard(async () =>
                 {
@@ -398,7 +399,84 @@ internal sealed class Launcher : Form
         DateTime date;
         updateDate = DateTime.TryParse(published, out date) ? date.ToString("dd.MM.yyyy") : "";
         phase = "Нова версия е на хоризонта";
-        Update("Открий какво е новото", "Виж описанието и пакета в GitHub • това копие остава запазено", .86f);
+        Update("Налична е нова версия", "Изтегли проверения Windows ZIP директно от програмата", .86f);
+    }
+    static Dictionary<string, object> UpdatePackage(Dictionary<string, object> release)
+    {
+        string tag = Str(release, "tag_name");
+        if (!System.Text.RegularExpressions.Regex.IsMatch(tag, "^[A-Za-z0-9_.-]+$") || !release.ContainsKey("assets")) return null;
+        var valid = new List<Dictionary<string, object>>();
+        foreach (var item in ArrayValue(release["assets"]))
+        {
+            var asset = Dict(item); string name = Str(asset, "name"), digest = Str(asset, "digest");
+            long size;
+            if (!System.Text.RegularExpressions.Regex.IsMatch(name, @"^AstroArchive_[A-Za-z0-9_.-]+_Windows_x64\.zip$") || !long.TryParse(Str(asset, "size"), out size) || size <= 0 || size > 1000000000) continue;
+            if (Str(asset, "browser_download_url") != "https://github.com/simonimonov-spec/astro-archive/releases/download/" + tag + "/" + name || !System.Text.RegularExpressions.Regex.IsMatch(digest, "^sha256:[a-fA-F0-9]{64}$")) continue;
+            valid.Add(asset);
+        }
+        return valid.Count == 1 ? valid[0] : null;
+    }
+    static string HashFile(string path)
+    { using (var stream = File.OpenRead(path)) using (var sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToLowerInvariant(); }
+    async Task DownloadUpdate(Dictionary<string, object> package)
+    {
+        stop.Token.ThrowIfCancellationRequested();
+        string folder = Path.Combine(root, "Backend", "Cache", "data", "Updates"), name = Str(package, "name");
+        string expected = Str(package, "digest").Substring(7).ToLowerInvariant(); long size = Convert.ToInt64(package["size"]);
+        string target = Path.Combine(folder, name), temporary = Path.Combine(folder, ".update-" + Guid.NewGuid().ToString("N") + ".part");
+        Directory.CreateDirectory(folder);
+        if (File.Exists(target))
+        {
+            if (new FileInfo(target).Length == size && await Task.Run(() => HashFile(target)) == expected) { ShowDownloaded(folder, name); return; }
+            target = Path.Combine(folder, Path.GetFileNameWithoutExtension(name) + "-" + Guid.NewGuid().ToString("N").Substring(0,8) + ".zip");
+        }
+        using (var cancellation = CancellationTokenSource.CreateLinkedTokenSource(stop.Token))
+        {
+            try
+            {
+                ClearButtons(); phase = "Изтегляне на новата версия";
+                Update("Изтегляне на " + name, "0% • проверката на SHA-256 предстои", 0);
+                AddButton("Спри изтеглянето", () => cancellation.Cancel(), true);
+                using (var client = new WebClient())
+                using (cancellation.Token.Register(client.CancelAsync))
+                {
+                    client.Headers[HttpRequestHeader.UserAgent] = "AstroArchive-Launcher";
+                    client.DownloadProgressChanged += delegate(object sender, DownloadProgressChangedEventArgs e)
+                    {
+                        if (e.BytesReceived > size) { client.CancelAsync(); return; }
+                        float fraction = (float)e.BytesReceived / size;
+                        Update("Изтегляне на " + name, Math.Min(100, (int)(fraction * 100)) + "% • " + e.BytesReceived / 1024 + " / " + size / 1024 + " KB", fraction);
+                    };
+                    await client.DownloadFileTaskAsync(new Uri(Str(package, "browser_download_url")), temporary);
+                }
+                cancellation.Token.ThrowIfCancellationRequested();
+                if (new FileInfo(temporary).Length != size || await Task.Run(() => HashFile(temporary)) != expected) throw new InvalidDataException("Непълен пакет или различна SHA-256. Опитай отново.");
+                cancellation.Token.ThrowIfCancellationRequested();
+                File.Move(temporary, target); ShowDownloaded(folder, Path.GetFileName(target));
+            }
+            catch (Exception error)
+            {
+                if (stop.IsCancellationRequested) return;
+                ClearButtons(); phase = cancellation.IsCancellationRequested ? "Изтеглянето е спряно" : "Изтеглянето не завърши";
+                Update(phase, cancellation.IsCancellationRequested ? "Временният файл ще се премахне" : error.Message, 0);
+                AddButton("Опитай отново", async () => await Guard(() => DownloadUpdate(package)));
+                AddButton("Стартирай това копие", async () => await Guard(() => Launch("Стартиране на текущата версия")));
+                AddButton("Затвори", Close);
+            }
+            finally
+            {
+                if (File.Exists(temporary)) File.Delete(temporary);
+                if (Directory.Exists(folder) && !Directory.EnumerateFileSystemEntries(folder).Any()) Directory.Delete(folder);
+            }
+        }
+    }
+    void ShowDownloaded(string folder, string name)
+    {
+        ClearButtons(); phase = "Новата версия е изтеглена";
+        Update(name, "SHA-256 е проверена. Отвори папката и разархивирай ZIP в отделна папка.", 1);
+        AddButton("Отвори папката", () => Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true }));
+        AddButton("Стартирай това копие", async () => await Guard(() => Launch("Стартиране на текущата версия")));
+        AddButton("Затвори", Close);
     }
     static void ValidateReleaseURL(string url)
     {

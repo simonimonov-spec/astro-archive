@@ -1,7 +1,7 @@
 param(
     [string]$Root = (Split-Path -Parent $PSScriptRoot),
     [DateTimeOffset]$ReleaseCutoff = [DateTimeOffset]::UtcNow,
-    [string]$ReleaseTag = 'beta1.2-preview',
+    [string]$ReleaseTag = 'beta1.2.1-preview',
     [long]$ReleaseId = 0
 )
 $ErrorActionPreference = 'Stop'

@@ -175,6 +175,9 @@
         <div id="diagnostic-resources" class="diagnostic-resources"></div>
         <div class="plugins-heading"><h3>Версия на програмата</h3><button type="button" class="quiet-button" id="app-update-check">Провери за нова версия</button></div>
         <p id="app-update-status" class="settings-note" role="status"></p>
+        <div class="plugin-actions"><button type="button" class="primary-button" id="app-update-download" hidden>Изтегли новата версия</button><button type="button" class="quiet-button" id="app-update-stop" hidden>Спри изтеглянето</button><button type="button" class="quiet-button" id="app-update-folder" hidden>Отвори папката с изтегления ZIP</button></div>
+        <progress id="app-update-progress" max="100" hidden></progress>
+        <p id="app-update-download-status" class="settings-note" role="status"></p>
         <a id="app-update-link" href="https://github.com/simonimonov-spec/astro-archive/releases" target="_blank" rel="noopener noreferrer" hidden>Издания в GitHub ↗</a>
         <div class="plugin-actions"><button type="button" class="quiet-button" id="diagnostics-restart" data-i18n="activity.restart">Рестартирай приложението</button></div>
         <p class="settings-note" data-i18n="diagnostics.restartHint">Затваря и стартира отново цялото приложение и услугите му.</p>
