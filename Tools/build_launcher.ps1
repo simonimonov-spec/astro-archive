@@ -1,6 +1,6 @@
 param(
     [string]$Root = (Split-Path -Parent $PSScriptRoot),
-    [string]$ReleaseCutoff = [DateTime]::UtcNow.ToString('o'),
+    [DateTimeOffset]$ReleaseCutoff = [DateTimeOffset]::UtcNow,
     [string]$ReleaseTag = 'beta1.2-preview',
     [long]$ReleaseId = 0
 )
@@ -17,7 +17,8 @@ foreach ($entry in $allowlist.repositories.'astro-archive') {
     }
 }
 $packages = @(Get-Content -LiteralPath (Join-Path $Root 'requirements-lock.txt') | Where-Object { $_ -match '^[a-zA-Z].*==' })
-$manifest = @{ files = $files; packages = $packages; release_id = $ReleaseId; release_tag = $ReleaseTag; release_cutoff = $ReleaseCutoff }
+$cutoffUtc = $ReleaseCutoff.ToUniversalTime().ToString('o', [Globalization.CultureInfo]::InvariantCulture)
+$manifest = @{ files = $files; packages = $packages; release_id = $ReleaseId; release_tag = $ReleaseTag; release_cutoff = $cutoffUtc }
 $manifestPath = Join-Path $work 'manifest.json'
 [IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
