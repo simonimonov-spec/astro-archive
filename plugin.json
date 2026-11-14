@@ -1,0 +1,46 @@
+{
+  "apiVersion": 1,
+  "id": "shared-archives",
+  "name": "Shared Archives · LAN",
+  "version": "V-1",
+  "description": "Споделени архиви между Windows инстанции на Astro Archive през LAN със задължително SMB 3 шифроване. Локални и мрежови архиви едновременно; четене, запис и създаване на нови архиви.",
+  "author": "Astro Archive",
+  "entry": "main.py",
+  "permissions": [
+    "archive.manage"
+  ],
+  "logo": "logo.png",
+  "contributions": [
+    {
+      "id": "network",
+      "slot": "settings",
+      "title": "Shared Archives · хост и връзки",
+      "clients": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "archives",
+      "slot": "archive",
+      "title": "Споделени LAN архиви",
+      "clients": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "state",
+      "slot": "header",
+      "title": "Споделени LAN архиви",
+      "clients": [
+        "desktop"
+      ]
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "archives.sharing.status",
+      "command": "status",
+      "name": "Състояние на шифрованото LAN споделяне"
+    }
+  ]
+}
