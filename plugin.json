@@ -1,0 +1,37 @@
+{
+  "apiVersion": 1,
+  "id": "remote-operation",
+  "name": "Remote Operation",
+  "version": "V-1",
+  "description": "Astro Archive с доверен HTTPS през Tailscale VPN или LAN със собствен доверен сертификат. Сдвояване, защитени сесии и автоматично подновяване. Без публично публикуване.",
+  "author": "Astro Archive",
+  "entry": "main.py",
+  "permissions": [
+    "remote.host"
+  ],
+  "contributions": [
+    {
+      "id": "connection",
+      "slot": "settings",
+      "title": "Remote Operation",
+      "description": "Избор на връзка, адрес, код за сдвояване и свързани устройства."
+    },
+    {
+      "id": "link-status",
+      "slot": "header",
+      "title": "Връзка със сървъра",
+      "description": "Качество на връзката и време за отговор на това устройство.",
+      "clients": [
+        "remote"
+      ]
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "remote.status",
+      "command": "status",
+      "name": "Състояние на дистанционната връзка"
+    }
+  ],
+  "logo": "logo.png"
+}
