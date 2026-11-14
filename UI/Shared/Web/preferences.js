@@ -14,6 +14,7 @@
   let selectedSettingsTab = "appearance";
   const pluginBrowser = window.AstroArchivePluginBrowser.create({
     controlsChanged: () => setBusy(busy),
+    download: id => mutatePlugins('ui.plugins.download',{id}),
     toggle: async (id, enabled) => {const plugin=configuration.plugins.find(p=>p.id===id);if(enabled&&!await window.AstroArchiveFunctions.confirm('Включване на добавка',plugin.name+' изпълнява собствен Python код на този компютър. Включвай добавки от доверен източник. Заявени команди: '+((plugin.permissions||[]).map(p=>p.label).join('; ')||'Без достъп до основните команди.')+' Визуализацията се разрешава отделно.','Включи')){drawPlugins();return;}return mutatePlugins("ui.plugins.toggle", { id, enabled, confirmed:true, revision:plugin.uiRevision });},
     remove: async id => {if(await window.AstroArchiveFunctions.confirm('Премахване на добавка','Добавката ще се изключи и ще се прибере в резервната папка. Настройките ѝ се запазват.','Премахни'))return mutatePlugins("ui.plugins.remove", { id, confirmed:true });},
       permission: async (plugin, allowed) => {if(allowed&&!await window.AstroArchiveFunctions.confirm('Допълнение към интерфейса',plugin.name+' иска да добави: '+plugin.contributions.map(c=>c.title).join(', ')+'. Ще използва готовите компоненти и текущата тема на приложението.','Разреши'))return;return mutatePlugins("ui.plugins.permission", { id:plugin.id, revision:plugin.uiRevision, allowed });},
@@ -84,7 +85,8 @@
     bindings?.pluginsChanged(configuration.plugins);
     fillControls();
     drawProblems();
-    $("ui-plugin-folder-path").textContent = configuration.pluginsFolder || "Plugins";
+    $("ui-plugin-folder-path").textContent = configuration.plugins?.length ? configuration.pluginsFolder : 'Папката Plugins ще се създаде при първото инсталиране.';
+    $("ui-plugin-catalog-status").textContent=configuration.catalogProblem || 'Официални плъгини от GitHub. Изтеглянето не ги включва автоматично.';
   }
 
   function option(select, value, text) {
@@ -127,7 +129,8 @@
   function setBusy(value) {
     busy = value;
     for (const control of $("settings-dialog").querySelectorAll("button, input, select, textarea")) control.disabled = (value && control.getAttribute("role") !== "tab") || control.dataset.pluginBusy === "true" || control.dataset.unavailable === "true" || control.dataset.customRequired === "true";
-    if (!bindings?.desktop) for (const id of ["ui-save", "ui-plugin-install", "ui-plugin-folder", "ui-plugin-scan", "ui-choose-background"]) $(id).disabled = true;
+    if (!bindings?.desktop) for (const id of ["ui-save", "ui-plugin-install", "ui-plugin-folder", "ui-plugin-scan", "ui-plugin-catalog", "app-update-check", "ui-choose-background"]) $(id).disabled = true;
+    if(!configuration?.plugins?.length)$("ui-plugin-folder").disabled=true;
     if (!bindings?.desktop) for (const control of $("settings-dialog").querySelectorAll("[data-debug-section], [data-storage-settings]")) control.disabled = true;
     if (!bindings?.desktop) for (const control of $("customization-editor").querySelectorAll("button,input,select,textarea")) control.disabled = true;
     if (appearanceOnly()) $("ui-choose-background").disabled = true;
@@ -263,6 +266,8 @@
   $("ui-background-color").addEventListener("input", () => { $("ui-background-hex").value = $("ui-background-color").value; preview(); });
   $("ui-background-hex").addEventListener("input", () => { if (/^#[0-9a-f]{6}$/i.test($("ui-background-hex").value)) $("ui-background-color").value = $("ui-background-hex").value; preview(); });
   $("ui-plugin-install").addEventListener("click", () => mutatePlugins("ui.plugins.install"));
+  $("ui-plugin-catalog").addEventListener("click", () => mutatePlugins("ui.plugins.catalog"));
+  $("app-update-check").addEventListener("click", () => checkUpdates());
   $("ui-plugin-scan").addEventListener("click", scanPlugins);
   for (const button of document.querySelectorAll("[data-settings-tab]")) button.addEventListener("click", () => showTab(button.dataset.settingsTab, true));
   document.querySelector(".settings-tabs").addEventListener("keydown", event => {
@@ -283,11 +288,25 @@
     } catch (error) { report(error); }
     finally { setBusy(false); }
   });
+  let checkingUpdates=false;
+  async function checkUpdates(startup=false){
+    if(checkingUpdates||!bindings?.desktop)return;
+    checkingUpdates=true;
+    const status=$('app-update-status'),link=$('app-update-link');
+    status.textContent='Проверка за нова версия…';
+    try{
+      const result=await bindings.call('app.updates.check');
+      status.textContent=result.problem || (result.available?'Налична е нова версия: '+result.latest:!result.currentKnown?'Последна публикувана версия: '+(result.latest||'няма')+'. Това копие няма идентификатор на издание.':'Текуща версия: '+result.current+'. Няма по-ново публикувано издание.');
+      link.hidden=!result.latest||!!result.problem;
+      if(result.available&&startup)window.AstroArchiveFunctions.modal('Нова версия на Astro Archive',body=>{const p=document.createElement('p');p.textContent='Налична е '+result.latest+'.';const a=document.createElement('a');a.href='https://github.com/simonimonov-spec/astro-archive/releases';a.target='_blank';a.rel='noopener noreferrer';a.textContent='Отвори изданията в GitHub';body.append(p,a);});
+    }catch(error){status.textContent='Проверката за версии е недостъпна. Опитай отново.';link.hidden=true;}
+    finally{checkingUpdates=false;}
+  }
   window.AstroArchivePreferences = {
     connect(value) { bindings = value; window.AstroArchiveCustomization?.connect(value); },
     customizationChanged: preview,
     addIcon(icon) { configuration.icons ||= []; if (!configuration.icons.some(i => i.fileName === icon.fileName)) configuration.icons.push(icon); },
-    initialize(data) { accept(data); },
+    initialize(data) { accept(data); if(bindings?.desktop&&!window.AstroArchiveRemote)setTimeout(()=>{checkUpdates(true);bindings.call('ui.plugins.catalog').then(result=>{configuration.pluginCatalog=result.pluginCatalog;configuration.catalogProblem=result.catalogProblem;drawPlugins();$('ui-plugin-catalog-status').textContent=result.catalogProblem||'Каталогът в GitHub е проверен.';}).catch(()=>{});},500); },
     close, open, showTab, refreshAppearance,
     get isOpen() { return $("settings-dialog").open; }
   };

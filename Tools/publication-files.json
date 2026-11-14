@@ -159,24 +159,24 @@
         "destination": "LICENSE.txt"
       },
       {
-        "source": "Plugins/.examples/sample-tools/main.py",
-        "destination": "Plugins/.examples/sample-tools/main.py"
+        "source": "docs/plugin-example/main.py",
+        "destination": "docs/plugin-example/main.py"
       },
       {
-        "source": "Plugins/.examples/sample-tools/plugin.json",
-        "destination": "Plugins/.examples/sample-tools/plugin.json"
+        "source": "docs/plugin-example/plugin.json",
+        "destination": "docs/plugin-example/plugin.json"
       },
       {
-        "source": "Plugins/API-reference.json",
-        "destination": "Plugins/API-reference.json"
+        "source": "docs/plugin-api/API-reference.json",
+        "destination": "docs/plugin-api/API-reference.json"
       },
       {
-        "source": "Plugins/API.md",
-        "destination": "Plugins/API.md"
+        "source": "docs/plugin-api/API.md",
+        "destination": "docs/plugin-api/API.md"
       },
       {
-        "source": "Plugins/Прочети ме.txt",
-        "destination": "Plugins/Прочети ме.txt"
+        "source": "docs/plugin-api/Прочети ме.txt",
+        "destination": "docs/plugin-api/Прочети ме.txt"
       },
       {
         "source": "README.md",
@@ -457,48 +457,26 @@
       {
         "source": "docs/LAUNCHER.md",
         "destination": "docs/LAUNCHER.md"
-      }
-    ],
-    "astro-archive-plugin-ai-training": [
-      {
-        "source": "Plugins/ai-training/.gitignore",
-        "destination": ".gitignore"
       },
       {
-        "source": "Plugins/ai-training/accelerator.py",
-        "destination": "accelerator.py"
+        "source": "Bridge/Plugins/downloads.py",
+        "destination": "Bridge/Plugins/downloads.py"
       },
       {
-        "source": "Plugins/ai-training/learning.py",
-        "destination": "learning.py"
+        "source": "Backend/Foundation/updates.py",
+        "destination": "Backend/Foundation/updates.py"
       },
       {
-        "source": "Plugins/ai-training/legacy_main.py",
-        "destination": "legacy_main.py"
+        "source": "docs/plugin-catalog.json",
+        "destination": "docs/plugin-catalog.json"
       },
       {
-        "source": "Plugins/ai-training/LICENSE-STATUS.md",
-        "destination": "LICENSE-STATUS.md"
+        "source": "tests/test_plugin_downloads.py",
+        "destination": "tests/test_plugin_downloads.py"
       },
       {
-        "source": "Plugins/ai-training/logo.png",
-        "destination": "logo.png"
-      },
-      {
-        "source": "Plugins/ai-training/main.py",
-        "destination": "main.py"
-      },
-      {
-        "source": "Plugins/ai-training/plugin.json",
-        "destination": "plugin.json"
-      },
-      {
-        "source": "Plugins/ai-training/README.md",
-        "destination": "README.md"
-      },
-      {
-        "source": "Plugins/ai-training/Прочети ме.md",
-        "destination": "Прочети ме.md"
+        "source": "Tools/plugin-manifests/frame-inspector-ai.json",
+        "destination": "Tools/plugin-manifests/frame-inspector-ai.json"
       }
     ],
     "astro-archive-plugin-archive-overview": [
@@ -605,10 +583,6 @@
         "destination": "analyzers/trails.py"
       },
       {
-        "source": "Plugins/frame-inspector-ai/ARCHITECTURE-MLP-HISTORICAL.md",
-        "destination": "ARCHITECTURE-MLP-HISTORICAL.md"
-      },
-      {
         "source": "Plugins/frame-inspector-ai/contracts/__init__.py",
         "destination": "contracts/__init__.py"
       },
@@ -693,16 +667,12 @@
         "destination": "pipeline.py"
       },
       {
-        "source": "Plugins/frame-inspector-ai/plugin.json",
+        "source": "Tools/plugin-manifests/frame-inspector-ai.json",
         "destination": "plugin.json"
       },
       {
         "source": "Plugins/frame-inspector-ai/quality.py",
         "destination": "quality.py"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/README-legacy.md",
-        "destination": "README-legacy.md"
       },
       {
         "source": "Plugins/frame-inspector-ai/README.md",
@@ -717,92 +687,8 @@
         "destination": "requirements-gpu.txt"
       },
       {
-        "source": "Plugins/frame-inspector-ai/RESNET-VALIDATION.md",
-        "destination": "RESNET-VALIDATION.md"
-      },
-      {
         "source": "Plugins/frame-inspector-ai/resnet_model.py",
         "destination": "resnet_model.py"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/SAFETY-ACCEPTANCE.md",
-        "destination": "SAFETY-ACCEPTANCE.md"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/tests/test_analyzers.py",
-        "destination": "tests/test_analyzers.py"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/tests/test_dataset.py",
-        "destination": "tests/test_dataset.py"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/tests/test_labeling.py",
-        "destination": "tests/test_labeling.py"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/tests/test_neural.py",
-        "destination": "tests/test_neural.py"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/tests/test_registry.py",
-        "destination": "tests/test_registry.py"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/tests/test_resnet.py",
-        "destination": "tests/test_resnet.py"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/tests/test_service.py",
-        "destination": "tests/test_service.py"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/Trainer/client.py",
-        "destination": "Trainer/client.py"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/Trainer/legacy_mlp_training.py",
-        "destination": "Trainer/legacy_mlp_training.py"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/Trainer/legacy_trainer.pyw",
-        "destination": "Trainer/legacy_trainer.pyw"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/Trainer/resnet_runtime.py",
-        "destination": "Trainer/resnet_runtime.py"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/Trainer/Start AI Trainer.cmd",
-        "destination": "Trainer/Start AI Trainer.cmd"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/Trainer/trainer.pyw",
-        "destination": "Trainer/trainer.pyw"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/Trainer/training_core.py",
-        "destination": "Trainer/training_core.py"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/Trainer/training_job.py",
-        "destination": "Trainer/training_job.py"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/Trainer/training_metrics.py",
-        "destination": "Trainer/training_metrics.py"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/Trainer/workspace.py",
-        "destination": "Trainer/workspace.py"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/Trainer/Прочети ме legacy.txt",
-        "destination": "Trainer/Прочети ме legacy.txt"
-      },
-      {
-        "source": "Plugins/frame-inspector-ai/Trainer/Прочети ме.txt",
-        "destination": "Trainer/Прочети ме.txt"
       },
       {
         "source": "Plugins/frame-inspector-ai/trainer_bridge.py",

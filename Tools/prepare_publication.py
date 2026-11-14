@@ -91,11 +91,10 @@ def plan(root=ROOT, manifest=MANIFEST, core_only=False):
             files.append(dict(source=entry['source'], destination=destination,
                               bytes=source.stat().st_size,
                               sha256=hashlib.sha256(source.read_bytes()).hexdigest()))
-        if name == 'astro-archive' and any(
-                f['destination'].startswith('Plugins/') and
-                not f['destination'].startswith('Plugins/.examples/') and
-                len(PurePosixPath(f['destination']).parts) > 2 for f in files):
-            raise ValueError('Installed plugin code must not be included in core')
+        if name == 'astro-archive' and any(f['destination'].startswith('Plugins/') for f in files):
+            raise ValueError('The core must not include a Plugins directory')
+        if name == 'astro-archive-plugin-ai-training' or any(f['destination'].startswith('Trainer/') for f in files):
+            raise ValueError('AI Trainer is private and must not be published')
         result[name] = sorted(files, key=lambda f: f['destination'])
     return result
 

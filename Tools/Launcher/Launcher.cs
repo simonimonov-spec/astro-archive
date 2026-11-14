@@ -406,6 +406,8 @@ internal sealed class Launcher : Form
         var info = new ProcessStartInfo(Path.Combine(Runtime, "pythonw.exe"), "-I -B \"" + Path.Combine(root, "start.pyw") + "\"") { WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true };
         info.EnvironmentVariables.Remove("PYTHONPATH"); info.EnvironmentVariables.Remove("PYTHONHOME");
         info.EnvironmentVariables["ASTRO_ARCHIVE_READY"] = ready;
+        info.EnvironmentVariables["ASTRO_ARCHIVE_RELEASE_TAG"] = Str(manifest, "release_tag");
+        info.EnvironmentVariables["ASTRO_ARCHIVE_RELEASE_CUTOFF"] = Str(manifest, "release_cutoff");
         using (var process = Process.Start(info))
         {
             var deadline = Stopwatch.StartNew();

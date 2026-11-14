@@ -79,8 +79,7 @@ profile.json
 desktop-session.json
 viewer-preferences.json
 # Installed plugin code belongs to its own repository, not to the core.
-/Plugins/*/
-!/Plugins/.examples/
+/Plugins/
 /Tools/AI Trainer/
 # The old local overview contains workstation-specific launch instructions.
 /Прочети ме.txt

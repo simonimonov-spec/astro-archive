@@ -21,7 +21,7 @@
     }
     return frame;
   }
-  const state = plugin => t(!plugin.available ? "plugins.unavailable" : plugin.busy ? "plugins.running" : plugin.enabled ? "plugins.enabled" : "plugins.disabled");
+  const state = plugin => plugin.installed === false ? 'Наличен за изтегляне' : t(!plugin.available ? "plugins.unavailable" : plugin.busy ? "plugins.running" : plugin.enabled ? "plugins.enabled" : "plugins.disabled");
 
   window.AstroArchivePluginBrowser = {
     create(actions) {
@@ -78,6 +78,12 @@
         if (plugin.author) title.append(node("div", "plugin-meta", plugin.author));
         heading.append(logo(plugin, true), title);
         panel.append(heading, node("p", "plugin-description", plugin.description));
+        if(plugin.installed === false){
+          panel.append(node('p','plugin-meta','Версия: '+plugin.version));
+          const download=actionButton('Изтегли от GitHub',()=>actions.download(plugin.id),'primary-button');
+          panel.append(download);actions.controlsChanged();return;
+        }
+        if(plugin.updateAvailable)panel.append(node('p','settings-note','Налична е версия '+plugin.latestVersion+'. За обновяване изтрий текущия плъгин и изтегли новия. Настройките се запазват.'));
         const toggleLabel = node("label", "checkbox-field plugin-toggle"), toggle = node("input");
         toggle.type = "checkbox"; toggle.checked = !!plugin.enabled; lock(toggle, plugin);
         toggle.addEventListener("change", () => actions.toggle(plugin.id, toggle.checked));
@@ -108,7 +114,8 @@
           else settings.append(node('p','settings-note','Включи плъгина и разреши интерфейса му, за да отвориш настройките.'));
         }
         const footer = node("div", "plugin-actions");
-        const remove = actionButton(t("plugins.remove"), () => actions.remove(plugin.id), "text-button plugin-remove");
+        footer.append(node('span','plugin-meta','Версия: '+plugin.version));
+        const remove = actionButton('Изтрий плъгина', () => actions.remove(plugin.id), "text-button plugin-remove");
         // A broken module can still be removed.
         remove.dataset.pluginBusy = String(!!plugin.busy); footer.append(remove); panel.append(footer);
         actions.controlsChanged();
@@ -120,7 +127,9 @@
       });
       return {
         render(configuration) {
-          plugins = configuration.plugins || [];
+          const installed=configuration.plugins || [],catalog=configuration.pluginCatalog || [];
+          plugins = installed.map(p=>({...p,installed:true,updateAvailable:catalog.find(c=>c.id===p.id)?.updateAvailable,latestVersion:catalog.find(c=>c.id===p.id)?.version}));
+          plugins.push(...catalog.filter(c=>!installed.some(p=>p.id===c.id)).map(c=>({...c,installed:false,available:true})));
           if (!plugins.some(plugin => plugin.id === selectedId)) selectedId = plugins[0]?.id || null;
           drawList(); drawDetails();
         }

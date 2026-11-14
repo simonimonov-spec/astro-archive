@@ -159,7 +159,9 @@
       <section id="settings-panel-plugins" class="settings-section" role="tabpanel" aria-labelledby="settings-tab-plugins" hidden>
         <div class="plugins-heading"><h3 id="plugins-heading" data-i18n="plugins.title">Плъгини</h3><button type="button" class="quiet-button" id="ui-plugin-scan" data-i18n="plugins.scan">Провери папката</button><button type="button" class="quiet-button" id="ui-plugin-folder" data-i18n="plugins.folder">Папка на плъгините</button><button type="button" class="quiet-button" id="ui-plugin-install" data-i18n="plugins.install">Добави плъгин…</button></div>
         <p class="settings-note" data-i18n="plugins.description">Теми, преводи и функционални модули. Всеки плъгин е в собствена подпапка на Plugins.</p>
-        <p id="ui-plugin-folder-path" class="settings-note plugin-folder-path"></p>
+          <p id="ui-plugin-folder-path" class="settings-note plugin-folder-path"></p>
+          <button type="button" class="quiet-button" id="ui-plugin-catalog">Провери каталога и версиите в GitHub</button>
+          <p id="ui-plugin-catalog-status" class="settings-note" role="status"></p>
         <p class="settings-note" data-i18n="plugins.immediate">Инсталирането, включването и премахването се запазват веднага. Външният вид се връща към запазените настройки.</p>
         <p id="ui-plugin-scan-status" class="settings-note" role="status"></p>
         <div class="plugin-browser">
@@ -170,6 +172,9 @@
       </section>
       <section id="settings-panel-diagnostics" class="settings-section" role="tabpanel" aria-labelledby="settings-tab-diagnostics" hidden>
         <div id="diagnostic-resources" class="diagnostic-resources"></div>
+        <div class="plugins-heading"><h3>Версия на програмата</h3><button type="button" class="quiet-button" id="app-update-check">Провери за нова версия</button></div>
+        <p id="app-update-status" class="settings-note" role="status"></p>
+        <a id="app-update-link" href="https://github.com/simonimonov-spec/astro-archive/releases" target="_blank" rel="noopener noreferrer" hidden>Издания в GitHub ↗</a>
         <div class="plugin-actions"><button type="button" class="quiet-button" id="diagnostics-restart" data-i18n="activity.restart">Рестартирай приложението</button></div>
         <p class="settings-note" data-i18n="diagnostics.restartHint">Затваря и стартира отново цялото приложение и услугите му.</p>
         <section id="archive-audit" class="archive-audit"><div class="archive-audit-heading"><h3 id="archive-audit-heading">Проверка на архивите</h3><button type="button" id="archive-audit-run" class="quiet-button">Провери и обнови архива</button><button type="button" id="archive-audit-stop" class="text-button" hidden>Спри безопасно</button></div><p id="archive-audit-scope" class="settings-note">Последователна проверка на FITS хедъри, размери, PNG структура и разположение. Обновява справочните файлове; оригиналите не се променят.</p><progress id="archive-audit-progress" max="100" hidden></progress><p id="archive-audit-status" class="settings-note">Няма извършена проверка.</p><button type="button" id="archive-audit-open" class="text-button" hidden>Покажи подробния отчет ↗</button><details id="archive-audit-issues" hidden><summary id="archive-audit-issues-title"></summary><ul id="archive-audit-issue-list"></ul></details></section>

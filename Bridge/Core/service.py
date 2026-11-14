@@ -32,6 +32,9 @@ class Service:
         from Backend.Foundation.resources import Sampler
         self.sampler=Sampler()
         self.session=SharedSession(self)
+        from Bridge.Plugins.downloads import Downloads
+        from Backend.Foundation.updates import Updates
+        self.downloads=Downloads(self.plugins);self.updates=Updates()
         self._register_bridge();self.plugins.scan()
     def _register_bridge(self):
         self._core_handlers = {
@@ -66,6 +69,9 @@ class Service:
             'ui.plugins.toggle':lambda p:self.toggle_plugin(p),
             'ui.plugins.permission':lambda p:self.permission_plugin(p),
             'ui.plugins.install':lambda p:self.install_plugin(),
+            'ui.plugins.catalog':lambda p:self.plugin_catalog(),
+            'ui.plugins.download':lambda p:self.download_plugin(p['id']),
+            'app.updates.check':lambda p:self.updates.check(),
             'ui.plugins.remove':lambda p:self.remove_plugin(p),
             'ui.plugins.archive':lambda p:self.plugin_archive(p),
             'plugin.call':lambda p:self.plugins.invoke(p['pluginId'],p.get('command',p.get('method')),p.get('parameters',p.get('params',p.get('payload',{})))),
@@ -144,6 +150,8 @@ class Service:
         subprocess.Popen([str(executable)],cwd=executable.parent)
         return dict(opened=True)
     def scan_plugins(self):self.plugins.scan();return self.configuration()
+    def plugin_catalog(self):self.downloads.refresh();return self.configuration()
+    def download_plugin(self,ident):self.downloads.install(ident);return self.configuration()
     def toggle_plugin(self,p):
         if type(p.get('enabled')) is not bool:raise ValueError('Невалидно състояние на плъгин.')
         if p['enabled'] and p.get('revision')!=self.plugins.records[p['id']]['uiRevision']:raise ValueError('Прегледай текущата версия на плъгина.')
@@ -172,7 +180,7 @@ class Service:
         preferences=copy.deepcopy(self.settings.value['preferences'])
         return dict(preferences=preferences,themes=appearance_themes(),
             languages=[dict(id='bg',locale='bg',name='Български',messages={}),dict(id='en',locale='en',name='English',messages={})],
-            plugins=self.plugins.list(),problems=list(self.plugins.problems),backgroundDataUrl=self.settings.value.get('backgroundDataUrl'),pluginsFolder=str(self.plugins.folder),icons=self.settings.value.get('icons',[]))
+            plugins=self.plugins.list(),pluginCatalog=self.downloads.list(),catalogProblem=self.downloads.problem,updates=dict(self.updates.value),problems=list(self.plugins.problems),backgroundDataUrl=self.settings.value.get('backgroundDataUrl'),pluginsFolder=str(self.plugins.folder),icons=self.settings.value.get('icons',[]))
     def bootstrap(self):
         return dict(protocol=1,archives=[dict(a,structure=schema(self.settings,a['id'])) for a in self.settings.value['archives'] if not a.get('hidden') and (not a.get('ownerPlugin') or a['ownerPlugin'] in self.plugins.live)],ui=self.configuration(),activity=self.jobs.snapshot(),problem=None)
     def commit_archive_edit(self,p):
@@ -281,7 +289,9 @@ class Service:
                 if a.get('path') and not a.get('hidden'):self.ensure_index(a['id'])
             return self.bootstrap()
         if method in ('plugin.archives',):return dict(archives=self.bootstrap()['archives'])
-        if method=='ui.plugins.folder':os.startfile(self.plugins.folder);return dict(opened=True)
+        if method=='ui.plugins.folder':
+            if not self.plugins.folder.is_dir():raise ValueError('Папката ще се създаде при първото инсталиране на плъгин.')
+            os.startfile(self.plugins.folder);return dict(opened=True)
         if method=='resources.read':return self.resources()
         if method=='debug.logs.folder':os.startfile(self.store.folder);return dict(opened=True)
         raise ValueError('Неподдържана команда: '+method)

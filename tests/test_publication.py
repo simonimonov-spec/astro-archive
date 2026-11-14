@@ -16,13 +16,15 @@ class PublicationTests(unittest.TestCase):
     def test_workspace_allowlist_separates_plugins_and_trainer(self):
         has_plugins = (ROOT/'Plugins'/'frame-inspector-ai'/'plugin.json').is_file()
         repositories = publication.plan(core_only=not has_plugins)
-        self.assertEqual(len(repositories), 8 if has_plugins else 1)
+        self.assertEqual(len(repositories), 7 if has_plugins else 1)
         core = {f['destination'] for f in repositories['astro-archive']}
         self.assertIn('start.pyw', core)
-        self.assertFalse(any('frame-inspector-ai' in p or 'AI Trainer' in p for p in core))
+        self.assertFalse(any(p.startswith('Plugins/') or 'AI Trainer' in p for p in core))
+        self.assertNotIn('astro-archive-plugin-ai-training', repositories)
         if has_plugins:
             inspector = {f['destination'] for f in repositories['astro-archive-plugin-frame-inspector-ai']}
-            self.assertTrue({'plugin.json', 'Trainer/trainer.pyw', 'requirements-ai.txt', 'requirements-gpu.txt'} <= inspector)
+            self.assertTrue({'plugin.json', 'requirements-ai.txt', 'requirements-gpu.txt'} <= inspector)
+            self.assertFalse(any(p.startswith('Trainer/') for p in inspector))
         for name, files in repositories.items():
             destinations = {f['destination'] for f in files}
             rights_document = 'docs/PROJECT-RIGHTS.md' if name == 'astro-archive' else 'LICENSE-STATUS.md'

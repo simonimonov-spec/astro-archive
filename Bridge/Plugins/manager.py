@@ -60,7 +60,7 @@ class PluginContext:
 class PluginManager:
     def __init__(self,service,folder=None):
         self.service=service;self.settings=service.settings;self.events=service.events
-        self.folder=Path(folder or ROOT/'Plugins').resolve();self.folder.mkdir(parents=True,exist_ok=True)
+        self.folder=Path(folder or ROOT/'Plugins').resolve()
         from Bridge.Plugins.archive_services import ArchiveServices
         self.archive_services=ArchiveServices(service)
         from Bridge.Plugins.inspection_services import InspectionServices
@@ -115,7 +115,7 @@ class PluginManager:
     def scan(self):
         with self.lock:
             found={};self.problems=[]
-            for folder in sorted(self.folder.iterdir()):
+            for folder in sorted(self.folder.iterdir()) if self.folder.exists() else []:
                 if not folder.is_dir() or folder.name.startswith('.') or folder.name=='__pycache__':continue
                 try:
                     folder=within(self.folder,folder.name)
@@ -134,6 +134,7 @@ class PluginManager:
                 elif state.get('enabled') and ident not in self.live:
                     try:self.load(ident)
                     except Exception as error:m['problem']=str(error);state['enabled']=False
+            self.prune_folder()
             self.settings.save();self.events.emit('plugins.changed');return self.list()
     def list(self):
         result=[]
@@ -309,12 +310,20 @@ class PluginManager:
             m=self.records[ident];self.unload(ident);source=within(self.folder,ident)
             destination=self.service.store.folder/'RemovedPlugins'/(ident+'-'+uuid.uuid4().hex);destination.parent.mkdir(parents=True,exist_ok=True)
             shutil.move(str(source),str(destination));self.records.pop(ident);self.state(ident).update(enabled=False,uiAllowed=False);self.settings.save();self.events.emit('plugins.changed')
+            self.prune_folder()
             return dict(preserved=str(destination))
+    def prune_folder(self):
+        # rmdir only removes an actually empty directory; never discard unknown files.
+        try:self.folder.rmdir()
+        except OSError:pass
     def install(self,source):
+        with self.lock:return self._install(source)
+    def _install(self,source):
         source=Path(source).resolve();m=self.manifest(source);destination=self.folder/m['id']
         if destination.exists():raise FileExistsError('Плъгин с този id вече съществува.')
         staging=self.folder/('.install-'+uuid.uuid4().hex)
         try:
+            self.folder.mkdir(parents=True,exist_ok=True)
             staging.mkdir()
             for parent,dirs,names in os.walk(source,followlinks=False):
                 dirs[:]=[d for d in dirs if not d.startswith('.') and d not in ('__pycache__','node_modules')]
@@ -323,4 +332,5 @@ class PluginManager:
             staging.rename(destination)
         finally:
             if staging.exists() and staging.resolve().is_relative_to(self.folder) and staging.name.startswith('.install-'):shutil.rmtree(staging)
+            self.prune_folder()
         self.scan();return dict(installed=m['id'])

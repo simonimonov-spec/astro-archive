@@ -1,0 +1,59 @@
+{
+  "format": 1,
+  "plugins": [
+    {
+      "id": "archive-overview",
+      "name": "Справка по обекти",
+      "version": "V-1",
+      "description": "Примерна независима добавка: чете постоянния индекс и добавя статистика, таблица и диаграма без промяна на приложението.",
+      "repository": "simonimonov-spec/astro-archive",
+      "commit": "273d3fdf20ab9eb245fe2084b10f73b95b46f05e",
+      "sha256": "f4e3460ede89c424045b9cba4f5cfe2c9f9c86efda265571a87762c59007f021"
+    },
+    {
+      "id": "frame-inspector-ai",
+      "name": "AI оценител",
+      "version": "Beta-1",
+      "description": "AI оценител на FITS кадри: облаци, следи и препятствия. Евристичен режим без активен обучен модел; незадължителен ResNet анализ.",
+      "repository": "simonimonov-spec/astro-archive",
+      "commit": "ba80e8a49b7deb7e2898fc75dab1349e277e44d8",
+      "sha256": "847457cd712cc685b7d2f8740fa2af13fc830df0506f0c219e65aa49c4f0e56f"
+    },
+    {
+      "id": "siril-auto",
+      "name": "Автоматично стакване чрез Siril",
+      "version": "V-1",
+      "description": "Независим Siril CLI плъгин с настройваем брой паралелни процеси, отделни работни папки, общ CPU/RAM бюджет, оценка и обединяване на приетите дневни стакове.",
+      "repository": "simonimonov-spec/astro-archive",
+      "commit": "f74b7c1a218088b08b0d741fe730fabbf5274c6a",
+      "sha256": "8690a3c31d4bbe2a2ec4db39e02f63c3cc331d27c25d2fd34f815d0d51a15db9"
+    },
+    {
+      "id": "remote-operation",
+      "name": "Remote Operation",
+      "version": "V-1",
+      "description": "Astro Archive с доверен HTTPS през Tailscale VPN или LAN със собствен доверен сертификат. Сдвояване, защитени сесии и автоматично подновяване. Без публично публикуване.",
+      "repository": "simonimonov-spec/astro-archive",
+      "commit": "c1fd0f6148f819407d98d0738c871853e70c86f8",
+      "sha256": "4433c538e6b9bc815100106463f1ac51b031d1490de7c2fd8c39285c4cda7e0a"
+    },
+    {
+      "id": "shared-archives",
+      "name": "Shared Archives · LAN",
+      "version": "V-1",
+      "description": "Споделени архиви между Windows инстанции на Astro Archive през LAN със задължително SMB 3 шифроване. Локални и мрежови архиви едновременно; четене, запис и създаване на нови архиви.",
+      "repository": "simonimonov-spec/astro-archive",
+      "commit": "3c66334aa4430fe9f951f61cfc4d156b0a46f58d",
+      "sha256": "e9d5564aafed5c62ddbc7178fae1e1c65d45a45ee74a6f30baa9bf9f130f613e"
+    },
+    {
+      "id": "iasc-campaigns",
+      "name": "IASC Campaigns",
+      "version": "V-1",
+      "description": "Избор на IASC кампании и екипи, известия за нови Image Sets и проверено изтегляне в отделен архив. Самостоятелен плъгин; без автоматично изпращане на отчети.",
+      "repository": "simonimonov-spec/astro-archive",
+      "commit": "f6f2194382f5d8419da235b549b3bb81a7428b91",
+      "sha256": "10e1b9b64404fc8634602e308f351447d23ff5ae85b0a9ad0a919d051639e6a7"
+    }
+  ]
+}

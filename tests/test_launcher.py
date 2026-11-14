@@ -29,7 +29,7 @@ class LauncherIsolationTests(unittest.TestCase):
         self.assertEqual(installation_id(ROOT), installation_id(ROOT / 'Bridge' / '..'))
 
     def test_ready_file_is_limited_to_own_cache(self):
-        with tempfile.TemporaryDirectory(dir=ROOT / 'publication-review') as temp:
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
             root = Path(temp)
             folder = root / 'Backend' / 'Cache' / 'data'
             folder.mkdir(parents=True)
