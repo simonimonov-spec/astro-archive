@@ -31,10 +31,11 @@ internal sealed class Launcher : Form
     ListBox issues;
     readonly CancellationTokenSource stop = new CancellationTokenSource();
     readonly bool preview;
-    string status = "Проверка на файловете…", detail = "Подготвяме твоята вселена", phase = "ПОДГОТОВКА";
+    string status = "Проверка на файловете…", detail = "Подготвяме твоята вселена", phase = "Подготовка";
     float progress = .04f;
     Icon logo;
     bool busy;
+    string updateTitle, updateVersion, updateDate;
     Dictionary<string, object> manifest;
     string Runtime { get { return Path.Combine(root, ".runtime", "python"); } }
     string Python { get { return Path.Combine(Runtime, "python.exe"); } }
@@ -55,12 +56,12 @@ internal sealed class Launcher : Form
                 int n = Array.IndexOf(args, "--render");
                 if (n + 1 == args.Length) return 2;
                 window.CreateControl(); window.progress = .64f;
-                window.phase = "ПРОВЕРКА НА КОМПОНЕНТИТЕ";
+                window.phase = "Проверка на компонентите";
                 window.status = "Всичко е на правилната орбита";
                 window.detail = "Python • библиотеки • файлове • версия";
                 if (args.Contains("--missing"))
                 {
-                    window.phase = "НУЖНИ СА ДОПЪЛНИТЕЛНИ КОМПОНЕНТИ";
+                    window.phase = "Нужни са допълнителни компоненти";
                     window.status = "Нужно е изтегляне преди стартиране";
                     window.detail = "Изтеглянето започва само след избор на „Изтегли“";
                     window.ShowIssues(new[] { "Самостоятелна Python среда 3.13.9 x64", "NumPy • SciPy • Astropy • Photutils • Pillow", "Точните версии се проверяват преди отваряне." });
@@ -68,9 +69,8 @@ internal sealed class Launcher : Form
                 }
                 if (args.Contains("--update"))
                 {
-                    window.phase = "ИМА НОВА ВЕРСИЯ"; window.status = "Налична е нова версия на Astro Archive";
-                    window.detail = "Текущото копие ще остане запазено";
-                    window.AddButton("Изтегли", delegate { }); window.AddButton("Пропусни сега", delegate { }); window.AddButton("Пропусни версията", delegate { });
+                    window.ShowUpdate("Astro Archive — нови възможности", "Примерно издание", "2026-11-14");
+                    window.AddButton("Виж новата версия", delegate { }); window.AddButton("Пропусни сега", delegate { }); window.AddButton("Пропусни версията", delegate { });
                 }
                 window.ShowInTaskbar = false; window.Opacity = 0; window.Show(); window.Refresh();
                 using (var bitmap = new Bitmap(window.Width, window.Height))
@@ -159,7 +159,7 @@ internal sealed class Launcher : Form
             if (rendering) return;
             if (preview)
             {
-                phase = "ПРЕГЛЕД НА НОВОТО СТАРТИРАНЕ";
+                phase = "Преглед на новото стартиране";
                 status = "Проверка на нужните файлове…";
                 detail = "Демонстрация • без изтегляне и промяна на данни";
                 AddButton("Затвори прегледа", Close);
@@ -179,6 +179,7 @@ internal sealed class Launcher : Form
     { status = text; detail = sub; progress = value; Invalidate(); }
     void ClearButtons()
     {
+        updateTitle = null;
         foreach (var b in buttons) { Controls.Remove(b); b.Dispose(); } buttons.Clear();
         if (issues != null) { Controls.Remove(issues); issues.Dispose(); issues = null; }
     }
@@ -204,7 +205,7 @@ internal sealed class Launcher : Form
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            phase = "СТАРТИРАНЕТО Е СПРЯНО";
+            phase = "Стартирането е спряно";
             Update("Не успяхме да завършим подготовката", ex.Message, progress);
             ClearButtons(); AddButton("Опитай отново", async () => await Guard(Start));
             AddButton("Затвори", Close);
@@ -218,30 +219,31 @@ internal sealed class Launcher : Form
         {
             string path = Path.GetFullPath(Path.Combine(root, entry.Key.Replace('/', Path.DirectorySeparatorChar)));
             if (!path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Невалиден път в пакета.");
-            if (!File.Exists(path) || Hash(File.ReadAllBytes(path)) != Convert.ToString(entry.Value)) missing.Add(entry.Key);
+            // Working copies can change between releases. Only absent files prevent startup.
+            if (!File.Exists(path)) missing.Add(entry.Key);
         }
         return missing;
     }
     async Task Start()
     {
-        ClearButtons(); phase = "ПРОВЕРКА НА ФАЙЛОВЕТЕ";
-        Update("Проверка на нужните файлове…", "Проверяваме целостта на това копие", .1f);
+        ClearButtons(); phase = "Проверка на файловете";
+        Update("Проверка на нужните файлове…", "Проверяваме дали нужните файлове са налични", .1f);
         var missing = await Task.Run(() => CheckFiles());
         if (missing.Count > 0)
         {
-            phase = "ЛИПСВАЩИ ИЛИ ПРОМЕНЕНИ ФАЙЛОВЕ";
+            phase = "Липсват програмни файлове";
             Update("Нужно е възстановяване на файлове", "Виж точния списък преди изтегляне", .1f);
             ShowIssues(missing);
             AddButton("Покажи файловете", () => MessageBox.Show(this, string.Join("\n", missing), "Файлове за възстановяване", MessageBoxButtons.OK, MessageBoxIcon.Warning));
             string packagePage = Str(manifest, "release_tag").Contains("preview") ? Releases : Releases + "/tag/" + Uri.EscapeDataString(Str(manifest, "release_tag"));
-            AddButton("Изтегли пакета", () => OpenRelease(packagePage)); AddButton("Затвори", Close); return;
+            AddButton("Към изданията", () => OpenRelease(packagePage)); AddButton("Затвори", Close); return;
         }
-        phase = "ПРОВЕРКА НА КОМПОНЕНТИТЕ";
+        phase = "Проверка на компонентите";
         Update("Проверка на Python и библиотеките…", "Самостоятелна среда за тази инсталация", .28f);
         string probe = await Probe();
         if (probe != "READY")
         {
-            phase = "НУЖНИ СА ДОПЪЛНИТЕЛНИ КОМПОНЕНТИ";
+            phase = "Нужни са допълнителни компоненти";
             Update("Нужно е изтегляне преди стартиране", "Изтеглянето започва само след избор на „Изтегли“", .28f);
             ShowIssues(probe.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries));
             AddButton("Виж какво липсва", () => MessageBox.Show(this, probe, "Необходими компоненти"));
@@ -308,7 +310,7 @@ internal sealed class Launcher : Form
     }
     async Task Install()
     {
-        phase = "ИЗТЕГЛЯНЕ НА КОМПОНЕНТИ";
+        phase = "Изтегляне на компоненти";
         Update("Изтегляне на Python 3.13.9…", "Официален източник: python.org", .35f);
         string stage = Path.Combine(root, ".runtime", "prepare-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(stage);
@@ -343,7 +345,7 @@ internal sealed class Launcher : Form
     async Task CheckUpdates()
     {
         string resultNote = "Проверките приключиха";
-        phase = "ПРОВЕРКА ЗА НОВА ВЕРСИЯ";
+        phase = "Проверка за нова версия";
         Update("Търсене на публикувана версия…", "Само издания от официалното хранилище", .82f);
         try
         {
@@ -360,9 +362,8 @@ internal sealed class Launcher : Form
             if (release != null && Str(ReadState(), "skipped_release") != Str(release, "id"))
             {
                 string page = Str(release, "html_url"); ValidateReleaseURL(page);
-                phase = "ИМА НОВА ВЕРСИЯ";
-                Update("Налична е " + Str(release, "name"), "Текущото копие ще остане запазено", .86f);
-                AddButton("Изтегли", () => { OpenRelease(page); AddContinue(); });
+                ShowUpdate(Str(release, "name"), Str(release, "tag_name"), Str(release, "published_at"));
+                AddButton("Виж новата версия", () => { OpenRelease(page); AddContinue(); });
                 AddButton("Пропусни сега", async () => await Guard(() => Launch("Версията е пропусната за това стартиране")));
                 AddButton("Пропусни версията", async () => await Guard(async () =>
                 {
@@ -390,6 +391,15 @@ internal sealed class Launcher : Form
     }
     void AddContinue()
     { ClearButtons(); AddButton("Стартирай това копие", async () => await Guard(() => Launch("Стартиране на текущата версия"))); AddButton("Затвори", Close); }
+    void ShowUpdate(string title, string version, string published)
+    {
+        updateTitle = string.IsNullOrWhiteSpace(title) ? version : title;
+        updateVersion = version;
+        DateTime date;
+        updateDate = DateTime.TryParse(published, out date) ? date.ToString("dd.MM.yyyy") : "";
+        phase = "Нова версия е на хоризонта";
+        Update("Открий какво е новото", "Виж описанието и пакета в GitHub • това копие остава запазено", .86f);
+    }
     static void ValidateReleaseURL(string url)
     {
         Uri uri;
@@ -398,7 +408,7 @@ internal sealed class Launcher : Form
     static void OpenRelease(string url) { ValidateReleaseURL(url); Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
     async Task Launch(string note)
     {
-        ClearButtons(); phase = "СТАРТИРАНЕ НА ASTRO ARCHIVE";
+        ClearButtons(); phase = "Стартиране на Astro Archive";
         Update("Отваряме твоя архив…", note, .96f);
         string token = Guid.NewGuid().ToString("N");
         string ready = Path.Combine(root, "Backend", "Cache", "data", "launcher-ready-" + token + ".json");
@@ -429,6 +439,20 @@ internal sealed class Launcher : Form
         try
         {
             if (CheckFiles().Count != 0) return 1;
+            // Changed contents are allowed; absent files must still be reported.
+            object originalFiles = manifest["files"];
+            string fixture = "publication-review/launcher-file-check-" + Guid.NewGuid().ToString("N") + ".txt";
+            string fixturePath = Path.Combine(root, fixture);
+            Directory.CreateDirectory(Path.GetDirectoryName(fixturePath));
+            try
+            {
+                manifest["files"] = new Dictionary<string, object> { { fixture, "old-hash" } };
+                File.WriteAllText(fixturePath, "edited working copy");
+                if (CheckFiles().Count != 0) return 5;
+                File.Delete(fixturePath);
+                if (!CheckFiles().SequenceEqual(new[] { fixture })) return 6;
+            }
+            finally { manifest["files"] = originalFiles; if (File.Exists(fixturePath)) File.Delete(fixturePath); }
             ValidateReleaseURL(Releases);
             try { ValidateReleaseURL("https://example.com/releases"); return 2; } catch (InvalidDataException) { }
             string temporary = Path.Combine(root, ".runtime", "test-" + Guid.NewGuid().ToString("N"));
@@ -458,8 +482,20 @@ internal sealed class Launcher : Form
             using (var star = new SolidBrush(Color.FromArgb(random.Next(35, 110), 177, 214, 235))) g.FillEllipse(star, x, y, i % 6 == 0 ? 2 : 1, i % 6 == 0 ? 2 : 1);
         }
         if (logo != null) g.DrawIcon(logo, new Rectangle(270, 32, 60, 60));
-        DrawText(g, "ASTRO ARCHIVE", 108, 23, Color.FromArgb(231, 243, 250), FontStyle.Bold);
-        DrawText(g, "ТВОЯТА ВСЕЛЕНА. ПОДРЕДЕНА.", 146, 8, Color.FromArgb(123, 160, 183), FontStyle.Regular);
+        DrawText(g, "Astro Archive", 108, 23, Color.FromArgb(231, 243, 250), FontStyle.Bold);
+        DrawText(g, "Твоята вселена. Подредена.", 146, 8, Color.FromArgb(123, 160, 183), FontStyle.Regular);
+        if (updateTitle != null)
+        {
+            var card = new Rectangle(36, 196, 528, 158);
+            using (var fill = new LinearGradientBrush(card, Color.FromArgb(24, 57, 78), Color.FromArgb(36, 31, 68), 25f))
+                g.FillRectangle(fill, card);
+            using (var border = new Pen(Color.FromArgb(86, 183, 201))) g.DrawRectangle(border, card);
+            DrawText(g, "✦  Ново публикувано издание", 208, 10, Color.FromArgb(137, 224, 228), FontStyle.Bold);
+            DrawText(g, updateTitle, 244, 17, Color.FromArgb(240, 245, 255), FontStyle.Bold);
+            DrawText(g, updateVersion + (updateDate.Length > 0 ? "  •  " + updateDate : ""), 292, 10, Color.FromArgb(190, 197, 225), FontStyle.Regular);
+        }
+        else
+        {
         float cx = 300, cy = 282, radius = 77;
         using (var pen = new Pen(Color.FromArgb(34, 89, 128, 154), 1)) g.DrawEllipse(pen, cx - radius, cy - radius * .62f, radius * 2, radius * 1.24f);
         for (int r = 33; r > 9; r -= 3) using (var glow = new SolidBrush(Color.FromArgb(5, 255, 182, 66))) g.FillEllipse(glow, cx - r, cy - r, r * 2, r * 2);
@@ -470,6 +506,7 @@ internal sealed class Launcher : Form
         using (var land = new SolidBrush(Color.FromArgb(113,183,145))) { g.FillEllipse(land,ex-7,ey-4,7,5); g.FillEllipse(land,ex+1,ey+1,5,6); }
         float mx = ex + 22 * (float)Math.Cos(t * 2.6), my = ey + 15 * (float)Math.Sin(t * 2.6);
         using (var moon = new SolidBrush(Color.FromArgb(205,214,221))) g.FillEllipse(moon,mx-3,my-3,6,6);
+        }
         DrawText(g, phase, 374, 8, Color.FromArgb(102, 196, 210), FontStyle.Bold);
         DrawText(g, status, 401, 14, Color.FromArgb(225, 238, 246), FontStyle.Regular);
         using (var track = new Pen(Color.FromArgb(31, 56, 75), 3)) g.DrawLine(track, 50, 457, 550, 457);
