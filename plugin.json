@@ -9,14 +9,15 @@
   "logo": "logo.png",
   "permissions": [
     "archive.read",
-    "processing.manage"
+    "processing.manage",
+    "capabilities.invoke"
   ],
   "contributions": [
     {
       "id": "automatic-stacking",
       "slot": "preparation",
       "title": "Автоматично стакване със Siril",
-      "description": "Работни копия → дневни стакове → оценка → обединяване",
+      "description": "Настройки → работа → оценка на всеки ден",
       "activate": "prepare",
       "layout": "workbench"
     },

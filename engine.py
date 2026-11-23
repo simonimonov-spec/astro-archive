@@ -5,18 +5,23 @@ from pathlib import Path
 
 DEFAULTS=dict(executable='',debayer=True,registration=True,mosaic=True,drizzle=False,scale=1.,pixfrac=1.,
               normalize='addscale',rejection=True,sigmaLow=3.,sigmaHigh=3.,background=False,
-              cpu=max(1,os.cpu_count() or 1),memory=.8,parallel=1,dark='',flat='',bias='',combine=False,override=False)
+              cpu=max(1,os.cpu_count() or 1),memory=.8,parallel=1,dark='',flat='',bias='',combine=False,override=False,
+              chunkSize=0,aiFilter=False,aiPercent=10.)
+
+MIN_CHUNK=10;MAX_CHUNK=100000
 
 MAX_PARALLEL=16
 
 def settings(values):
     result=dict(DEFAULTS,**{k:v for k,v in values.items() if k in DEFAULTS})
-    for key in ('debayer','registration','mosaic','drizzle','rejection','background','combine','override'):
+    for key in ('debayer','registration','mosaic','drizzle','rejection','background','combine','override','aiFilter'):
         if type(result[key]) is not bool:raise ValueError('Невалидна отметка: '+key)
-    for key,lo,hi in [('scale',.5,3),('pixfrac',.1,1),('sigmaLow',.1,10),('sigmaHigh',.1,10),('memory',.05,.95),('cpu',1,os.cpu_count() or 1),('parallel',1,MAX_PARALLEL)]:
+    for key,lo,hi in [('scale',.5,3),('pixfrac',.1,1),('sigmaLow',.1,10),('sigmaHigh',.1,10),('memory',.05,.95),('cpu',1,os.cpu_count() or 1),('parallel',1,MAX_PARALLEL),('aiPercent',0,90)]:
         value=result[key]
         if type(value) not in (int,float) or not lo<=value<=hi:raise ValueError('Невалидна стойност: '+key)
     if result['parallel']!=int(result['parallel']):raise ValueError('Броят паралелни процеси трябва да е цяло число.')
+    chunk=result['chunkSize']
+    if type(chunk) is not int or not (chunk==0 or MIN_CHUNK<=chunk<=MAX_CHUNK):raise ValueError(f'Кадрите на част са 0 (без разделяне) или от {MIN_CHUNK} до {MAX_CHUNK}.')
     result['cpu']=int(result['cpu']);result['parallel']=int(result['parallel'])
     if result['normalize'] not in ('addscale','add','mulscale','mul','none'):raise ValueError('Непозната нормализация.')
     for key in ('executable','dark','flat','bias'):
@@ -63,6 +68,14 @@ def plan(options,cfa=False,combined=False):
     normalize='-nonorm' if o['normalize']=='none' else '-norm='+o['normalize']
     lines+=['stack '+registered+' rej '+reject+' '+normalize+' -filter-included -32b -out=result'+(' -maximize' if o['registration'] and o['mosaic'] else '')+(' -weight=nbstack' if combined else '')]
     return lines,registered
+
+def merge_options(options,count):
+    """Merge part stacks of one night: align, weight by frame count, no re-calibration."""
+    o=settings(options)
+    o.update(debayer=False,drizzle=False,background=False,dark='',flat='',bias='',registration=True,scale=1.,rejection=o['rejection'] and count>=3)
+    return o
+
+def merge_plan(options,count):return plan(merge_options(options,count),cfa=False,combined=True)[0]
 
 def included(folder,sequence,count):
     """Read Siril file numbers; registration may omit failed original numbers."""
