@@ -686,9 +686,9 @@ internal sealed class Launcher : Form
             if (!skipped.SetEquals(new[] { "101", "202" }) || skipped.Contains("303")) return 7;
             var cutoff = DateTimeOffset.Parse("2026-11-24T11:00:00Z");
             var lower = TestRelease(1, "beta1.2.2", "2026-11-24T12:00:00Z");
-            var same = TestRelease(2, "beta1.3.0", "2026-11-25T12:00:00Z");
-            var earlier = TestRelease(3, "beta1.3", "2026-11-23T12:00:00Z");
-            if (SelectUpdate(new[] { lower, same }, 3, "beta1.3", cutoff) != null) return 8;
+            var same = TestRelease(2, "beta1.4.0", "2026-11-25T12:00:00Z");
+            var earlier = TestRelease(3, "beta1.4", "2026-11-23T12:00:00Z");
+            if (SelectUpdate(new[] { lower, same }, 3, "beta1.4", cutoff) != null) return 8;
             if (SelectUpdate(new[] { earlier }, 1, "beta1.2.2", cutoff) != null) return 9;
             var desired = TestRelease(4, "beta1.10", "2026-11-25T12:00:00Z");
             if (SelectUpdate(new[] { TestRelease(5, "beta1.9", "2026-11-27T12:00:00Z"),

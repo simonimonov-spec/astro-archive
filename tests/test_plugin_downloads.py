@@ -122,9 +122,9 @@ class UpdateTests(unittest.TestCase):
 
     def test_release_check_rejects_newly_published_lower_beta(self):
         for current, cutoff, tag, published in (
-            ('beta1.3', '2026-11-23T11:00:00Z', 'beta1.2.2', '2026-11-24T12:00:00Z'),
-            ('beta1.3', '2026-11-23T11:00:00Z', 'beta1.3.0', '2026-11-25T12:00:00Z'),
-            ('beta1.2.2', '2026-11-24T11:00:00Z', 'beta1.3', '2026-11-23T12:00:00Z'),
+            ('beta1.4', '2026-11-23T11:00:00Z', 'beta1.2.2', '2026-11-24T12:00:00Z'),
+            ('beta1.4', '2026-11-23T11:00:00Z', 'beta1.4.0', '2026-11-25T12:00:00Z'),
+            ('beta1.2.2', '2026-11-24T11:00:00Z', 'beta1.4', '2026-11-23T12:00:00Z'),
         ):
             releases = [dict(tag_name=tag, published_at=published, draft=False)]
             with self.subTest(current=current, offered=tag), patch.dict(os.environ, {
