@@ -77,6 +77,27 @@ class DownloadTests(unittest.TestCase):
         for patch_value in ({'id':'ai-training'},{'repository':'someone/other'},{'commit':'main'}):
             with self.subTest(patch_value=patch_value),self.assertRaises(ValueError):validate(dict(format=1,plugins=[dict(self.entry,**patch_value)]))
 
+    def test_archive_source_package_selects_compatible_download(self):
+        newer = archive({'plugin.json':json.dumps(dict(id='sample', apiVersion=1, name='Sample',
+                        description='Sources', version='V-2.1', entry='main.py')), 'main.py':''})
+        package = dict(description='Sources', version='V-2.1', commit='2'*40,
+                       sha256=hashlib.sha256(newer).hexdigest())
+        item = dict(self.entry, archiveSourcePackage=package)
+        self.downloads.entries = validate(dict(format=1, plugins=[item]))
+        self.assertEqual(self.downloads.entries, [dict(self.entry, **package)])
+        self.assertEqual(item['version'], 'V-1')
+        with patch('Bridge.Plugins.downloads.fetch', return_value=newer) as fetch:
+            self.downloads.install('sample')
+        self.assertIn(package['commit'], fetch.call_args.args[0])
+        self.assertEqual(self.manager.records['sample']['version'], 'V-2.1')
+
+    def test_rejects_unverified_archive_source_package(self):
+        good = dict(version='V-2.1', description='Sources', commit='2'*40, sha256='b'*64)
+        for package in (None, dict(good, commit='main'), dict(good, repository='someone/other'),
+                        dict(good, version=''), dict(good, sha256='invalid')):
+            with self.subTest(package=package), self.assertRaises(ValueError):
+                validate(dict(format=1, plugins=[dict(self.entry, archiveSourcePackage=package)]))
+
     def test_hostile_zip_paths_and_symlinks(self):
         for name in ('../escape','a/../../escape','/outside','a\\evil.py','a:stream','CON.txt','nul','a./file'):
             with self.subTest(name=name),tempfile.TemporaryDirectory(dir=self.root) as folder,self.assertRaises(ValueError):unpack(archive({name:'x'}),Path(folder))

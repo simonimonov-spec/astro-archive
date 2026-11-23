@@ -29,21 +29,39 @@ def fetch(url, limit):
         return data
 
 
+def validate_package(item):
+    if item.get('repository') != REPOSITORY:
+        raise ValueError('Каталогът трябва да сочи проверено официално изтегляне.')
+    for field, length in (('commit', 40), ('sha256', 64)):
+        value = item.get(field)
+        if not isinstance(value, str) or len(value) != length or not re.fullmatch(r'[0-9a-f]+', value):
+            raise ValueError('Каталогът трябва да сочи проверено официално изтегляне.')
+    for field in ('name', 'description', 'version'):
+        if not isinstance(item.get(field), str) or not item[field] or len(item[field]) > 2000:
+            raise ValueError('Непълно описание на плъгин.')
+
+
 def validate(document):
     if not isinstance(document, dict) or document.get('format') != 1 or not isinstance(document.get('plugins'), list) or len(document['plugins']) > 100:
         raise ValueError('Невалиден каталог на плъгините.')
-    seen = set()
+    entries, seen = [], set()
     for item in document['plugins']:
         if not isinstance(item, dict):raise ValueError('Невалиден запис в каталога.')
         ident = item.get('id', '')
-        if not re.fullmatch(r'[a-z][a-z0-9_-]{0,63}', ident) or ident in seen or ident == 'ai-training':
+        if not isinstance(ident, str) or not re.fullmatch(r'[a-z][a-z0-9_-]{0,63}', ident) or ident in seen or ident == 'ai-training':
             raise ValueError('Невалиден публичен плъгин.')
         seen.add(ident)
-        if item.get('repository') != REPOSITORY or not re.fullmatch(r'[0-9a-f]{40}', item.get('commit', '')) or not re.fullmatch(r'[0-9a-f]{64}', item.get('sha256', '')):
-            raise ValueError('Каталогът трябва да сочи проверено официално изтегляне.')
-        for field in ('name', 'description', 'version'):
-            if not isinstance(item.get(field), str) or not item[field] or len(item[field]) > 2000:raise ValueError('Непълно описание на плъгин.')
-    return document['plugins']
+        validate_package(item)
+        # Earlier builds ignore this field and keep using the base package.
+        if 'archiveSourcePackage' in item:
+            package = item['archiveSourcePackage']
+            if not isinstance(package, dict) or set(package) != {'description', 'version', 'commit', 'sha256'}:
+                raise ValueError('Невалиден пакет за споделен източник.')
+            item = dict(item, **package)
+            del item['archiveSourcePackage']
+            validate_package(item)
+        entries.append(item)
+    return entries
 
 
 def unpack(data, target):

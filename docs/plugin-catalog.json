@@ -44,7 +44,13 @@
       "description": "Споделяне на архиви през шифрован SMB 3 в LAN и пробен режим за автоматично откриване, преглед и защитен запис между две копия на Astro Archive на един Windows компютър.",
       "repository": "simonimonov-spec/astro-archive",
       "commit": "97067f94d51f67e6cc043083d618f86d51220619",
-      "sha256": "d5ced467e2d93bf326aa51d76cd44263a790837ec62e318f772b7350c5d7d69e"
+      "sha256": "d5ced467e2d93bf326aa51d76cd44263a790837ec62e318f772b7350c5d7d69e",
+      "archiveSourcePackage": {
+        "version": "V-2.1",
+        "description": "Споделени източници за кадри, стакове и снимки между две копия на Astro Archive на един Windows компютър. JSON каталог, известия и изтегляне при отваряне. Шифрован SMB 3 за споделяне между компютри.",
+        "commit": "33c6223e40c3a5d3e4f941dd5e4689cc0e0c3a20",
+        "sha256": "00fb8a910792ee185c51e7050968be777e94ca740c28fb3d83c748e0850f3975"
+      }
     },
     {
       "id": "iasc-campaigns",
