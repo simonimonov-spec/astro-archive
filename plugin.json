@@ -18,6 +18,12 @@
       "clients": ["desktop"]
     },
     {
+      "id": "local-library",
+      "slot": "archive",
+      "title": "Споделени архиви",
+      "clients": ["desktop"]
+    },
+    {
       "id": "network",
       "slot": "settings",
       "title": "Shared Archives · хост и връзки",

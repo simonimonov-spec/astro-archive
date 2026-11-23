@@ -14,6 +14,7 @@ from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from .catalog_documents import PAGE_SIZE, identifier, snapshot, store
 from .managed_files import Conflict, ManagedFiles, transfer
 from .validation import atomic, label
 
@@ -51,7 +52,7 @@ def discover(folder, own_identity):
 
 
 class LocalHost:
-    def __init__(self, folder, identity, name, archives):
+    def __init__(self, folder, identity, name, archives, *, catalog_folder=None):
         if not re.fullmatch(r"[a-zA-Z0-9_-]{1,80}", identity):
             raise ValueError("Невалиден идентификатор на инсталацията.")
         if not archives:
@@ -75,6 +76,12 @@ class LocalHost:
         self.stopping = True
         self.clients = {}
         self.activity = deque(maxlen=100)
+        self.catalog_folder = catalog_folder or self.folder / "Catalogs" / identity
+        self.catalogs = {}
+        self.catalog_unavailable = set()
+        self.catalog_epoch = secrets.token_hex(16)
+        self.catalog_lock = threading.RLock()
+        self.scan_lock = threading.Lock()
 
     def start(self):
         if self.server is not None:
@@ -171,6 +178,50 @@ class LocalHost:
                     return result
         return result
 
+    def refresh_catalogs(self):
+        changed = []
+        with self.scan_lock:
+            for ident, (name, kind, archive) in self.archives.items():
+                try:
+                    document = snapshot(archive, lambda path: self.file_type(kind, path))
+                    document["revision"] = identifier(self.catalog_epoch, name, document["revision"])
+                    with self.catalog_lock:
+                        previous = self.catalogs.get(ident)
+                    if not previous or previous["revision"] != document["revision"]:
+                        document.update(archive=ident, name=name, host=self.identity)
+                        store(self.catalog_folder, identifier(self.identity, ident), document)
+                        with self.catalog_lock:
+                            self.catalogs[ident] = document
+                        if previous:
+                            changed.append(name)
+                    with self.catalog_lock:
+                        self.catalog_unavailable.discard(ident)
+                except OSError:
+                    with self.catalog_lock:
+                        self.catalog_unavailable.add(ident)
+        return changed
+
+    def catalog(self, ident, data):
+        with self.catalog_lock:
+            needs_scan = ident not in self.catalogs
+        if needs_scan:
+            self.refresh_catalogs()
+        with self.catalog_lock:
+            document = self.catalogs.get(ident)
+            if document is None or ident in self.catalog_unavailable:
+                raise RequestError(503, "Каталогът на архива е временно недостъпен.")
+            revision = document["revision"]
+            offset = data.get("offset", 0)
+            if type(offset) is not int or offset < 0:
+                raise ValueError("Невалидна страница на каталога.")
+            if offset and data.get("revision") != revision:
+                raise RequestError(409, "Каталогът беше обновен. Опитай отново.")
+            if not offset and data.get("known") == revision:
+                return dict(revision=revision, rows=None, next=None)
+            rows = document["rows"][offset:offset+PAGE_SIZE]
+            remaining = offset + len(rows) < len(document["rows"])
+            return dict(revision=revision, rows=rows, next=offset+len(rows) if remaining else None)
+
     def dispatch(self, identity, action, data):
         with self.lock:
             if self.stopping:
@@ -185,7 +236,7 @@ class LocalHost:
                                                   lastSeen=time.time())
                     self.record(identity, "pending")
                 self.clients[identity]["lastSeen"] = time.time()
-                return dict(status=self.clients[identity]["status"])
+                return dict(status=self.clients[identity]["status"], catalog=1)
             client = self.client(identity)
             if action == "archives":
                 return [dict(id=ident, name=name, kind=kind)
@@ -201,14 +252,24 @@ class LocalHost:
             if action in ("renew", "release"):
                 getattr(archive, action)(identity, data["lease"])
                 return {}
+        if action == "catalog":
+            result = self.catalog(ident, data)
+            with self.lock:
+                self.client(identity)
+            return result
         if action == "files":
             return self.files(kind, archive)
         raise RequestError(404, "Непозната операция.")
 
-    def download(self, identity, ident, path, destination):
+    def download(self, identity, ident, path, destination, *, revision=None):
         with self.lock:
             self.client(identity)
             _, kind, archive = self.archive(ident)
+            if revision is not None:
+                with self.catalog_lock:
+                    if (ident in self.catalog_unavailable
+                            or self.catalogs.get(ident, {}).get("revision") != revision):
+                        raise RequestError(409, "Каталогът е променен. Избери файла отново.")
             self.file_type(kind, path)
             if archive.path(path).stat().st_size > MAX_TRANSFER:
                 raise RequestError(413, "Файлът надхвърля ограничението за прехвърляне.")
@@ -276,7 +337,7 @@ class LocalHandler(BaseHTTPRequestHandler):
             if action == "download":
                 with tempfile.TemporaryFile() as data:
                     archive, path = payload["archive"], payload["path"]
-                    revision = host.download(identity, archive, path, data)
+                    revision = host.download(identity, archive, path, data, revision=payload.get("revision"))
                     size = data.tell()
                     data.seek(0)
                     self.reply(200, size, "application/octet-stream", revision)
@@ -348,8 +409,24 @@ class LocalClient:
         body = json.dumps(data).encode("ascii")
         return self.request(action, body, lambda response: json.load(response), timeout=timeout)
 
-    def download(self, archive, path, destination):
-        body = json.dumps(dict(archive=archive, path=path)).encode("ascii")
+    def read_catalog(self, archive, known):
+        page = self.call("catalog", archive=archive, known=known)
+        if page["rows"] is None:
+            return None
+        revision = page["revision"]
+        rows = page["rows"]
+        while page["next"] is not None:
+            offset = page["next"]
+            if type(offset) is not int or offset != len(rows):
+                raise RequestError(503, "Невалиден отговор за каталога.")
+            page = self.call("catalog", archive=archive, offset=offset, revision=revision)
+            if page["revision"] != revision or not page["rows"]:
+                raise RequestError(409, "Каталогът беше обновен. Опитай отново.")
+            rows.extend(page["rows"])
+        return dict(format=1, revision=revision, rows=rows)
+
+    def download(self, archive, path, destination, *, revision=None):
+        body = json.dumps(dict(archive=archive, path=path, revision=revision)).encode("ascii")
 
         def consume(response):
             length = int(response.getheader("Content-Length", "-1"))

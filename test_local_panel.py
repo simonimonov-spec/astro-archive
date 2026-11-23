@@ -17,6 +17,7 @@ class Context:
         self.entries = archives
         self.commands = {}
         self.elements = []
+        self.documents = {}
 
     def command(self, name, call):
         self.commands[name] = call
@@ -25,7 +26,7 @@ class Context:
         return {"archives": self.entries}
 
     def publish(self, section, elements):
-        self.elements = ui_document(elements)
+        self.elements = self.documents[section] = ui_document(elements)
 
     def task(self, title, work, section):
         import threading
@@ -66,8 +67,8 @@ class LocalPanelTests(unittest.TestCase):
             host_manager, host = copy("host", source)
             client_manager, client = copy("empty")
 
-            def ui(manager, element, values=None, item=None):
-                return manager.input("shared-archives", "local-sharing", element, values, item_id=item)
+            def ui(manager, element, values=None, item=None, contribution="local-sharing"):
+                return manager.input("shared-archives", contribution, element, values, item_id=item)
 
             try:
                 ui(host_manager, "local-mode", {"local-mode": "host"})
@@ -77,17 +78,20 @@ class LocalPanelTests(unittest.TestCase):
                 host.tick()
                 ui(host_manager, "local-approve", item=client.client.identity)
                 client.tick()
-                ui(client_manager, "local-archives", item="frames")
-                self.assertEqual(list(client.files.values()), ["image.fit"])
-                file_id = next(iter(client.files))
-                work = ui(client_manager, "local-files", item=file_id)
+                catalog_id = next(iter(client.documents))
+                ui(client_manager, "local-library-archives", item=catalog_id, contribution="local-library")
+                library = client_manager.live["shared-archives"]["documents"]["local-library"]
+                files = next(field["items"] for field in library if field["id"] == "local-library-entries")
+                self.assertEqual([item["label"] for item in files], ["image.fit"])
+                work = ui(client_manager, "local-library-entries", item=files[0]["id"],
+                          contribution="local-library")
                 client_manager.service.wait_task(work)
                 data_path = client.cached["path"]
                 np.testing.assert_array_equal(fits.getdata(data_path), fits.getdata(source / "image.fit"))
-                ui(client_manager, "local-begin")
+                ui(client_manager, "local-begin", contribution="local-library")
                 with fits.open(data_path, mode="update", memmap=False) as data:
                     data[0].data[0, 0] = 7
-                work = ui(client_manager, "local-save")
+                work = ui(client_manager, "local-save", contribution="local-library")
                 client_manager.service.wait_task(work)
                 self.assertEqual(fits.getdata(source / "image.fit")[0, 0], 7)
             finally:
@@ -145,6 +149,23 @@ class LocalPanelTests(unittest.TestCase):
             self.assertTrue(client.cached["path"].is_file())
             np.testing.assert_array_equal(fits.getdata(client.cached["path"]), fits.getdata(archive / "image.fit"))
             self.assertTrue(client.preview.startswith("data:image/png;base64,"))
+            self.assertIn("local-library", client_context.documents)
+            client.action("local-library-archive", {"selected": {
+                "id": next(iter(client.documents))}})
+            self.assertIn("image.fit", str(client_context.documents["local-library"]))
+            fits.writeto(archive / "added.fit", np.arange(16, dtype=np.int16).reshape(4, 4))
+            host.tick()
+            client.tick()
+            self.assertIn("added.fit", str(client_context.documents["local-library"]))
+            self.assertIn("обновен", client.notice)
+            self.assertIn("обновен", host.notice)
+            saved_document, = (client_context.folder / "SharedCatalogs" / "Client").glob("*.json")
+            self.assertIn("added.fit", saved_document.read_text(encoding="utf-8"))
             host.close()
             client.tick()
             self.assertEqual(client.connection, "offline")
+            offline = panel.LocalPanel(Context(client_context.folder, []), client_context.folder,
+                                       registry=root / "registry")
+            self.addCleanup(offline.close)
+            self.assertIn("Запазен каталог", str(offline.ctx.documents["local-library"]))
+            self.assertIn("added.fit", str(offline.documents))
