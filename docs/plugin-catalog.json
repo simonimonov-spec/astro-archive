@@ -13,11 +13,11 @@
     {
       "id": "frame-inspector-ai",
       "name": "AI оценител",
-      "version": "Beta-1",
+      "version": "Beta-2",
       "description": "AI оценител на FITS кадри: облаци, следи и препятствия. Евристичен режим без активен обучен модел; незадължителен ResNet анализ.",
       "repository": "simonimonov-spec/astro-archive",
-      "commit": "ba80e8a49b7deb7e2898fc75dab1349e277e44d8",
-      "sha256": "847457cd712cc685b7d2f8740fa2af13fc830df0506f0c219e65aa49c4f0e56f"
+      "commit": "c13c4ce4afce53d4bad7246e32c2bf46a70cfa8b",
+      "sha256": "8439a4a72506009fa0236783c284a9debcea98e55e2845bef97074dbd02bc45e"
     },
     {
       "id": "siril-auto",
