@@ -22,11 +22,11 @@
     {
       "id": "siril-auto",
       "name": "Автоматично стакване чрез Siril",
-      "version": "V-1",
-      "description": "Независим Siril CLI плъгин с настройваем брой паралелни процеси, отделни работни папки, общ CPU/RAM бюджет, оценка и обединяване на приетите дневни стакове.",
+      "version": "V-2",
+      "description": "Siril CLI плъгин на стъпки: настройки, работа и оценка на всеки ден. Разделя големите дни на части за няколко паралелни Siril и ги слива в един дневен стак; по желание AI филтър чрез AI оценителя.",
       "repository": "simonimonov-spec/astro-archive",
-      "commit": "f74b7c1a218088b08b0d741fe730fabbf5274c6a",
-      "sha256": "8690a3c31d4bbe2a2ec4db39e02f63c3cc331d27c25d2fd34f815d0d51a15db9"
+      "commit": "c6018956baa71fa6cf4f3a3dbc1a5274857319c7",
+      "sha256": "11b43ea11d9f8cd88f16577c2c7a2a5884877f07ce27d00e03695913daef92d9"
     },
     {
       "id": "remote-operation",
