@@ -24,6 +24,7 @@ class Inspector:
         self.archives=ctx.inspection('archives')['archives'];self.facets={k:[] for k in ('telescope','object','night')}
         for name,callback in [('refresh',self.refresh),('save',self.save),('adopt',self.adopt),('choose',self.choose),('run',self.run),('chart_run',self.chart_run),('chart_cutoff',self.chart_cutoff),('row',self.row),('diagnostic',self.diagnostic),('original',self.original),('apply',self.apply),('label',self.label),('export',self.export),('training',self.training),('training_preview',self.training_preview),('training_api',self.training_api)]:ctx.command(name,callback)
         ctx.command('ai_api',self.ai.service.call)
+        ctx.command('quality_api',self.quality_api)
         self.publish()
 
     def values(self,p):return p.get('values',p)
@@ -176,6 +177,10 @@ class Inspector:
 
     def training_api(self,p):
         from .trainer_bridge import invoke
+        return invoke(self,p)
+
+    def quality_api(self,p):
+        from .quality_api import invoke
         return invoke(self,p)
 
     def training_preview(self,p):
