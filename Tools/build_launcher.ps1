@@ -1,11 +1,31 @@
+[CmdletBinding(DefaultParameterSetName = 'Build')]
 param(
     [string]$Root = (Split-Path -Parent $PSScriptRoot),
+    [Parameter(ParameterSetName = 'Build')]
     [DateTimeOffset]$ReleaseCutoff = [DateTimeOffset]::UtcNow,
+    [Parameter(ParameterSetName = 'Build')]
     [string]$ReleaseTag = 'beta1.2.1-preview',
-    [long]$ReleaseId = 0
+    [Parameter(ParameterSetName = 'Build')]
+    [long]$ReleaseId = 0,
+    [Parameter(Mandatory, ParameterSetName = 'Verify')]
+    [switch]$VerifyReleaseSignature
 )
 $ErrorActionPreference = 'Stop'
 $Root = (Resolve-Path -LiteralPath $Root).Path
+$exe = Join-Path $Root 'AstroArchive.exe'
+
+if ($VerifyReleaseSignature) {
+    $signature = Get-AuthenticodeSignature -LiteralPath $exe
+    if ($signature.Status -ne 'Valid' -or $signature.SignatureType -ne 'Authenticode') {
+        throw "Release launcher requires a valid embedded Authenticode signature. Windows reported: $($signature.Status) ($($signature.SignatureType))."
+    }
+    if (-not $signature.TimeStamperCertificate) {
+        throw 'Release launcher requires a timestamped Authenticode signature.'
+    }
+    Write-Output "Verified timestamped signature: $($signature.SignerCertificate.Subject)"
+    return
+}
+
 $work = Join-Path $Root ('publication-review/launcher-build-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $work | Out-Null
 $allowlist = Get-Content -LiteralPath (Join-Path $Root 'Tools/publication-files.json') -Raw -Encoding utf8 | ConvertFrom-Json
@@ -22,7 +42,6 @@ $manifest = @{ files = $files; packages = $packages; release_id = $ReleaseId; re
 $manifestPath = Join-Path $work 'manifest.json'
 [IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
-$exe = Join-Path $Root 'AstroArchive.exe'
 $arguments = @('/nologo', '/target:winexe', '/platform:x64', '/optimize+', '/debug-',
     "/out:$exe", '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/r:System.Web.Extensions.dll',
     '/r:System.IO.Compression.dll', '/r:System.IO.Compression.FileSystem.dll',
