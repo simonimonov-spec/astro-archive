@@ -15,7 +15,7 @@ class ApplyUpdateTest(unittest.TestCase):
         self.stage.mkdir(parents=True)
         self.package = Path(workspace) / 'release.zip'
         self.payload = {name: b'new' for name in updater.REQUIRED}
-        self.payload.update({'UI/unchanged.js': b'same', 'UI/added.js': b'added'})
+        self.payload.update({'UI/unchanged.js': b'same', 'UI/added.js': b'added', 'Bridge/Plugins/manager.py': b'builtin'})
         for name, value in {
             'AstroArchive.exe': b'old', 'UI/unchanged.js': b'same',
             'Backend/Cache/data/profile.json': b'profile', 'Plugins/local.py': b'plugin',

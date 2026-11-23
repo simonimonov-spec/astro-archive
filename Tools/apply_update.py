@@ -17,7 +17,7 @@ LAUNCHER = 'AstroArchive.exe'
 REQUIRED = {LAUNCHER, 'start.pyw', 'requirements-lock.txt', 'Tools/runtime_probe.py'}
 ROOT_FILES = REQUIRED | {'README.md', 'LICENSE.txt', 'requirements.txt', 'Tools/apply_update.py'}
 PROGRAM_DIRS = {'Backend', 'Bridge', 'UI', 'docs'}
-PROTECTED = {'cache', '__pycache__', 'plugins', '.runtime', '.venv'}
+PROTECTED = {'cache', '__pycache__', '.runtime', '.venv'}
 MAX_UNPACKED = 1_000_000_000
 
 
