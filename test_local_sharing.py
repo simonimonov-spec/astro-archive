@@ -39,7 +39,7 @@ class LocalSharingTests(unittest.TestCase):
         with self.assertRaises(local.RequestError):
             client.call("archives")
         self.host.set_access(client.identity, "approved")
-        self.assertEqual(client.call("archives"), [{"id": "frames", "name": "Кадри", "kind": "frames"}])
+        self.assertEqual(client.call("archives"), [{"id": "frames", "name": "Кадри", "kind": "frames", "source": self.host.archive_sources["frames"]}])
         self.assertEqual(client.call("files", archive="frames"), ["test.fit"])
         output = io.BytesIO()
         revision = client.download("frames", "test.fit", output)
@@ -102,6 +102,21 @@ class LocalSharingTests(unittest.TestCase):
         with self.assertRaises(local.RequestError) as error:
             client.read_catalog("frames", first["revision"])
         self.assertEqual(error.exception.status, 503)
+
+    def test_fits_transfers_with_gzip_and_verified_original_bytes(self):
+        client = self.client()
+        client.call("join")
+        self.host.set_access(client.identity, "approved")
+        material = b"FITS HEADER " * 8192
+        self.frame.write_bytes(material)
+        output = io.BytesIO()
+        client.download("frames", "test.fit", output, compressed=True)
+        self.assertEqual(output.getvalue(), material)
+        request = b'{"archive":"frames","path":"test.fit","compression":"gzip"}'
+        wire = client.request("download", request,
+                              lambda response: (response.getheader("Content-Encoding"), response.read()))
+        self.assertEqual(wire[0], "gzip")
+        self.assertLess(len(wire[1]), len(material))
 
     def test_two_clients_edit_conflict_and_block(self):
         a, b = self.client(), self.client("other-copy", "Друго копие")
@@ -176,6 +191,26 @@ class LocalSharingTests(unittest.TestCase):
                 stopper.join(3)
         self.assertEqual(len(errors), 1)
         self.assertEqual(self.frame.read_bytes(), b"first version")
+
+    def test_replacing_archive_folder_preserves_approval_but_rejects_old_source(self):
+        client = self.client()
+        client.call("join")
+        self.host.set_access(client.identity, "approved")
+        old_source = self.host.archive_sources["frames"]
+        self.host.close()
+        replacement = self.frame.parent.with_name("replacement")
+        replacement.mkdir()
+        (replacement / self.frame.name).write_bytes(b"other archive")
+        host = local.LocalHost(self.registry, "host-copy", "Архиви на хоста",
+                              {"frames": ("Кадри", "frames", replacement)})
+        host.start()
+        self.addCleanup(host.close)
+        client.peer, = local.discover(self.registry, "empty-copy")
+        self.assertEqual(client.call("join")["status"], "approved")
+        self.assertNotEqual(client.call("archives")[0]["source"], old_source)
+        with self.assertRaises(local.RequestError) as denied:
+            client.download("frames", self.frame.name, io.BytesIO(), source=old_source)
+        self.assertEqual(denied.exception.status, 409)
 
     def test_host_stop_leaves_no_discovery_entry(self):
         self.host.close()

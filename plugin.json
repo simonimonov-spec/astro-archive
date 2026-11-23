@@ -18,23 +18,19 @@
       "clients": ["desktop"]
     },
     {
-      "id": "local-library",
-      "slot": "archive",
-      "title": "Споделени архиви",
+      "id": "archive-source",
+      "slot": "anchor",
+      "anchor": "archive.location",
+      "mode": "append",
+      "presentation": "inline",
+      "title": "Споделен архив",
+      "archiveIds": ["frames", "stacks", "photos"],
       "clients": ["desktop"]
     },
     {
       "id": "network",
       "slot": "settings",
       "title": "Shared Archives · хост и връзки",
-      "clients": [
-        "desktop"
-      ]
-    },
-    {
-      "id": "archives",
-      "slot": "archive",
-      "title": "Споделени LAN архиви",
       "clients": [
         "desktop"
       ]
@@ -49,6 +45,11 @@
     }
   ],
   "capabilities": [
+    {
+      "id": "archives.sharing.source",
+      "command": "local-source",
+      "name": "Каталог и файлове на споделен архив"
+    },
     {
       "id": "archives.sharing.status",
       "command": "status",

@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import io
+import json
 import os
 import secrets
 import tempfile
@@ -11,8 +12,9 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
-from .catalog_documents import identifier, saved, store
-from .local_sharing import FITS, LocalClient, LocalHost, RequestError, discover
+from .catalog_documents import CatalogView, identifier, saved, store
+from .local_sharing import CREDENTIAL, FITS, LocalClient, LocalHost, RequestError, discover
+from .validation import atomic
 from .windows import private_directory
 
 OPERATIONS = {"pending": "Поискан достъп", "approved": "Разрешен достъп",
@@ -68,7 +70,9 @@ class LocalPanel:
                          Path(os.environ["LOCALAPPDATA"]) / "AstroArchive" / "SharedArchivesPeers")
         self.private_registry = registry is None
         self.identity = hashlib.sha256(os.fsencode(str(self.folder).casefold())).hexdigest()[:32]
-        self.credential = secrets.token_hex(32)
+        self.trust_folder = self.folder / "LocalTrust"
+        self.trust_path = self.trust_folder / "client.json"
+        self.credential, self.preferred_peer = self.load_identity()
         self.name = "Astro Archive " + self.identity[:8]
         self.lock = threading.RLock()
         self.publish_lock = threading.Lock()
@@ -88,32 +92,59 @@ class LocalPanel:
         self.catalog_folder = self.folder / "SharedCatalogs" / "Client"
         self.documents = saved(self.catalog_folder)
         self.available_catalogs = set()
-        self.active_catalog = ""
-        self.library_path = ""
-        self.library_offset = 0
-        self.notice = ""
+        self.catalog_views = {}
         self.last_document = None
-        self.last_library = None
         self.closed = False
         self.busy = False
 
         for name in ("mode", "start", "stop", "join", "refresh", "approve", "block", "unblock",
-                     "archive", "download", "begin", "save", "release", "library-archive",
-                     "library-entry", "library-back", "library-prev", "library-next", "library-close"):
+                     "archive", "download", "begin", "save", "release"):
             command = "local-" + name
             context.command(command, lambda p, command=command: self.action(command, p))
+        context.command("local-source", self.source)
+        context.command("local-choose-source", self.choose_source)
+        context.publish("archive-source", [field("button", "local-choose-source", label="Споделен архив…",
+                                                 command="local-choose-source")])
         self.publish()
+
+    @staticmethod
+    def choose_source(parameters):
+        archive = parameters.get("context", {}).get("archiveId")
+        if archive not in ("frames", "stacks", "photos"):
+            raise ValueError("Избери архив за кадри, стакове или снимки.")
+        return {"uiActions": [dict(type="choose-archive-source", archiveId=archive)]}
+
+    def load_identity(self):
+        try:
+            state = json.loads(self.trust_path.read_text(encoding="utf-8"))
+            if state["installation"] == self.identity and CREDENTIAL.fullmatch(state["credential"]):
+                return state["credential"], state.get("host") or ""
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+        if self.private_registry:
+            private_directory(self.trust_folder)
+        else:
+            self.trust_folder.mkdir(parents=True, exist_ok=True)
+        credential = secrets.token_hex(32)
+        atomic(self.trust_path, dict(installation=self.identity, credential=credential, host=""))
+        return credential, ""
 
     def tick(self):
         if not self.lock.acquire(blocking=False):
             return
         host = catalog_client = None
+        notify_availability = False
         try:
             if self.closed:
                 return
             host = self.host
+            previous = self.connection
             if self.mode == "receive":
                 self.peers = discover(self.registry, self.identity)
+                if self.client is None:
+                    peer = next((row for row in self.peers if row["identity"] == self.preferred_peer), None)
+                    if peer:
+                        self.client = LocalClient(peer, self.credential, self.name)
                 if self.client:
                     try:
                         current = next((peer for peer in self.peers
@@ -122,21 +153,28 @@ class LocalPanel:
                             raise RequestError(503, "Хостът е недостъпен.")
                         if current["proof"] != self.client.peer["proof"]:
                             self.available_catalogs.clear()
+                            self.connection = ""
                         self.client.peer = current
                         if self.update_client():
                             catalog_client = self.client
                     except RequestError:
                         self.connection = "offline"
                         self.available_catalogs.clear()
+                notify_availability = previous == "approved" and self.connection != previous
         finally:
             self.lock.release()
         if catalog_client:
             self.sync_catalogs(catalog_client)
         if host:
-            changed = host.refresh_catalogs()
+            host.refresh_catalogs()
+            changed = host.take_catalog_changes()
             with self.lock:
-                if self.host is host:
-                    self.note_changes(changed)
+                if self.host is not host:
+                    changed = []
+            if changed:
+                self.note_changes(changed)
+        if notify_availability:
+            self.note_changes([])
         self.publish()
 
     def update_client(self):
@@ -146,7 +184,7 @@ class LocalPanel:
         if self.connection == "approved":
             if previous != "approved":
                 self.archives = self.client.call("archives")
-            if joined.get("catalog") != 1:
+            if joined.get("catalog") != 2:
                 self.available_catalogs.clear()
             if self.lease and self.matches_cached():
                 try:
@@ -167,13 +205,16 @@ class LocalPanel:
                 for key, document in list(self.documents.items()):
                     if document["host"] == host:
                         self.documents.pop(key)
+                        self.catalog_views.pop(key, None)
                         (self.catalog_folder / (key + ".json")).unlink(missing_ok=True)
-        return self.connection == "approved" and joined.get("catalog") == 1
+        return self.connection == "approved" and joined.get("catalog") == 2
 
     def note_changes(self, names):
+        self.ctx.archives("source-changed", dict(message=""))
         if names:
             clock = datetime.now().strftime("%H:%M:%S")
-            self.notice = f"Споделените архиви са обновени в {clock} · " + ", ".join(names)[:320]
+            message = f"Споделените архиви са обновени в {clock} · " + ", ".join(names)[:320]
+            self.ctx.notify(message)
 
     def sync_catalogs(self, client):
         if not self.catalog_sync.acquire(blocking=False):
@@ -195,15 +236,17 @@ class LocalPanel:
         available = set()
         for row in archives:
             archive = row["id"]
-            key = identifier(host, archive)
+            physical = row["source"]
+            key = identifier(host, archive, physical)
             previous = previous_documents.get(key)
             try:
-                document = client.read_catalog(archive, previous["revision"] if previous else "")
+                document = client.read_catalog(archive, previous["revision"] if previous else "", source=physical)
             except RequestError:
                 continue
             available.add(key)
             if document is not None:
-                document.update(host=host, archive=archive, name=row["name"], hostName=peer["name"])
+                document.update(host=host, archive=archive, name=row["name"],
+                                hostName=peer["name"], kind=row["kind"], source=physical)
                 changed[key] = document
 
         with self.lock:
@@ -220,8 +263,75 @@ class LocalPanel:
                 if key in self.documents:
                     names.append(document["name"])
                 self.documents[key] = document
+                self.catalog_views.pop(key, None)
+            availability_changed = self.available_catalogs != available
             self.available_catalogs = available
+        if names or availability_changed:
             self.note_changes(names)
+
+    def source(self, parameters):
+        action = parameters.get("action")
+        key = parameters.get("id")
+        with self.lock:
+            if action == "choices":
+                return [dict(id=ident, name=document["name"], host=document.get("hostName", ""))
+                        for ident, document in self.documents.items() if ident in self.available_catalogs
+                        and document.get("kind") == parameters.get("kind")]
+            document = self.documents.get(key)
+            if document is None:
+                raise ValueError("Няма запазен каталог за този споделен архив.")
+            view = self.catalog_views.get(key)
+            if view is None:
+                view = self.catalog_views[key] = CatalogView(document, key)
+            relative = parameters.get("path", "").replace("\\", "/").strip("/")
+            if action == "browse":
+                return view.browse(relative, parameters.get("search", ""), parameters.get("offset", 0))
+            if action == "summary":
+                return view.summary(relative)
+            if action == "record":
+                row = view.files.get(parameters.get("token"))
+                if row is None:
+                    raise FileNotFoundError("Файлът вече не е в споделения архив.")
+                return row
+            if action == "records":
+                if parameters.get("revision") not in (None, document["revision"]):
+                    raise ValueError("Каталогът беше обновен. Опитай отново.")
+                offset = int(parameters.get("offset", 0))
+                items = view.file_items
+                return dict(rows=[dict(row, token=token) for token,row in items[offset:offset+100]],
+                            total=len(items), revision=document["revision"])
+            if action not in ("ingest", "refresh") and (action != "open" or view.rows.get(relative, {}).get("kind") != "file"):
+                raise ValueError("Файлът вече не е в запазения каталог.")
+            if key not in self.available_catalogs or self.connection != "approved" or self.client is None:
+                raise ValueError("Свържи се с хоста, за да използваш файла.")
+            client = self.client
+        if action == "ingest":
+            result = client.ingest(document["archive"], Path(parameters["file"]), parameters["fingerprint"],
+                                   parameters.get("context", {}), document["source"])
+            return result
+        if action == "refresh":
+            client.call("refresh-catalog", archive=document["archive"], source=document["source"], timeout=60)
+            with self.catalog_sync:
+                self.sync_catalog_documents(client)
+            return {}
+        cache = self.folder / "ViewerCache"
+        cache.mkdir(parents=True, exist_ok=True)
+        entry = view.rows[relative]
+        folder = identifier(key, relative, str(entry["modified"]), str(entry["bytes"]), str(entry["changed"]))
+        filename = Path(relative).name
+        target = cache / folder / filename
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not target.is_file():
+            handle = tempfile.NamedTemporaryFile(dir=target.parent, suffix=".part", delete=False)
+            temporary = Path(handle.name)
+            try:
+                with handle:
+                    client.download(document["archive"], relative, handle, revision=document["revision"],
+                                    compressed=True, source=document["source"])
+                temporary.replace(target)
+            finally:
+                temporary.unlink(missing_ok=True)
+        return {"cacheFile": target.relative_to(cache).as_posix()}
 
     def action(self, command, parameters):
         if command == "local-refresh":
@@ -232,26 +342,7 @@ class LocalPanel:
         with self.lock:
             if self.closed or self.busy:
                 raise ValueError("Изчакай текущата операция.")
-            if command == "local-library-entry":
-                document = self.library_documents().get(self.active_catalog)
-                entry = next((row for row in self.library_rows(document) if
-                              self.library_entry_id(document, row) == item), None)
-                if entry is None:
-                    raise ValueError("Избраният запис вече не е в тази папка.")
-                if entry["kind"] == "folder":
-                    self.library_path = entry["path"]
-                    self.library_offset = 0
-                else:
-                    if self.lease or not self.live_document(document):
-                        raise ValueError("Свържи се с хоста, за да отвориш файла.")
-                    if self.selected != document["archive"]:
-                        self.files = {}
-                    self.selected = document["archive"]
-                    operation = self.fetch
-                    arguments = (self.client, self.selected, entry["path"], document["name"], document["revision"])
-                    title = "Изтегляне на споделен файл"
-                result = None
-            elif command == "local-download":
+            if command == "local-download":
                 path = self.files.get(item)
                 if self.connection != "approved" or self.lease or path is None:
                     raise ValueError("Избраният файл вече не е достъпен за изтегляне.")
@@ -295,32 +386,26 @@ class LocalPanel:
             if mode != self.mode and (self.host or self.lease):
                 raise ValueError("Първо приключи редакцията или спри локалния хост.")
             if mode != self.mode:
-                self.active_catalog = self.library_path = self.notice = ""
-                self.library_offset = 0
+                self.available_catalogs.clear()
+                self.connection = ""
+                self.client = None
             self.mode = mode
-        elif command == "local-library-archive":
-            if item not in self.library_documents():
-                raise ValueError("Каталогът на архива вече не е наличен.")
-            self.active_catalog = item
-            self.library_path = ""
-            self.library_offset = 0
-        elif command == "local-library-close":
-            self.active_catalog = self.library_path = ""
-            self.library_offset = 0
-        elif command == "local-library-back":
-            self.library_path = self.library_path.rpartition("/")[0]
-            self.library_offset = 0
-        elif command in ("local-library-prev", "local-library-next"):
-            self.library_offset = max(0, self.library_offset + (50 if command.endswith("next") else -50))
         elif command == "local-start":
             if self.mode != "host" or self.host or self.smb_active():
                 raise ValueError("Избери „Хостване“ и спри другото споделяне, ако е включено.")
-            selected = {row["id"]: (row["name"], row["type"], Path(row["path"]))
+            selected = {row["id"]: (row["name"], row["type"] or
+                        (row["id"] if row["id"] in ("frames","stacks","photos") else "frames"), Path(row["path"]))
                         for row in self.exports if values.get(archive_checkbox(row["id"])) is True}
             if self.private_registry:
                 private_directory(self.registry)
             host = LocalHost(self.registry, self.identity, self.name, selected,
-                             catalog_folder=self.folder / "SharedCatalogs" / "Host")
+                             catalog_folder=self.folder / "SharedCatalogs" / "Host",
+                             access_file=self.trust_folder / "approved.json",
+                             metadata=lambda ident, root: self.ctx.archives("source-metadata",
+                                 dict(archiveId=ident, root=str(root))),
+                             importer=lambda ident, root, path, context: self.ctx.archives("source-ingest",
+                                 dict(archiveId=ident, root=str(root), path=str(path), context=context)),
+                             incoming=self.folder / "Incoming")
             host.start()
             self.host = host
         elif command == "local-stop" and self.host:
@@ -336,6 +421,9 @@ class LocalPanel:
             peer = next((peer for peer in self.peers if peer["identity"] == item), None)
             if peer is None:
                 raise ValueError("Хостът вече е недостъпен.")
+            self.preferred_peer = peer["identity"]
+            atomic(self.trust_path, dict(installation=self.identity, credential=self.credential,
+                                         host=self.preferred_peer))
             self.client = LocalClient(peer, self.credential, self.name)
             self.connection, self.selected, self.files = "", "", {}
             self.update_client()
@@ -430,86 +518,9 @@ class LocalPanel:
                             options=[dict(value="receive", label="Приемане"), dict(value="host", label="Хостване")],
                             disabled=bool(self.host or self.lease or self.busy), command="local-mode")]
             fields.extend(self.host_fields() if self.mode == "host" else self.receive_fields())
-            library = self.library_fields()
         if fields != self.last_document:
             self.ctx.publish("local-sharing", fields)
             self.last_document = fields
-        if library != self.last_library:
-            self.ctx.publish("local-library", library)
-            self.last_library = library
-
-    def library_documents(self):
-        if self.mode == "receive":
-            return self.documents
-        if self.host:
-            with self.host.catalog_lock:
-                return {identifier(self.identity, ident): document
-                        for ident, document in self.host.catalogs.items()}
-        return {}
-
-    def live_document(self, document):
-        return (self.mode == "receive" and self.connection == "approved" and self.client
-                and document["host"] == self.client.peer["identity"]
-                and identifier(document["host"], document["archive"]) in self.available_catalogs)
-
-    @staticmethod
-    def library_entry_id(document, row):
-        return identifier(document["host"], document["archive"], document["revision"], row["path"])
-
-    def library_rows(self, document):
-        if not document:
-            return []
-        return sorted((row for row in document["rows"]
-                       if row["path"].rpartition("/")[0] == self.library_path),
-                      key=lambda row: (row["kind"] != "folder", row["path"].casefold()))
-
-    def library_fields(self):
-        documents = self.library_documents()
-        if not documents:
-            return []
-        fields = [field("list", "local-library-archives", items=[
-            dict(id=key, label=document["name"], description=document.get("hostName", ""),
-                 status="Споделен оттук" if self.mode == "host" else
-                 "Свързан" if self.live_document(document) else "Запазен каталог")
-            for key, document in documents.items()],
-            command="local-library-archive", actionLabel="Отвори архив", disabled=self.busy)]
-        if self.notice:
-            fields.insert(0, field("text", "shared-change", span=2, tone="success", value=self.notice))
-        document = documents.get(self.active_catalog)
-        if not document:
-            return fields
-        rows = self.library_rows(document)
-        if not rows and self.library_path and not any(row["path"] == self.library_path
-                                                       for row in document["rows"]):
-            self.library_path = ""
-            self.library_offset = 0
-            rows = self.library_rows(document)
-        offset = min(self.library_offset, max(0, (len(rows) - 1) // 50) * 50)
-        self.library_offset = offset
-        live = bool(self.live_document(document))
-        title = document["name"] + (" / " + self.library_path if self.library_path else "")
-        fields.append(field("list", "local-library-entries", label=title, items=[
-            dict(id=self.library_entry_id(document, row),
-                 label=row["path"].rpartition("/")[2],
-                 description="Папка" if row["kind"] == "folder" else f'{row["bytes"]:,} B',
-                 disabled=row["kind"] != "folder" and (not live or bool(self.lease)))
-            for row in rows[offset:offset + 50]],
-            command="local-library-entry", actionLabel="Отвори", disabled=self.busy))
-        fields.append(field("button", "local-library-close", label="Скрий съдържанието",
-                            command="local-library-close"))
-        if self.library_path:
-            fields.append(field("button", "local-library-back", label="Към горната папка",
-                                command="local-library-back"))
-        if offset:
-            fields.append(field("button", "local-library-prev", label="Предишни записи",
-                                command="local-library-prev"))
-        if offset + 50 < len(rows):
-            fields.append(field("button", "local-library-next", label="Следващи записи",
-                                command="local-library-next"))
-        if self.cached and (self.cached["host"], self.cached["archive"]) == (
-                document["host"], document["archive"]):
-            fields.extend(self.working_copy_fields())
-        return fields
 
     def host_fields(self):
         if not self.host:

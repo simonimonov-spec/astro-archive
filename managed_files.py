@@ -105,14 +105,14 @@ class ManagedFiles:
             raise ValueError("Очаква се обикновен файл от споделения архив.")
         return path.resolve(strict=True)
 
-    def read(self, relative: str, destination: BinaryIO) -> str:
+    def read(self, relative: str, destination: BinaryIO, *, expected_size=None) -> str:
         with self.lock:
             path = self.path(relative)
             stream = path.open("rb")
             self.readers[path] += 1
         try:
             with stream:
-                return transfer(stream, destination)
+                return transfer(stream, destination, expected_size=expected_size)
         finally:
             with self.lock:
                 self.readers[path] -= 1

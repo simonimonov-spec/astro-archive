@@ -266,7 +266,6 @@ class SharedArchives:
             ]),field('button','refresh',label='Обнови състоянието и LAN адресите',command='refresh')]
         if self.problem:fields.insert(1,field('text','problem',span=2,value=self.problem,tone='warning'))
         self.ctx.publish('network',fields)
-        self.ctx.publish('archives',[field('text','archive-help',span=2,value='Споделените архиви се добавят от Настройки → Плъгини → Shared Archives. След свързване са в обичайния списък до собствените локални архиви.'),field('button','archive-refresh',label='Обнови споделените архиви',command='refresh-index')])
         self.publish_header()
 
     def watch(self):

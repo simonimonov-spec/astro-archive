@@ -1,6 +1,8 @@
 """Declarative host/client flow with two isolated plugin profiles."""
 import importlib
 import tempfile
+import threading
+import uuid
 import unittest
 from pathlib import Path
 
@@ -23,7 +25,13 @@ class Context:
         self.commands[name] = call
 
     def archives(self, action, parameters=None):
+        if action == "source-changed":
+            self.refreshes = getattr(self, "refreshes", 0) + 1
+            return {}
         return {"archives": self.entries}
+
+    def notify(self, message):
+        self.events = getattr(self, "events", []) + [message]
 
     def publish(self, section, elements):
         self.elements = self.documents[section] = ui_document(elements)
@@ -71,6 +79,11 @@ class LocalPanelTests(unittest.TestCase):
                 return manager.input("shared-archives", contribution, element, values, item_id=item)
 
             try:
+                for archive_id in ("frames", "stacks", "photos"):
+                    context = dict(anchor="archive.location", archiveId=archive_id)
+                    result = client_manager.input("shared-archives", "archive-source", "local-choose-source", context=context)
+                    self.assertEqual(result["uiActions"], [dict(type="choose-archive-source", archiveId=archive_id)])
+                    self.assertIsNone(client_manager.service.shared_sources.get(archive_id))
                 ui(host_manager, "local-mode", {"local-mode": "host"})
                 ui(host_manager, "local-start", {panel.archive_checkbox("frames"): True})
                 client.tick()
@@ -78,22 +91,70 @@ class LocalPanelTests(unittest.TestCase):
                 host.tick()
                 ui(host_manager, "local-approve", item=client.client.identity)
                 client.tick()
-                catalog_id = next(iter(client.documents))
-                ui(client_manager, "local-library-archives", item=catalog_id, contribution="local-library")
-                library = client_manager.live["shared-archives"]["documents"]["local-library"]
-                files = next(field["items"] for field in library if field["id"] == "local-library-entries")
-                self.assertEqual([item["label"] for item in files], ["image.fit"])
-                work = ui(client_manager, "local-library-entries", item=files[0]["id"],
-                          contribution="local-library")
-                client_manager.service.wait_task(work)
-                data_path = client.cached["path"]
+                service = client_manager.service
+                choices = service.call("archive.shared.choices", {"archiveId": "frames"})
+                self.assertEqual(len(choices), 1)
+                self.assertEqual(service.call("archive.shared.choices", {"archiveId": "photos"}), [])
+                binding = service.call("archive.shared.bind", {"archiveId": "frames", "sourceId": choices[0]["id"]})
+                frame_archive = next(row for row in binding["archives"] if row["id"] == "frames")
+                self.assertEqual(frame_archive["path"], "")
+                self.assertEqual(frame_archive["sharedSource"], choices[0])
+                page = service.call("archive.list", {"archiveId": "frames"})
+                self.assertEqual([row["name"] for row in page["entries"]], ["image.fit"])
+                cache = client.folder / "ViewerCache"
+                self.assertFalse(cache.exists())
+                opened = service.call("image.open", {"archiveId": "frames", "relativePath": "image.fit"})
+                self.assertTrue(opened["opened"])
+                data_path, = cache.rglob("*.fit")
                 np.testing.assert_array_equal(fits.getdata(data_path), fits.getdata(source / "image.fit"))
-                ui(client_manager, "local-begin", contribution="local-library")
-                with fits.open(data_path, mode="update", memmap=False) as data:
-                    data[0].data[0, 0] = 7
-                work = ui(client_manager, "local-save", contribution="local-library")
-                client_manager.service.wait_task(work)
-                self.assertEqual(fits.getdata(source / "image.fit")[0, 0], 7)
+                self.assertNotIn("local-library", client_manager.live["shared-archives"]["documents"])
+                imported = root / "client-import.fit"
+                fits.writeto(imported, np.full((16, 16), 55, dtype=np.int16))
+                from types import SimpleNamespace
+                service._dialogs = SimpleNamespace(choose=lambda *_args, **_kwargs: [str(imported)])
+                result = service.wait_task(service.call("archive.import", {"archiveId": "frames"}))
+                self.assertEqual(result["errors"], [])
+                imported_id, = result["imported"]
+                rows = service.call("python.archive.query", {"filters":{"archive":"frames"}})["rows"]
+                self.assertIn(imported_id, [row["id"] for row in rows])
+                remote = service.catalog.record(imported_id)
+                self.assertTrue(remote["shared"])
+                self.assertEqual(fits.getdata(source / remote["relative"])[0,0], 55)
+                with self.assertRaises(ValueError):
+                    service.catalog.trash([imported_id], confirmed=True)
+                with self.assertRaises(PermissionError):
+                    service.host_services.invoke("remote-operation", "core", {"method":"image.open",
+                        "params":{"archiveId":"frames","relativePath":remote["relative"]}})
+                self.assertNotIn("frames", [row["id"] for row in
+                                 service.host_services.invoke("remote-operation","bootstrap",{})["archives"]])
+                self.assertFalse(any(path.name == imported.name for path in cache.rglob("*.fit")))
+                analysis = service.quality.run([imported_id], threading.Event(),
+                                               lambda *_: None)
+                self.assertTrue(any(file["id"] == imported_id and not file.get("error")
+                                    for file in analysis["frames"]))
+                work = root / "preparation"
+                work.mkdir()
+                exported = service.workflow.export([imported_id], work, threading.Event(),
+                                                   lambda *_: None)
+                self.assertTrue(any(path.suffix==".fit" for path in work.iterdir()))
+                self.assertIsNotNone(exported)
+                returning = root / "returning"
+                returning.mkdir()
+                output = returning / "returned.fit"
+                fits.writeto(output, np.full((16,16),77,dtype=np.int16))
+                from Backend.Foundation.branding import marker
+                from Backend.Foundation.runtime import atomic_json
+                job_id = uuid.uuid4().hex
+                service.workflow.save(dict(id=job_id, state="waiting", workspace=str(returning),
+                                           baseline={}, created=[], asStack=False,
+                                           resultArchive="frames", ids=[imported_id], started=1))
+                atomic_json(marker(returning,"session"), dict(id=job_id))
+                finish = service.wait_task(service.call("python.preparation.finish",
+                    {"id":job_id,"outputs":[output.name],"confirmed":True}))
+                self.assertEqual(finish["state"], "completed")
+                returned_id, = finish["imported"]
+                record = service.catalog.record(returned_id)
+                self.assertEqual(fits.getdata(source / record["relative"])[0,0], 77)
             finally:
                 client_manager.unload("shared-archives")
                 host_manager.unload("shared-archives")
@@ -149,16 +210,16 @@ class LocalPanelTests(unittest.TestCase):
             self.assertTrue(client.cached["path"].is_file())
             np.testing.assert_array_equal(fits.getdata(client.cached["path"]), fits.getdata(archive / "image.fit"))
             self.assertTrue(client.preview.startswith("data:image/png;base64,"))
-            self.assertIn("local-library", client_context.documents)
-            client.action("local-library-archive", {"selected": {
-                "id": next(iter(client.documents))}})
-            self.assertIn("image.fit", str(client_context.documents["local-library"]))
+            key = next(iter(client.documents))
+            self.assertIn("image.fit", str(client.source({"action": "browse", "id": key})))
             fits.writeto(archive / "added.fit", np.arange(16, dtype=np.int16).reshape(4, 4))
             host.tick()
             client.tick()
-            self.assertIn("added.fit", str(client_context.documents["local-library"]))
-            self.assertIn("обновен", client.notice)
-            self.assertIn("обновен", host.notice)
+            self.assertIn("added.fit", str(client.source({"action": "browse", "id": key})))
+            self.assertIn("обновени", client_context.events[-1])
+            self.assertIn("обновени", host_context.events[-1])
+            self.assertGreater(client_context.refreshes, 0)
+            self.assertGreater(host_context.refreshes, 0)
             saved_document, = (client_context.folder / "SharedCatalogs" / "Client").glob("*.json")
             self.assertIn("added.fit", saved_document.read_text(encoding="utf-8"))
             host.close()
@@ -167,5 +228,15 @@ class LocalPanelTests(unittest.TestCase):
             offline = panel.LocalPanel(Context(client_context.folder, []), client_context.folder,
                                        registry=root / "registry")
             self.addCleanup(offline.close)
-            self.assertIn("Запазен каталог", str(offline.ctx.documents["local-library"]))
-            self.assertIn("added.fit", str(offline.documents))
+            self.assertIn("added.fit", str(offline.source({"action": "browse", "id": key})))
+            with self.assertRaises(ValueError):
+                offline.source({"action": "open", "id": key, "path": "added.fit"})
+            self.assertEqual(offline.credential, client.credential)
+            restarted = panel.LocalPanel(Context(host_context.folder, rows), host_context.folder,
+                                         registry=root / "registry")
+            self.addCleanup(restarted.close)
+            restarted.action("local-mode", {"values": {"local-mode": "host"}})
+            restarted.action("local-start", {"values": {panel.archive_checkbox("frames"): True}})
+            offline.tick()
+            self.assertEqual(offline.connection, "approved")
+            restarted.close()
