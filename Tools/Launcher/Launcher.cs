@@ -16,6 +16,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
+using Microsoft.Win32;
 
 internal sealed class Launcher : Form
 {
@@ -31,15 +32,19 @@ internal sealed class Launcher : Form
     ListBox issues;
     readonly CancellationTokenSource stop = new CancellationTokenSource();
     readonly bool preview;
+    readonly bool skipUpdateOnce;
     string status = "Проверка на файловете…", detail = "Подготвяме твоята вселена", phase = "Подготовка";
     float progress = .04f;
     Icon logo;
     bool busy;
     string updateTitle, updateVersion, updateDate;
     Dictionary<string, object> manifest;
+    string selectedPython;
+    string selectedPythonw;
     string Runtime { get { return Path.Combine(root, ".runtime", "python"); } }
     string Python { get { return Path.Combine(Runtime, "python.exe"); } }
     string State { get { return Path.Combine(root, "Backend", "Cache", "data", "launcher.json"); } }
+    string UpdateStage { get { return Path.Combine(root, ".runtime", "app-update"); } }
 
     [STAThread]
     static int Main(string[] args)
@@ -49,7 +54,7 @@ internal sealed class Launcher : Form
         Application.SetCompatibleTextRenderingDefault(false);
         if (args.Contains("--native-dialog-probe")) { WriteReply(new { ready = true, text = "Избор на файлове" }); return 0; }
         if (args.Contains("--native-dialog")) return NativeDialog();
-        using (var window = new Launcher(args.Contains("--preview") || args.Contains("--render"), args.Contains("--render")))
+        using (var window = new Launcher(args.Contains("--preview") || args.Contains("--render"), args.Contains("--render"), args.Contains("--skip-update-once")))
         {
             if (args.Contains("--render"))
             {
@@ -143,9 +148,9 @@ internal sealed class Launcher : Form
         catch (Exception error) { WriteReply(new { error = error.Message }); return 1; }
     }
 
-    Launcher(bool isPreview, bool rendering)
+    Launcher(bool isPreview, bool rendering, bool skipUpdate)
     {
-        preview = isPreview; ClientSize = new Size(600, 590); Text = "Astro Archive — стартиране";
+        preview = isPreview; skipUpdateOnce = skipUpdate; ClientSize = new Size(600, 590); Text = "Astro Archive — стартиране";
         FormBorderStyle = FormBorderStyle.FixedSingle; MaximizeBox = false;
         StartPosition = FormStartPosition.CenterScreen; BackColor = Color.FromArgb(10, 16, 29);
         DoubleBuffered = true; Font = new Font("Segoe UI", 10);
@@ -226,6 +231,11 @@ internal sealed class Launcher : Form
     }
     async Task Start()
     {
+        if (File.Exists(Path.Combine(UpdateStage, "pending.json")))
+        {
+            BeginUpdate(File.ReadAllText(Path.Combine(UpdateStage, "python.txt")), "--recover");
+            return;
+        }
         ClearButtons(); phase = "Проверка на файловете";
         Update("Проверка на нужните файлове…", "Проверяваме дали нужните файлове са налични", .1f);
         var missing = await Task.Run(() => CheckFiles());
@@ -239,7 +249,7 @@ internal sealed class Launcher : Form
             AddButton("Към изданията", () => OpenRelease(packagePage)); AddButton("Затвори", Close); return;
         }
         phase = "Проверка на компонентите";
-        Update("Проверка на Python и библиотеките…", "Самостоятелна среда за тази инсталация", .28f);
+        Update("Проверка на Python и библиотеките…", "Търсим налична съвместима среда", .28f);
         string probe = await Probe();
         if (probe != "READY")
         {
@@ -250,14 +260,70 @@ internal sealed class Launcher : Form
             AddButton("Изтегли", async () => await Guard(async () => { ClearButtons(); await Install(); await Start(); }));
             AddButton("Отказ", Close); return;
         }
-        await CheckUpdates();
+        if (skipUpdateOnce || ApplicationIsRunning()) await Launch("Стартиране на текущата версия");
+        else await CheckUpdates();
     }
+
+    IEnumerable<string> PythonCandidates()
+    {
+        yield return Python;
+        yield return Path.Combine(root, ".venv", "Scripts", "python.exe");
+        foreach (var hive in new[] { Registry.CurrentUser, Registry.LocalMachine })
+        using (var core = hive.OpenSubKey(@"Software\Python"))
+        {
+            if (core == null) continue;
+            foreach (string vendor in core.GetSubKeyNames())
+            using (var versions = core.OpenSubKey(vendor))
+            {
+                if (versions == null) continue;
+                foreach (string version in versions.GetSubKeyNames().Where(v => v == "3.13" || v == "3.13-64"))
+                using (var install = versions.OpenSubKey(version + @"\InstallPath"))
+                {
+                    if (install == null) continue;
+                    string executable = install.GetValue("ExecutablePath") as string;
+                    string directory = install.GetValue(null) as string;
+                    if (!string.IsNullOrWhiteSpace(executable) && Path.IsPathRooted(executable)) yield return executable;
+                    if (!string.IsNullOrWhiteSpace(directory) && Path.IsPathRooted(directory)) yield return Path.Combine(directory, "python.exe");
+                }
+            }
+        }
+        // Store-app aliases are scoped to the installed Python 3.13 package.
+        yield return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Microsoft", "WindowsApps", "PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0", "python.exe");
+        string parent = Path.GetDirectoryName(root);
+        if (parent == null) yield break;
+        foreach (string folder in Directory.EnumerateDirectories(parent, "Astro*"))
+        {
+            string name = Path.GetFileName(folder);
+            if ((name.StartsWith("AstroArchive", StringComparison.OrdinalIgnoreCase) || name.StartsWith("Astro Archive", StringComparison.OrdinalIgnoreCase))
+                && File.Exists(Path.Combine(folder, "AstroArchive.exe")))
+                yield return Path.Combine(folder, ".runtime", "python", "python.exe");
+        }
+    }
+
     async Task<string> Probe()
     {
-        if (!File.Exists(Python)) return "Липсва самостоятелната Python среда.\nЩе се изтеглят Python 3.13.9 и библиотеките:\n" + string.Join("\n", ArrayValue(manifest["packages"]).Select(Convert.ToString));
-        try { return (await Execute(Python, "-I -B \"" + Path.Combine(root, "Tools", "runtime_probe.py") + "\"", 60000)).Trim(); }
-        catch (InvalidOperationException ex) { return "Python средата се нуждае от възстановяване.\n" + ex.Message; }
-        catch (System.ComponentModel.Win32Exception ex) { return "Python средата се нуждае от възстановяване.\n" + ex.Message; }
+        string problem = null;
+        foreach (string candidate in PythonCandidates().Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            string name = Path.GetFileName(candidate);
+            if (!name.StartsWith("python", StringComparison.OrdinalIgnoreCase)) continue;
+            string windowless = Path.Combine(Path.GetDirectoryName(candidate), name.Insert(6, "w"));
+            if (!File.Exists(candidate) || !File.Exists(windowless)) continue;
+            string check;
+            try { check = (await Execute(candidate, "-I -B \"" + Path.Combine(root, "Tools", "runtime_probe.py") + "\"", 20000)).Trim(); }
+            catch (InvalidOperationException ex) { check = ex.Message; }
+            catch (System.ComponentModel.Win32Exception ex) { check = ex.Message; }
+            catch (TimeoutException ex) { check = ex.Message; }
+            if (check == "READY")
+            {
+                selectedPython = candidate;
+                selectedPythonw = windowless;
+                return check;
+            }
+            if (problem == null) problem = check;
+        }
+        return "Няма съвместима налична Python среда.\n" + (problem ?? string.Join("\n", ArrayValue(manifest["packages"]).Select(Convert.ToString)));
     }
     async Task<string> Execute(string executable, string args, int timeout)
     {
@@ -266,7 +332,7 @@ internal sealed class Launcher : Form
             process.StartInfo = new ProcessStartInfo(executable, args) { WorkingDirectory = root,
                 UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
                 StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8 };
-            // Never accept a Python installation or startup hook from another copy.
+            // Keep the probe and app isolated from Python environment overrides.
             process.StartInfo.EnvironmentVariables.Remove("PYTHONPATH"); process.StartInfo.EnvironmentVariables.Remove("PYTHONHOME");
             process.StartInfo.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
             process.Start();
@@ -341,7 +407,39 @@ internal sealed class Launcher : Form
         }
     }
     Dictionary<string, object> ReadState()
-    { try { return Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(State)) ?? new Dictionary<string, object>(); } catch (IOException) { return new Dictionary<string, object>(); } catch (ArgumentException) { return new Dictionary<string, object>(); } }
+    {
+        try { return Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(State)) ?? new Dictionary<string, object>(); }
+        catch (IOException) { return new Dictionary<string, object>(); }
+        catch (ArgumentException) { return new Dictionary<string, object>(); }
+        catch (InvalidOperationException) { return new Dictionary<string, object>(); }
+    }
+    static HashSet<string> SkippedReleases(Dictionary<string, object> state)
+    {
+        var ids = new HashSet<string>();
+        string legacy = Str(state, "skipped_release");
+        if (legacy.Length > 0) ids.Add(legacy);
+        object saved;
+        if (state.TryGetValue("skipped_releases", out saved) && saved is IList)
+            foreach (object id in (IList)saved) ids.Add(Convert.ToString(id));
+        return ids;
+    }
+    async Task SkipRelease(string id)
+    {
+        var state = ReadState();
+        var ids = SkippedReleases(state);
+        ids.Add(id);
+        state["skipped_release"] = id;
+        state["skipped_releases"] = ids.ToArray();
+        Directory.CreateDirectory(Path.GetDirectoryName(State));
+        string temp = State + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(temp, Json.Serialize(state));
+            if (File.Exists(State)) File.Replace(temp, State, null); else File.Move(temp, State);
+        }
+        finally { if (File.Exists(temp)) File.Delete(temp); }
+        await Launch("Версията е пропусната за това копие");
+    }
     async Task CheckUpdates()
     {
         string resultNote = "Проверките приключиха";
@@ -359,21 +457,15 @@ internal sealed class Launcher : Form
             long currentID = Convert.ToInt64(manifest["release_id"]);
             DateTime built = DateTime.Parse(Str(manifest, "release_cutoff"), null, System.Globalization.DateTimeStyles.RoundtripKind);
             var release = releases.FirstOrDefault(x => Convert.ToInt64(x["id"]) != currentID && Str(x, "tag_name") != Str(manifest, "release_tag") && DateTime.Parse(Str(x, "published_at"), null, System.Globalization.DateTimeStyles.RoundtripKind) > built);
-            if (release != null && Str(ReadState(), "skipped_release") != Str(release, "id"))
+            if (release != null && !SkippedReleases(ReadState()).Contains(Str(release, "id")))
             {
                 var package = UpdatePackage(release);
                 ShowUpdate(Str(release, "name"), Str(release, "tag_name"), Str(release, "published_at"));
                 if (package != null) AddButton("Изтегли новата версия", async () => await Guard(() => DownloadUpdate(package)));
                 else Update("Няма проверим Windows пакет", "Можеш да продължиш с текущата версия", .86f);
                 AddButton("Пропусни сега", async () => await Guard(() => Launch("Версията е пропусната за това стартиране")));
-                AddButton("Пропусни версията", async () => await Guard(async () =>
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(State));
-                    string temp = State + "." + Guid.NewGuid().ToString("N") + ".tmp";
-                    File.WriteAllText(temp, Json.Serialize(new Dictionary<string, object> { { "skipped_release", Str(release, "id") } }));
-                    if (File.Exists(State)) File.Replace(temp, State, null); else File.Move(temp, State);
-                    await Launch("Версията е пропусната за това копие");
-                })); return;
+                AddButton("Пропусни версията", async () => await Guard(() => SkipRelease(Str(release, "id"))));
+                return;
             }
         }
         catch (WebException)
@@ -399,7 +491,7 @@ internal sealed class Launcher : Form
         DateTime date;
         updateDate = DateTime.TryParse(published, out date) ? date.ToString("dd.MM.yyyy") : "";
         phase = "Нова версия е на хоризонта";
-        Update("Налична е нова версия", "Изтегли проверения Windows ZIP директно от програмата", .86f);
+        Update("Налична е нова версия", "Стартерът изтегля, проверява и инсталира обновяването", .86f);
     }
     static Dictionary<string, object> UpdatePackage(Dictionary<string, object> release)
     {
@@ -425,15 +517,19 @@ internal sealed class Launcher : Form
         string expected = Str(package, "digest").Substring(7).ToLowerInvariant(); long size = Convert.ToInt64(package["size"]);
         string target = Path.Combine(folder, name), temporary = Path.Combine(folder, ".update-" + Guid.NewGuid().ToString("N") + ".part");
         Directory.CreateDirectory(folder);
-        if (File.Exists(target))
-        {
-            if (new FileInfo(target).Length == size && await Task.Run(() => HashFile(target)) == expected) { ShowDownloaded(folder, name); return; }
-            target = Path.Combine(folder, Path.GetFileNameWithoutExtension(name) + "-" + Guid.NewGuid().ToString("N").Substring(0,8) + ".zip");
-        }
         using (var cancellation = CancellationTokenSource.CreateLinkedTokenSource(stop.Token))
         {
             try
             {
+                if (File.Exists(target))
+                {
+                    if (new FileInfo(target).Length == size && await Task.Run(() => HashFile(target)) == expected)
+                    {
+                        InstallUpdate(target, expected);
+                        return;
+                    }
+                    target = Path.Combine(folder, Path.GetFileNameWithoutExtension(name) + "-" + Guid.NewGuid().ToString("N").Substring(0,8) + ".zip");
+                }
                 ClearButtons(); phase = "Изтегляне на новата версия";
                 Update("Изтегляне на " + name, "0% • проверката на SHA-256 предстои", 0);
                 AddButton("Спри изтеглянето", () => cancellation.Cancel(), true);
@@ -452,12 +548,13 @@ internal sealed class Launcher : Form
                 cancellation.Token.ThrowIfCancellationRequested();
                 if (new FileInfo(temporary).Length != size || await Task.Run(() => HashFile(temporary)) != expected) throw new InvalidDataException("Непълен пакет или различна SHA-256. Опитай отново.");
                 cancellation.Token.ThrowIfCancellationRequested();
-                File.Move(temporary, target); ShowDownloaded(folder, Path.GetFileName(target));
+                File.Move(temporary, target);
+                InstallUpdate(target, expected);
             }
             catch (Exception error)
             {
                 if (stop.IsCancellationRequested) return;
-                ClearButtons(); phase = cancellation.IsCancellationRequested ? "Изтеглянето е спряно" : "Изтеглянето не завърши";
+                ClearButtons(); phase = cancellation.IsCancellationRequested ? "Изтеглянето е спряно" : "Обновяването не започна";
                 Update(phase, cancellation.IsCancellationRequested ? "Временният файл ще се премахне" : error.Message, 0);
                 AddButton("Опитай отново", async () => await Guard(() => DownloadUpdate(package)));
                 AddButton("Стартирай това копие", async () => await Guard(() => Launch("Стартиране на текущата версия")));
@@ -470,13 +567,34 @@ internal sealed class Launcher : Form
             }
         }
     }
-    void ShowDownloaded(string folder, string name)
+    bool ApplicationIsRunning()
     {
-        ClearButtons(); phase = "Новата версия е изтеглена";
-        Update(name, "SHA-256 е проверена. Отвори папката и разархивирай ZIP в отделна папка.", 1);
-        AddButton("Отвори папката", () => Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true }));
-        AddButton("Стартирай това копие", async () => await Guard(() => Launch("Стартиране на текущата версия")));
-        AddButton("Затвори", Close);
+        string identity = Hash(Encoding.UTF8.GetBytes(root.ToLowerInvariant())).Substring(0, 32);
+        Mutex running;
+        if (!Mutex.TryOpenExisting("Local\\AstroArchive-" + identity, out running)) return false;
+        running.Dispose();
+        return true;
+    }
+    void InstallUpdate(string package, string digest)
+    {
+        stop.Token.ThrowIfCancellationRequested();
+        if (ApplicationIsRunning()) throw new InvalidOperationException("Затвори Astro Archive, преди да приложиш обновяването.");
+        Directory.CreateDirectory(UpdateStage);
+        if ((File.GetAttributes(UpdateStage) & FileAttributes.ReparsePoint) != 0
+            || (File.GetAttributes(Path.GetDirectoryName(UpdateStage)) & FileAttributes.ReparsePoint) != 0)
+            throw new InvalidDataException("Папката за обновяване не може да бъде връзка.");
+        File.Copy(Path.Combine(root, "Tools", "apply_update.py"), Path.Combine(UpdateStage, "apply_update.py"), true);
+        File.WriteAllText(Path.Combine(UpdateStage, "python.txt"), selectedPython);
+        BeginUpdate(selectedPython, "\"" + package + "\" " + digest);
+    }
+    void BeginUpdate(string python, string arguments)
+    {
+        ClearButtons(); phase = "Инсталиране на обновяването";
+        Update("Подготвяме програмните файлове…", "Astro Archive ще се отвори автоматично", 1);
+        var info = new ProcessStartInfo(python, "-I -B \"" + Path.Combine(UpdateStage, "apply_update.py") + "\" " + Process.GetCurrentProcess().Id + " " + arguments)
+            { WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true };
+        using (Process.Start(info)) { }
+        Close();
     }
     static void ValidateReleaseURL(string url)
     {
@@ -491,7 +609,7 @@ internal sealed class Launcher : Form
         string token = Guid.NewGuid().ToString("N");
         string ready = Path.Combine(root, "Backend", "Cache", "data", "launcher-ready-" + token + ".json");
         Directory.CreateDirectory(Path.GetDirectoryName(ready));
-        var info = new ProcessStartInfo(Path.Combine(Runtime, "pythonw.exe"), "-I -B \"" + Path.Combine(root, "start.pyw") + "\"") { WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true };
+        var info = new ProcessStartInfo(selectedPythonw, "-I -B \"" + Path.Combine(root, "start.pyw") + "\"") { WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true };
         info.EnvironmentVariables.Remove("PYTHONPATH"); info.EnvironmentVariables.Remove("PYTHONHOME");
         info.EnvironmentVariables["ASTRO_ARCHIVE_READY"] = ready;
         info.EnvironmentVariables["ASTRO_ARCHIVE_RELEASE_TAG"] = Str(manifest, "release_tag");
@@ -533,6 +651,9 @@ internal sealed class Launcher : Form
             finally { manifest["files"] = originalFiles; if (File.Exists(fixturePath)) File.Delete(fixturePath); }
             ValidateReleaseURL(Releases);
             try { ValidateReleaseURL("https://example.com/releases"); return 2; } catch (InvalidDataException) { }
+            var skipped = SkippedReleases(new Dictionary<string, object>
+                { { "skipped_release", "101" }, { "skipped_releases", new[] { "202" } } });
+            if (!skipped.SetEquals(new[] { "101", "202" }) || skipped.Contains("303")) return 7;
             string temporary = Path.Combine(root, ".runtime", "test-" + Guid.NewGuid().ToString("N"));
             try
             {

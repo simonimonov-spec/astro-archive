@@ -443,6 +443,10 @@
         "destination": "Tools/build_launcher.ps1"
       },
       {
+        "source": "Tools/apply_update.py",
+        "destination": "Tools/apply_update.py"
+      },
+      {
         "source": "Tools/runtime_probe.py",
         "destination": "Tools/runtime_probe.py"
       },
@@ -481,6 +485,10 @@
       {
         "source": "Backend/Foundation/update_download.py",
         "destination": "Backend/Foundation/update_download.py"
+      },
+      {
+        "source": "tests/test_apply_update.py",
+        "destination": "tests/test_apply_update.py"
       },
       {
         "source": "tests/test_update_download.py",

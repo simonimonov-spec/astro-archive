@@ -11,7 +11,7 @@ New-Item -ItemType Directory -Path $work | Out-Null
 $allowlist = Get-Content -LiteralPath (Join-Path $Root 'Tools/publication-files.json') -Raw -Encoding utf8 | ConvertFrom-Json
 $files = [ordered]@{}
 foreach ($entry in $allowlist.repositories.'astro-archive') {
-    if ($entry.destination -match '^(Backend/|Bridge/|UI/|start\.pyw$|requirements-lock\.txt$|Tools/runtime_probe\.py$)') {
+    if ($entry.destination -match '^(Backend/|Bridge/|UI/|start\.pyw$|requirements-lock\.txt$|Tools/(runtime_probe|apply_update)\.py$)') {
         $source = Join-Path $Root $entry.source
         $files[$entry.destination] = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLowerInvariant()
     }

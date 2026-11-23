@@ -321,7 +321,7 @@
     try{drawUpdateDownload(await bindings.call('app.updates.download'));await monitorUpdateDownload();}
     catch(error){$('app-update-download-status').textContent=error.message;}
   }
-  async function checkUpdates(startup=false){
+  async function checkUpdates(){
     if(checkingUpdates||!bindings?.desktop)return;
     checkingUpdates=true;
     const status=$('app-update-status'),link=$('app-update-link');
@@ -332,7 +332,6 @@
       drawUpdateDownload(updateTransfer);
       status.textContent=result.problem || (result.available?'Налична е нова версия: '+result.latest:!result.currentKnown?'Последна публикувана версия: '+(result.latest||'няма')+'. Това копие няма идентификатор на издание.':'Текуща версия: '+result.current+'. Няма по-ново публикувано издание.');
       link.hidden=!result.latest||!!result.problem;
-      if(result.available&&startup)window.AstroArchiveFunctions.modal('Нова версия на Astro Archive',(body,box)=>{const p=document.createElement('p');p.textContent='Налична е '+result.latest+'.';body.append(p);if(result.downloadable){const button=document.createElement('button');button.type='button';button.className='primary-button';button.textContent='Изтегли новата версия';button.onclick=async()=>{box.close();await open('diagnostics');await startUpdateDownload();};body.append(button);}});
     }catch(error){status.textContent='Проверката за версии е недостъпна. Опитай отново.';link.hidden=true;}
     finally{checkingUpdates=false;}
   }
@@ -340,7 +339,7 @@
     connect(value) { bindings = value; window.AstroArchiveCustomization?.connect(value); },
     customizationChanged: preview,
     addIcon(icon) { configuration.icons ||= []; if (!configuration.icons.some(i => i.fileName === icon.fileName)) configuration.icons.push(icon); },
-    initialize(data) { accept(data); if(bindings?.desktop&&!window.AstroArchiveRemote)setTimeout(()=>{checkUpdates(true);monitorUpdateDownload();bindings.call('ui.plugins.catalog').then(result=>{configuration.pluginCatalog=result.pluginCatalog;configuration.catalogProblem=result.catalogProblem;drawPlugins();$('ui-plugin-catalog-status').textContent=result.catalogProblem||'Каталогът в GitHub е проверен.';}).catch(()=>{});},500); },
+    initialize(data) { accept(data); if(bindings?.desktop&&!window.AstroArchiveRemote)setTimeout(()=>{checkUpdates();monitorUpdateDownload();bindings.call('ui.plugins.catalog').then(result=>{configuration.pluginCatalog=result.pluginCatalog;configuration.catalogProblem=result.catalogProblem;drawPlugins();$('ui-plugin-catalog-status').textContent=result.catalogProblem||'Каталогът в GitHub е проверен.';}).catch(()=>{});},500); },
     close, open, showTab, refreshAppearance,
     get isOpen() { return $("settings-dialog").open; }
   };
