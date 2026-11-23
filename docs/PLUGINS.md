@@ -36,7 +36,7 @@
 | AI оценител | Beta-1 | [frame-inspector-ai](https://github.com/simonimonov-spec/astro-archive/tree/plugin-frame-inspector-ai) |
 | Автоматично стакване чрез Siril | V-1 | [siril-auto](https://github.com/simonimonov-spec/astro-archive/tree/plugin-siril-auto) |
 | Remote Operation | V-1 | [remote-operation](https://github.com/simonimonov-spec/astro-archive/tree/plugin-remote-operation) |
-| Shared Archives · LAN | V-1 | [shared-archives](https://github.com/simonimonov-spec/astro-archive/tree/plugin-shared-archives) |
+| Shared Archives · LAN | V-2 | [shared-archives](https://github.com/simonimonov-spec/astro-archive/tree/plugin-shared-archives) |
 | IASC Campaigns | V-1 | [iasc-campaigns](https://github.com/simonimonov-spec/astro-archive/tree/plugin-iasc-campaigns) |
 
 AI Trainer и частният плъгин за етикетиране `ai-training` не се публикуват.

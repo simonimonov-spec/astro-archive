@@ -40,11 +40,11 @@
     {
       "id": "shared-archives",
       "name": "Shared Archives · LAN",
-      "version": "V-1",
-      "description": "Споделени архиви между Windows инстанции на Astro Archive през LAN със задължително SMB 3 шифроване. Локални и мрежови архиви едновременно; четене, запис и създаване на нови архиви.",
+      "version": "V-2",
+      "description": "Споделяне на архиви през шифрован SMB 3 в LAN и пробен режим за автоматично откриване, преглед и защитен запис между две копия на Astro Archive на един Windows компютър.",
       "repository": "simonimonov-spec/astro-archive",
-      "commit": "3c66334aa4430fe9f951f61cfc4d156b0a46f58d",
-      "sha256": "e9d5564aafed5c62ddbc7178fae1e1c65d45a45ee74a6f30baa9bf9f130f613e"
+      "commit": "97067f94d51f67e6cc043083d618f86d51220619",
+      "sha256": "d5ced467e2d93bf326aa51d76cd44263a790837ec62e318f772b7350c5d7d69e"
     },
     {
       "id": "iasc-campaigns",

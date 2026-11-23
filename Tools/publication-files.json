@@ -905,6 +905,30 @@
         "destination": "logo.png"
       },
       {
+        "source": "Plugins/shared-archives/local_panel.py",
+        "destination": "local_panel.py"
+      },
+      {
+        "source": "Plugins/shared-archives/local_sharing.py",
+        "destination": "local_sharing.py"
+      },
+      {
+        "source": "Plugins/shared-archives/managed_files.py",
+        "destination": "managed_files.py"
+      },
+      {
+        "source": "Plugins/shared-archives/test_local_panel.py",
+        "destination": "test_local_panel.py"
+      },
+      {
+        "source": "Plugins/shared-archives/test_local_sharing.py",
+        "destination": "test_local_sharing.py"
+      },
+      {
+        "source": "Plugins/shared-archives/test_managed_files.py",
+        "destination": "test_managed_files.py"
+      },
+      {
         "source": "Plugins/shared-archives/main.py",
         "destination": "main.py"
       },
