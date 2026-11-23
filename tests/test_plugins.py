@@ -181,6 +181,64 @@ class PluginTests(unittest.TestCase):
 @unittest.skipUnless(all(importlib.util.find_spec(m) for m in ('numpy', 'scipy', 'astropy', 'photutils', 'PIL')),
                      'Full Service integration requires the core scientific dependencies')
 class CoreIntegrationTests(unittest.TestCase):
+    def shared_archive(self):
+        from Bridge.Core.service import Service
+        from Backend.Foundation.runtime import atomic_json
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        service = Service(Store(root/'state'), plugin_folder=root/'Plugins')
+        self.addCleanup(service.jobs.pool.shutdown, cancel_futures=True)
+        source = {'id': 'a'*64, 'name': 'Пробен архив'}
+        service.settings.value['archives'][0].update(path='', sharedSource=source)
+        catalog = service.plugins.settings_path('shared-archives').parent/'SharedCatalogs'/'Client'/(source['id']+'.json')
+        directory = {'path': 'Telescope', 'kind': 'folder'}
+        file = dict(path='Telescope/capture.fit', kind='file', bytes=5760, modified=1700000000000000000,
+                    meta=dict(kind='frame', telescope='Telescope', frames=1, framesKnown=True,
+                              exposure=120, totalExposure=120, observed='2026-11-20T22:00:00',
+                              filter='L', sensor='Camera', width=16, height=12))
+        atomic_json(catalog, {'format': 1, 'rows': [directory, file]})
+        return service, catalog, directory, file
+
+    def test_shared_archive_projects_metadata_from_saved_catalog(self):
+        from unittest.mock import patch
+        from Backend.Foundation.runtime import atomic_json
+        service, catalog, folder, file = self.shared_archive()
+
+        def provider(action, **p):
+            entries = [file] if p['path'] else [folder]
+            return dict(path=p['path'], rows=entries, total=1, offset=0,
+                        files=int(bool(p['path'])), folders=int(not p['path']))
+
+        with patch.object(service.shared_sources, 'request', side_effect=provider) as request:
+            root, = service.call('archive.list', {'archiveId':'frames'})['entries']
+            self.assertEqual((root['bytes'], root['details']['frames'], root['details']['totalExposure']), (5760, 1, 120))
+            self.assertEqual(root['info']['realTelescope'], 'Telescope')
+            row, = service.call('archive.list', {'archiveId':'frames','relativePath':'Telescope'})['entries']
+            self.assertEqual((row['info']['resolution'], row['info']['sensor'], row['details']['exposure']), ('16 × 12', 'Camera', 120))
+            self.assertEqual(row['details']['firstObservation'], '2026-11-20')
+            second = dict(file, path='Telescope/second.fit')
+            atomic_json(catalog, {'format': 1, 'rows': [folder, file, second]})
+            changed, = service.call('archive.list', {'archiveId':'frames'})['entries']
+            self.assertEqual((changed['bytes'], changed['details']['frames'], changed['details']['totalExposure']), (11520, 2, 240))
+            self.assertTrue(all(call.args == ('browse',) for call in request.call_args_list))
+
+    def test_shared_archive_refresh_routes_to_provider(self):
+        from unittest.mock import patch
+        service, _, _, _ = self.shared_archive()
+
+        def provider(action, **params):
+            return {'files': 1} if action == 'summary' else {}
+
+        with patch.object(service.shared_sources, 'request', side_effect=provider) as request, patch.object(service, 'start_index') as local:
+            task = service.call('python.archive.scan', {'archiveId':'frames'})
+            result = service.wait_task(task)
+            self.assertTrue(result['shared'])
+            self.assertEqual(result['files'], 1)
+            self.assertEqual([call.args[0] for call in request.call_args_list], ['refresh', 'summary'])
+            self.assertEqual(request.call_args_list[0].kwargs['id'], 'a'*64)
+            local.assert_not_called()
+
     def test_core_bootstrap_without_any_plugins(self):
         from Bridge.Core.service import Service
         with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[1]) as folder:

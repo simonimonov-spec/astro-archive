@@ -362,8 +362,15 @@ class Service:
             return self.catalog.summary(p['archiveId'],p.get('relativePath',''))
         if method in ('archive.summary.refresh','python.archive.scan'):
             archive=p.get('archiveId','frames')
-            if method=='archive.summary.refresh' and self.shared_sources.get(archive):
-                return self.shared_sources.summary(archive,p)
+            if self.shared_sources.get(archive):
+                def refresh_shared(cancel, progress):
+                    if cancel.is_set():raise InterruptedError('Задачата е спряна.')
+                    progress(0,1,'Обновяване на запазения каталог от хоста')
+                    self.shared_sources.refresh(archive)
+                    if cancel.is_set():raise InterruptedError('Задачата е спряна.')
+                    return dict(self.shared_sources.summary(archive,p),shared=True)
+                started=self.task('archive','Обновяване на споделения архив',refresh_shared,'ambient')
+                return self.wait_task(started) if method=='archive.summary.refresh' else started
             started=self.start_index(archive,verify=True)
             if method=='archive.summary.refresh':self.wait_task(started);return self.catalog.summary(archive,p.get('relativePath',''))
             return started

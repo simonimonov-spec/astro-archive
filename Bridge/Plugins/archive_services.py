@@ -132,6 +132,7 @@ class ArchiveServices:
             if root != Path(p['root']).resolve(strict=True):
                 raise ValueError('Архивната папка на хоста е променена.')
             if action == 'source-metadata':
+                self.service.ensure_index(archive)
                 keys = ('object','telescope','realTelescope','night','filter','sensor','width','height',
                         'kind','frames','framesKnown','exposure','totalExposure','observed','created',
                         'sourceNights','sourceStackCount','telescopes')

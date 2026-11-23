@@ -18,6 +18,13 @@ def accumulate(out,row):
         values=m.get(key,[]);values=values if isinstance(values,list) else [values]
         out['info'].setdefault(key,set()).update(str(v) for v in values if v)
 
+def group_details(group, kind, meta=None, *, building=False, stale=False):
+    return dict(kind=kind,files=group['files'],stacks=group['stacks'],frames=group['frames'] if kind!='frame' else None,exposure=(meta or {}).get('exposure'),
+        totalExposure=group['exposure'] if not group['files'] or group['exposureUnknown']<group['files'] else None,
+        dateKind='observation' if kind in ('frame','dark','flat','bias','stack','day','night') else 'modified',firstObservation=group['firstObservation'],lastObservation=group['lastObservation'],created=group['created'],
+        minimumExposure=bool(group['exposureUnknown']),minimumFrames=bool(group['framesUnknown']),unknownExposure=group['exposureUnknown'],metadataIncomplete=group['metadataIncomplete'],building=building,stale=stale)
+
+
 class BrowseIndex:
     def __init__(self,catalog):self.catalog=catalog;self.lock=threading.RLock();self.cache={}
     def get(self,archive):
@@ -46,6 +53,4 @@ class BrowseIndex:
         if row:accumulate(group,row)
         else:group=cache['groups'].get(rel,group)
         state=self.catalog.index_status(archive)
-        return dict(kind=kind,files=group['files'],stacks=group['stacks'],frames=group['frames'] if kind!='frame' else None,exposure=row['meta'].get('exposure') if row else None,
-            totalExposure=group['exposure'] if not group['files'] or group['exposureUnknown']<group['files'] else None,
-            dateKind='observation' if kind in ('frame','dark','flat','bias','stack','day','night') else 'modified',firstObservation=group['firstObservation'],lastObservation=group['lastObservation'],created=group['created'],minimumExposure=bool(group['exposureUnknown']),minimumFrames=bool(group['framesUnknown']),unknownExposure=group['exposureUnknown'],metadataIncomplete=group['metadataIncomplete'],building=state['building'],stale=state['stale'])
+        return group_details(group,kind,row['meta'] if row else None,building=state['building'],stale=state['stale'])
