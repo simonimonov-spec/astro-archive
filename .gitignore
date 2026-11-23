@@ -1,5 +1,4 @@
 # Runtime state contains archive paths, credentials, observations and training data.
-/AGENTS.md
 /Backend/Cache/
 **/__pycache__/
 *.py[cod]
