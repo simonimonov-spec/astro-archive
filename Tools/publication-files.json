@@ -11,6 +11,10 @@
         "destination": ".gitignore"
       },
       {
+        "source": ".github/workflows/windows-launcher.yml",
+        "destination": ".github/workflows/windows-launcher.yml"
+      },
+      {
         "source": "Backend/Analysis/alignment.py",
         "destination": "Backend/Analysis/alignment.py"
       },

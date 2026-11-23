@@ -1,0 +1,28 @@
+name: Build Windows launcher
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Build and test the Windows launcher
+        shell: pwsh
+        run: |
+          ./Tools/build_launcher.ps1
+          $result = Start-Process -FilePath ./AstroArchive.exe -ArgumentList '--self-test' -Wait -PassThru -WindowStyle Hidden
+          if ($result.ExitCode -ne 0) { throw "Launcher self-test failed: $($result.ExitCode)" }
+      - name: Upload unsigned launcher
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: unsigned-windows-launcher
+          path: AstroArchive.exe
+          if-no-files-found: error
