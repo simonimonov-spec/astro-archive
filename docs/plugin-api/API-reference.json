@@ -222,6 +222,11 @@
       ]
     }
   },
+  "anchorOptions": {
+    "archive.location": {
+      "archiveIds": "Optional list of archive IDs at which to display this contribution."
+    }
+  },
   "uiActions": [
     "message",
     "copy",

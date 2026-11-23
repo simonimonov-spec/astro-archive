@@ -118,7 +118,11 @@ class PluginTests(unittest.TestCase):
         for bad in (dict(slot='anchor', anchor='archive.unknown'),
                     dict(slot='anchor', anchor='archive.layout', mode='replace'),
                     dict(slot='anchor', anchor='archive.empty', presentation='html'),
-                    dict(slot='archive', anchor='archive.empty')):
+                    dict(slot='archive', anchor='archive.empty'),
+                    dict(slot='anchor', anchor='archive.empty', archiveIds=['frames']),
+                    dict(slot='anchor', anchor='archive.location', archiveIds='frames'),
+                    dict(slot='anchor', anchor='archive.location', archiveIds=['frames', 'frames']),
+                    dict(slot='anchor', anchor='archive.location', archiveIds=['../frames'])):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 contribution_layout(dict(id='a', title='A', **bad))
         self.ui_fixture([dict(id='empty', slot='anchor', title='Empty', anchor='archive.empty', mode='replace')],

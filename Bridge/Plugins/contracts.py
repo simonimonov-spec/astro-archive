@@ -75,6 +75,13 @@ def contribution_layout(c):
         if c.get('mode','append') not in modes:raise ValueError('Котвата '+c['anchor']+' приема: '+', '.join(modes))
         if c.get('presentation','bare') not in PRESENTATIONS:raise ValueError('Невалиден изглед на допълнението.')
     elif any(k in c for k in ('anchor','mode','presentation')):raise ValueError('anchor, mode и presentation са само за slot „anchor“.')
+    if 'archiveIds' in c:
+        ids=c['archiveIds']
+        if (c.get('slot')!='anchor' or c.get('anchor')!='archive.location'
+                or not isinstance(ids,list) or not 1<=len(ids)<=100
+                or any(not isinstance(ident,str) or not re.fullmatch(r'[a-zA-Z0-9_-]{1,120}',ident) for ident in ids)
+                or len(set(ids))!=len(ids)):
+            raise ValueError('archiveIds трябва да е списък с уникални архиви за archive.location.')
 
 def ui_document(elements):
     """Declarative data only: fixed controls, no markup, scripts or arbitrary URLs."""

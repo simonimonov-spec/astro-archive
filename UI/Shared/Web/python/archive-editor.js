@@ -13,9 +13,9 @@
   function input(label,value,onchange){const wrap=node('label',null,'settings-field'),e=node('input');e.type='text';e.value=value??'';e.maxLength=512;e.setAttribute('aria-label',label);e.oninput=()=>onchange(e.value);wrap.append(node('span',label),e);return {wrap,e};}
   // The shared-source option exists only while an enabled plugin provides it.
   function usesSharedSource(id){return ['frames','stacks','photos'].includes(id)&&!!window.AstroArchiveExtensions?.hasCapability?.('archives.sharing.source');}
-  async function chooseShared(archive, apply){
+  async function chooseShared(archive, apply, {confirm=false}={}){
     const U=window.AstroArchiveFunctions, choices=await call('archive.shared.choices',{archiveId:archive.id});
-    if(choices.length===1){await apply(choices[0]);return;}
+    if(choices.length===1&&!confirm){await apply(choices[0]);return;}
     U.modal('Избери споделен архив',(body,dialog)=>{
       if(!choices.length){body.append(node('p','Свържи се с хост и получи достъп до архив от този тип в Настройки → Плъгини.'));return;}
       for(const source of choices){
@@ -24,6 +24,13 @@
       }
     });
   }
+  function sourceLocation(actions,archive,apply){
+    const extensions=window.AstroArchiveExtensions;
+    if(usesSharedSource(archive.id)&&!extensions.hasAnchor('archive.location',archive.id,'archives.sharing.source')){
+      actions.append(button('Избери споделен…',()=>chooseShared(archive,apply,{confirm:true})));
+    }
+    extensions?.anchor(actions,'archive.location',{archiveId:archive.id,applySharedSource:apply});
+  }
   function render(host,archive,changed,assets=[]){
     const card=node('section',null,'archive-schema-card');host.append(card);let sample;const kind=archiveKind(archive),expandedLevels=new WeakSet();card.dataset.archiveId=archive.id;card.dataset.archiveKind=kind;
     const status=node('p',null,'settings-note'),head=node('div',null,'archive-schema-heading'),name=input('Име на архива',archive.name,v=>{archive.name=v;changed();}),path=input('Местоположение',archive.path,v=>{archive.path=v;delete archive.sharedSource;path.e.placeholder='';changed();});
@@ -31,8 +38,7 @@
     setPath();
     const actions=node('div',null,'archive-location-actions');
     actions.append(button('Избери…',async()=>{const chosen=await call('customization.folder.choose');if(chosen?.path){archive.path=chosen.path;delete archive.sharedSource;setPath();changed();}}));
-    if(usesSharedSource(archive.id))actions.append(button('Избери споделен…',()=>chooseShared(archive,source=>{archive.path='';archive.sharedSource=source;setPath();changed();})));
-    window.AstroArchiveExtensions?.anchor?.(actions,'archive.location',{archiveId:archive.id});head.append(name.wrap,path.wrap,actions);const fileFormula=input('Формула за името на файла',archive.structure?.fileFormula||'{filename}',v=>{if(archive.structure){archive.structure.fileFormula=v;changed();}});fileFormula.wrap.classList.add('archive-file-formula');fileFormula.e.disabled=!archive.structure;card.append(head,status,fileFormula.wrap);
+    sourceLocation(actions,archive,source=>{archive.path='';archive.sharedSource=source;setPath();changed();});head.append(name.wrap,path.wrap,actions);const fileFormula=input('Формула за името на файла',archive.structure?.fileFormula||'{filename}',v=>{if(archive.structure){archive.structure.fileFormula=v;changed();}});fileFormula.wrap.classList.add('archive-file-formula');fileFormula.e.disabled=!archive.structure;card.append(head,status,fileFormula.wrap);
     const details=node('details',null,'archive-schema-options'),summary=node('summary','Структура, имена и информация по нива'),body=node('div');details.append(summary,body);card.append(details);
     async function load(){status.textContent='Зареждане на полетата от индекса…';sample=await call('archive.structure.sample',{archiveId:archive.id}).catch(()=>null);
       if(!sample){sample=await call('archive.structure.sample',{archiveId:'frames'});sample.sample={};sample.hasSample=false;sample.fields=sample.fields.filter(f=>f.key in titles||['filename','basename','extension'].includes(f.key)).map(f=>({...f,value:null}));sample.structure=sample.presets[archive.type||'frames'];}
@@ -68,5 +74,5 @@
     body.append(button('Преглед преди записване',async()=>{const values={};for(const[k,v]of Object.entries(inputs))if(v.enabled.checked)values[k]=v.input.value;await previewEdit(archiveId,entry.relativePath,values);dialog.close();}));
   });}
   async function sourceNights(id){const U=window.AstroArchiveFunctions,nights=await call('archive.source.nights',{id});U.modal('Изходни наблюдателни нощи',(body,dialog)=>{if(!nights.length)body.append(node('p','Няма намерена връзка с изходни кадри. Попълни обект, телескоп и наблюдателна нощ или внеси резултат през подготовката.'));for(const night of nights)body.append(button(night.name,()=>{dialog.close();window.AstroArchiveArchiveView.navigate(night.archiveId,night.relativePath);}));});}
-  window.AstroArchiveArchiveSchema={render,edit,previewEdit,titles,sourceNights,chooseShared,usesSharedSource};
+  window.AstroArchiveArchiveSchema={render,edit,previewEdit,titles,sourceNights,chooseShared,usesSharedSource,sourceLocation};
 })();

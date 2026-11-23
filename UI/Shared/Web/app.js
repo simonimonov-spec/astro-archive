@@ -272,6 +272,7 @@
     const version = ++state.version;
     window.AstroArchiveArchiveRows.stop();
     const selected = state.archives.find(item => item.id === state.archiveId);
+    state.locationUnavailable = false;
     window.AstroArchiveMonitoring.select({ archiveId: state.archiveId, relativePath: state.path,
       name: state.entered ? state.path.split(/[\\/]/).filter(Boolean).at(-1) || archiveName(selected) : t("folder.choose"),
       rootName: archiveName(selected), root: selected?.path || "", enabled: !!webview && !!(selected?.path || selected?.sharedSource), summaryEnabled: state.entered }, refresh);
@@ -321,6 +322,8 @@
       $("files").replaceChildren();
       $("empty").hidden = false;
       $("empty-message").textContent = t("folder.failed");
+      state.locationUnavailable = !state.path && !selected.sharedSource;
+      sharedSourceButton();
       $("folder-counts").textContent = t("folder.noContent");
       $("page-label").textContent = "";
       $("folder-path").textContent = selected.path || selected.sharedSource?.name || "";
@@ -394,7 +397,7 @@
   });
   $("previous").addEventListener("click", () => { if (state.folder) { state.offset = Math.max(0, state.offset - state.folder.pageSize); loadFolder(); } });
   $("next").addEventListener("click", () => { if (state.folder) { state.offset += state.folder.pageSize; loadFolder(); } });
-  function sharedSourceButton(){const selected=state.archives.find(row=>row.id===state.archiveId);$("empty-shared-source").hidden=!(webview&&selected&&!selected.path&&!selected.sharedSource&&window.AstroArchiveArchiveSchema.usesSharedSource(selected.id));}
+  function sharedSourceButton(){const selected=state.archives.find(row=>row.id===state.archiveId);$("empty-shared-source").hidden=!(webview&&state.entered&&selected&&(!selected.path||state.locationUnavailable)&&!selected.sharedSource&&window.AstroArchiveArchiveSchema.usesSharedSource(selected.id));}
   window.addEventListener('astroarchive-extensions-rendered',sharedSourceButton);
   $("empty-shared-source").onclick=async()=>{
     const archive=state.archives.find(row=>row.id===state.archiveId);

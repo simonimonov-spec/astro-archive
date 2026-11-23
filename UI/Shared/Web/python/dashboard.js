@@ -54,8 +54,7 @@
           name.input.oninput=()=>a.name=name.input.value;
           path.input.oninput=()=>{a.path=path.input.value;delete a.sharedSource;path.input.placeholder='';};
           actions.append(button('Избери…',async()=>{const {path:chosen}=await P.call('python.settings.choose',{kind:'folder'});if(chosen){a.path=chosen;delete a.sharedSource;setPath();}}));
-          if(source.usesSharedSource(a.id))actions.append(button('Избери споделен…',()=>source.chooseShared(a,selected=>{a.path='';a.sharedSource=selected;setPath();})));
-          window.AstroArchiveExtensions?.anchor?.(actions,'archive.location',{archiveId:a.id});row.append(name.wrap,path.wrap,actions);archiveList.append(row);
+          source.sourceLocation(actions,a,selected=>{a.path='';a.sharedSource=selected;setPath();});row.append(name.wrap,path.wrap,actions);archiveList.append(row);
         }
       }
       renderArchives();body.append(button('Добави архив',()=>{archives.push({id:'library-'+crypto.randomUUID().replaceAll('-',''),name:'Нов архив',path:''});renderArchives();}));

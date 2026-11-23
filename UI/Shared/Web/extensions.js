@@ -33,7 +33,7 @@
   async function returnToPicker(){await window.AstroArchivePreparation?.newSelection?.();select('preparation',null,false);}
   async function leavePreparation(p,c){for(const[id,pending]of [...saveTimers])if(id.startsWith(key(p,c)+':')){clearTimeout(pending.timer);pending.flush();}await actionQueues.get(p.id);await returnToPicker();}
   function finishNavigation(tasks){for(const task of tasks||[])if(returnTasks.has(task.id)&&task.state!=='running'){returnTasks.delete(task.id);if(task.state==='completed')returnToPicker().catch(error=>U.error('preparation',error));}}
-  async function runActions(p,c,response){
+  async function runActions(p,c,response,sourceSelection){
     const actions=Array.isArray(response?.uiActions)?response.uiActions.slice(0,16):[];
     for(const item of actions){
       if(!item||typeof item!=='object')continue;
@@ -52,12 +52,16 @@
         // The user picks and confirms in the core dialog; the plugin never binds by itself.
         const schema=window.AstroArchiveArchiveSchema,archive={id:item.archiveId};
         if(!schema?.chooseShared||!schema.usesSharedSource(item.archiveId))throw Error('Този архив не приема споделен източник.');
-        await schema.chooseShared(archive,async source=>{const result=await U.call('archive.shared.bind',{archiveId:item.archiveId,sourceId:source.id});window.AstroArchiveCustomization?.locationsSaved(result.archives);});
+        const apply=sourceSelection?.archiveId===item.archiveId?sourceSelection.apply:async source=>{
+          const result=await U.call('archive.shared.bind',{archiveId:item.archiveId,sourceId:source.id});
+          window.AstroArchiveCustomization?.locationsSaved(result.archives);
+        };
+        await schema.chooseShared(archive,apply,{confirm:true});
       }
     }
   }
   function action(p,c,e,row,itemId,context){
-    const scope=context?{...context}:{...selection(c.slot)};
+    const {applySharedSource,...scope}=context||selection(c.slot);
     // Selected catalog IDs are sent only to plugins allowed to read the archive.
     if(!(p.permissions||[]).some(x=>(x?.id||x)==='archive.read'))delete scope.ids;
     const parameters={pluginId:p.id,contributionId:c.id,element:e.id,values:readValues(p,c),row,itemId,context:scope};
@@ -70,7 +74,7 @@
       if(response?.navigation){window.AstroArchiveArchiveView.navigate(response.navigation.archiveId,response.navigation.relativePath);window.AstroArchivePython.navigate('archive');}
       if(response?.advanceViewer===true&&p.id==='ai-training'&&c.id==='rating'&&c.slot==='viewer-tools'&&viewerContext?.viewerId===parameters.context.viewerId)await window.AstroArchiveViewer?.next(parameters.context.viewerId);
       if(response?.message)window.dispatchEvent(new CustomEvent('astroarchive-plugin-message',{detail:{plugin:p.id,message:response.message}}));
-      await runActions(p,c,response);
+      await runActions(p,c,response,applySharedSource?{archiveId:scope.archiveId,apply:applySharedSource}:null);
     }catch(error){U.modal(p.name,body=>body.append(node('p',error.message,'error-banner')));}};
     const next=(actionQueues.get(p.id)||Promise.resolve()).then(perform);actionQueues.set(p.id,next.catch(()=>{}));return next;
   }
@@ -160,16 +164,18 @@
   }
   function syncReplace(target){target.classList.toggle('plugin-replacing',(anchorHosts.get(target)||[]).some(host=>host.isConnected&&host.dataset.anchorMode==='replace'&&!host.hidden));}
   function clearAnchor(target){for(const host of anchorHosts.get(target)||[])host.remove();anchorHosts.delete(target);target.classList.remove('plugin-replacing');}
+  const matchingAnchors=(name,archiveId)=>approved('anchor').filter(({c})=>c.anchor===name&&(!c.archiveIds||c.archiveIds.includes(archiveId)));
   function renderAnchor(target,activate){
     clearAnchor(target);const name=target.dataset.pluginAnchor,hosts=[];let after=target,prepend=null;
-    for(const{p,c}of approved('anchor').filter(x=>x.c.anchor===name)){
+    const {applySharedSource,...scope}=anchorContexts.get(target)||{};
+    for(const{p,c}of matchingAnchors(name,scope.archiveId)){
       const mode=c.mode||'append',host=node('section',null,'plugin-anchor plugin-anchor-'+(c.presentation||'bare')+(c.presentation==='panel'?' panel declarative-plugin':''));
       host.dataset.pluginAnchorHost=key(p,c);host.dataset.anchorMode=mode;host.hidden=true;
-      const context={...(anchorContexts.get(target)||{}),anchor:name};containerContexts.set(host,context);hostTargets.set(host,target);
+      const context={...scope,anchor:name};containerContexts.set(host,{...context,applySharedSource});hostTargets.set(host,target);
       if(mode==='before')target.before(host);else if(mode==='after'){after.after(host);after=host;}
       else if(mode==='prepend'){if(prepend)prepend.after(host);else target.prepend(host);prepend=host;}else target.append(host);
       hosts.push(host);anchorHosts.set(target,hosts);mount(host,p,c);
-      if(activate&&c.activate)U.call('plugin.ui.activate',{pluginId:p.id,contributionId:c.id,context}).then(response=>runActions(p,c,response)).catch(error=>console.warn(error.message));
+      if(activate&&c.activate)U.call('plugin.ui.activate',{pluginId:p.id,contributionId:c.id,context}).then(response=>runActions(p,c,response,applySharedSource?{archiveId:scope.archiveId,apply:applySharedSource}:null)).catch(error=>console.warn(error.message));
     }
     if(!hosts.length)anchorHosts.delete(target);syncReplace(target);
   }
@@ -271,6 +277,7 @@
     // Core code may register a dynamic anchor; plugins add/replace only while approved.
     anchor(element,name,context={}){if(!(element instanceof Element)||typeof name!=='string'||!/^[a-z]+\.[a-z-]+$/.test(name))return;element.dataset.pluginAnchor=name;anchorContexts.set(element,{...context});if(loaded){renderAnchor(element,true);applyThemes();}},
     hasCapability:id=>plugins.some(p=>p.enabled&&p.available&&(p.capabilities||[]).some(c=>c.id===id)),
+    hasAnchor:(name,archiveId,capability)=>matchingAnchors(name,archiveId).some(({p,c})=>c.elements?.length&&p.capabilities?.some(entry=>entry.id===capability)),
     broadcast(){},theme(){for(const[id,holders]of mounts){const item=plugins.flatMap(p=>(p.contributions||[]).map(c=>({p,c}))).find(x=>key(x.p,x.c)===id);if(item)for(const holder of holders)if(holder.isConnected)renderDocument(holder,item.p,item.c);}}
   };
   window.addEventListener('astroarchive-python-event',async event=>{
