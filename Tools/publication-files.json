@@ -733,6 +733,10 @@
       {
         "source": "Plugins/frame-inspector-ai/Прочети ме.md",
         "destination": "Прочети ме.md"
+      },
+      {
+        "source": "Plugins/frame-inspector-ai/quality_api.py",
+        "destination": "quality_api.py"
       }
     ],
     "astro-archive-plugin-iasc-campaigns": [
@@ -997,6 +1001,62 @@
       {
         "source": "Plugins/siril-auto/Siril-GPLv3.txt",
         "destination": "Siril-GPLv3.txt"
+      },
+      {
+        "source": "Plugins/siril-auto/ai_filter.py",
+        "destination": "ai_filter.py"
+      },
+      {
+        "source": "Plugins/siril-auto/parts.py",
+        "destination": "parts.py"
+      },
+      {
+        "source": "Plugins/siril-auto/scheduler.py",
+        "destination": "scheduler.py"
+      },
+      {
+        "source": "Plugins/siril-auto/slots.py",
+        "destination": "slots.py"
+      },
+      {
+        "source": "Plugins/siril-auto/view.py",
+        "destination": "view.py"
+      },
+      {
+        "source": "Plugins/siril-auto/tests/__init__.py",
+        "destination": "tests/__init__.py"
+      },
+      {
+        "source": "Plugins/siril-auto/tests/support.py",
+        "destination": "tests/support.py"
+      },
+      {
+        "source": "Plugins/siril-auto/tests/test_ai_filter.py",
+        "destination": "tests/test_ai_filter.py"
+      },
+      {
+        "source": "Plugins/siril-auto/tests/test_controller.py",
+        "destination": "tests/test_controller.py"
+      },
+      {
+        "source": "Plugins/siril-auto/tests/test_engine.py",
+        "destination": "tests/test_engine.py"
+      },
+      {
+        "source": "Plugins/siril-auto/tests/test_parts.py",
+        "destination": "tests/test_parts.py"
+      },
+      {
+        "source": "Plugins/siril-auto/tests/test_scheduler.py",
+        "destination": "tests/test_scheduler.py"
+      },
+      {
+        "source": "Plugins/siril-auto/tests/test_slots.py",
+        "destination": "tests/test_slots.py"
+      },
+      {
+        "source": "Plugins/siril-auto/tests/test_view.py",
+        "destination": "tests/test_view.py"
       }
     ]
   }
