@@ -440,6 +440,36 @@ internal sealed class Launcher : Form
         finally { if (File.Exists(temp)) File.Delete(temp); }
         await Launch("Версията е пропусната за това копие");
     }
+    static Version BetaVersion(string tag)
+    {
+        if (string.Equals(tag, "beta1-launcher", StringComparison.OrdinalIgnoreCase)) return new Version(1, 1, 0);
+        if (string.Equals(tag, "beta1-mit-update", StringComparison.OrdinalIgnoreCase)) return new Version(1, 0, 0);
+        var match = System.Text.RegularExpressions.Regex.Match(tag, @"\Abeta([0-9]{1,9})(?:\.([0-9]{1,9}))?(?:\.([0-9]{1,9}))?\z",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        if (!match.Success) return null;
+        int minor, patch;
+        int.TryParse(match.Groups[2].Value, out minor);
+        int.TryParse(match.Groups[3].Value, out patch);
+        return new Version(int.Parse(match.Groups[1].Value), minor, patch);
+    }
+    static Dictionary<string, object> SelectUpdate(IEnumerable<Dictionary<string, object>> releases, long currentID, string currentTag, DateTimeOffset cutoff)
+    {
+        Version current = BetaVersion(currentTag);
+        var candidates = releases
+            .Where(release => !Convert.ToBoolean(release["draft"])
+                && !string.IsNullOrEmpty(Str(release, "published_at"))
+                && !string.IsNullOrEmpty(Str(release, "tag_name"))
+                && Convert.ToInt64(release["id"]) != currentID
+                && Str(release, "tag_name") != currentTag)
+            .Select(release => new { Release = release, Published = DateTimeOffset.Parse(Str(release, "published_at")), Version = BetaVersion(Str(release, "tag_name")) })
+            .Where(candidate => candidate.Published > cutoff);
+        if (current != null)
+            return candidates.Where(candidate => candidate.Version != null && candidate.Version > current)
+                .OrderByDescending(candidate => candidate.Version).ThenByDescending(candidate => candidate.Published)
+                .Select(candidate => candidate.Release).FirstOrDefault();
+        return candidates.OrderByDescending(candidate => candidate.Published)
+            .Select(candidate => candidate.Release).FirstOrDefault();
+    }
     async Task CheckUpdates()
     {
         string resultNote = "Проверките приключиха";
@@ -450,13 +480,9 @@ internal sealed class Launcher : Form
             var request = Download(ReleaseAPI);
             if (await Task.WhenAny(request, Task.Delay(6000)) != request)
                 throw new WebException("Проверката за версия надвиши времето за изчакване.");
-            var releases = ArrayValue(Json.DeserializeObject(Encoding.UTF8.GetString(await request))).Select(Dict)
-                .Where(x => !Convert.ToBoolean(x["draft"]) && x.ContainsKey("published_at") && x["published_at"] != null)
-                .OrderByDescending(x => DateTime.Parse(Str(x, "published_at"), null, System.Globalization.DateTimeStyles.RoundtripKind)).ToList();
-            // Current release ID/date is embedded at build time, never inferred from tags lexically.
-            long currentID = Convert.ToInt64(manifest["release_id"]);
-            DateTime built = DateTime.Parse(Str(manifest, "release_cutoff"), null, System.Globalization.DateTimeStyles.RoundtripKind);
-            var release = releases.FirstOrDefault(x => Convert.ToInt64(x["id"]) != currentID && Str(x, "tag_name") != Str(manifest, "release_tag") && DateTime.Parse(Str(x, "published_at"), null, System.Globalization.DateTimeStyles.RoundtripKind) > built);
+            var releases = ArrayValue(Json.DeserializeObject(Encoding.UTF8.GetString(await request))).Select(Dict);
+            var release = SelectUpdate(releases, Convert.ToInt64(manifest["release_id"]), Str(manifest, "release_tag"),
+                DateTimeOffset.Parse(Str(manifest, "release_cutoff")));
             if (release != null && !SkippedReleases(ReadState()).Contains(Str(release, "id")))
             {
                 var package = UpdatePackage(release);
@@ -630,6 +656,10 @@ internal sealed class Launcher : Form
             finally { if (File.Exists(ready)) File.Delete(ready); }
         }
     }
+    static Dictionary<string, object> TestRelease(long id, string tag, string published, bool draft = false)
+    {
+        return new Dictionary<string, object> { { "id", id }, { "tag_name", tag }, { "published_at", published }, { "draft", draft } };
+    }
     int SelfTest()
     {
         try
@@ -654,6 +684,17 @@ internal sealed class Launcher : Form
             var skipped = SkippedReleases(new Dictionary<string, object>
                 { { "skipped_release", "101" }, { "skipped_releases", new[] { "202" } } });
             if (!skipped.SetEquals(new[] { "101", "202" }) || skipped.Contains("303")) return 7;
+            var cutoff = DateTimeOffset.Parse("2026-11-24T11:00:00Z");
+            var lower = TestRelease(1, "beta1.2.2", "2026-11-24T12:00:00Z");
+            var same = TestRelease(2, "beta1.3.0", "2026-11-25T12:00:00Z");
+            var earlier = TestRelease(3, "beta1.3", "2026-11-23T12:00:00Z");
+            if (SelectUpdate(new[] { lower, same }, 3, "beta1.3", cutoff) != null) return 8;
+            if (SelectUpdate(new[] { earlier }, 1, "beta1.2.2", cutoff) != null) return 9;
+            var desired = TestRelease(4, "beta1.10", "2026-11-25T12:00:00Z");
+            if (SelectUpdate(new[] { TestRelease(5, "beta1.9", "2026-11-27T12:00:00Z"),
+                    TestRelease(6, "beta1.11", "2026-11-28T12:00:00Z", true),
+                    TestRelease(7, "plugin-testing", "2026-11-29T12:00:00Z"), desired },
+                0, "beta1-launcher", cutoff) != desired) return 10;
             string temporary = Path.Combine(root, ".runtime", "test-" + Guid.NewGuid().ToString("N"));
             try
             {

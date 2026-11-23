@@ -2,10 +2,39 @@
 import datetime as dt
 import json
 import os
+import re
 import threading
 from Bridge.Plugins.downloads import fetch, REPOSITORY
 from Backend.Foundation.runtime import CACHE
 from Backend.Foundation.update_download import package_for, download
+
+
+def beta_version(tag):
+    aliases = {'beta1-launcher': (1, 1, 0), 'beta1-mit-update': (1, 0, 0)}
+    tag = tag.lower()
+    if tag in aliases:
+        return aliases[tag]
+    match = re.fullmatch(r'beta([0-9]{1,9})(?:\.([0-9]{1,9}))?(?:\.([0-9]{1,9}))?', tag)
+    if match:
+        return tuple(int(part or '0') for part in match.groups())
+    return None
+
+
+def select_update(published, current_tag, cutoff):
+    built = dt.datetime.fromisoformat(cutoff.replace('Z', '+00:00'))
+    later = (release for release in published if release.get('tag_name')
+             and release['tag_name'] != current_tag
+             and dt.datetime.fromisoformat(release['published_at'].replace('Z', '+00:00')) > built)
+    current_version = beta_version(current_tag)
+    if current_version is None:
+        return next(later, None)
+    best = None
+    best_version = current_version
+    for release in later:
+        version = beta_version(release['tag_name'])
+        if version is not None and version > best_version:
+            best, best_version = release, version
+    return best
 
 
 class Updates:
@@ -20,13 +49,13 @@ class Updates:
             try:
                 releases = json.loads(fetch(f'https://api.github.com/repos/{REPOSITORY}/releases?per_page=100', 2_000_000))
                 published = sorted((r for r in releases if not r.get('draft') and r.get('published_at')), key=lambda r:r['published_at'], reverse=True)
-                release = published[0] if published else None
-                self.release=release
+                latest = published[0] if published else None
                 cutoff = os.environ.get('ASTRO_ARCHIVE_RELEASE_CUTOFF')
-                available = bool(release and cutoff and release['tag_name'] != self.value['current'] and dt.datetime.fromisoformat(release['published_at'].replace('Z','+00:00')) > dt.datetime.fromisoformat(cutoff.replace('Z','+00:00')))
-                self.value = dict(current=self.value['current'], checked=True, available=available,
-                                  latest=release['tag_name'] if release else None,
-                                  downloadable=bool(package_for(release)),
+                current = self.value['current']
+                self.release = select_update(published, current, cutoff) if cutoff else latest
+                self.value = dict(current=current, checked=True, available=bool(cutoff and self.release),
+                                  latest=(self.release or latest or {}).get('tag_name'),
+                                  downloadable=bool(package_for(self.release)),
                                   url=f'https://github.com/{REPOSITORY}/releases',
                                   problem=None, currentKnown=bool(cutoff), checkedUtc=dt.datetime.now(dt.timezone.utc).isoformat())
             except Exception:

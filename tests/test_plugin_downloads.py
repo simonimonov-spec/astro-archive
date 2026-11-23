@@ -120,6 +120,36 @@ class UpdateTests(unittest.TestCase):
             self.assertTrue(u.check()['available'])
         with patch('Backend.Foundation.updates.fetch',side_effect=OSError):self.assertTrue(u.check()['problem'])
 
+    def test_release_check_rejects_newly_published_lower_beta(self):
+        for current, cutoff, tag, published in (
+            ('beta1.3', '2026-11-23T11:00:00Z', 'beta1.2.2', '2026-11-24T12:00:00Z'),
+            ('beta1.3', '2026-11-23T11:00:00Z', 'beta1.3.0', '2026-11-25T12:00:00Z'),
+            ('beta1.2.2', '2026-11-24T11:00:00Z', 'beta1.3', '2026-11-23T12:00:00Z'),
+        ):
+            releases = [dict(tag_name=tag, published_at=published, draft=False)]
+            with self.subTest(current=current, offered=tag), patch.dict(os.environ, {
+                'ASTRO_ARCHIVE_RELEASE_TAG': current, 'ASTRO_ARCHIVE_RELEASE_CUTOFF': cutoff,
+            }), patch('Backend.Foundation.updates.fetch', return_value=json.dumps(releases).encode()):
+                updates = Updates()
+                self.assertFalse(updates.check()['available'])
+                self.assertIsNone(updates.release)
+
+    def test_release_check_prefers_highest_number_among_new_beta_releases(self):
+        releases = [
+            dict(tag_name='beta1.9', published_at='2026-11-27T12:00:00Z', draft=False),
+            dict(tag_name='beta1.10', published_at='2026-11-25T12:00:00Z', draft=False),
+            dict(tag_name='beta1.11', published_at='2026-11-28T12:00:00Z', draft=True),
+            dict(tag_name='beta2', published_at='2026-11-21T12:00:00Z', draft=False),
+            dict(tag_name='plugin-testing', published_at='2026-11-29T12:00:00Z', draft=False),
+        ]
+        with patch.dict(os.environ, {
+            'ASTRO_ARCHIVE_RELEASE_TAG': 'beta1-launcher',
+            'ASTRO_ARCHIVE_RELEASE_CUTOFF': '2026-11-23T11:00:00Z',
+        }), patch('Backend.Foundation.updates.fetch', return_value=json.dumps(releases).encode()):
+            result = Updates().check()
+        self.assertTrue(result['available'])
+        self.assertEqual(result['latest'], 'beta1.10')
+
     def test_source_copy_does_not_claim_to_be_current(self):
         with patch.dict(os.environ,{},clear=True),patch('Backend.Foundation.updates.fetch',return_value=b'[]'):
             result=Updates().check();self.assertFalse(result['available']);self.assertFalse(result['currentKnown'])
