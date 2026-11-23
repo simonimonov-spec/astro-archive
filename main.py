@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy, hashlib, json, os, re, threading, time, uuid
 from pathlib import Path
 from . import windows
+from .local_panel import LocalPanel
 from .validation import SHARE_MARKER, ARCHIVE_MARKER, KINDS, label, child_name, share_name, lan, unc, metadata, atomic
 
 def field(kind, ident, **properties):return dict(type=kind,id=ident,**properties)
@@ -25,6 +26,8 @@ class SharedArchives:
                       clientRoot='',clientName='',clientKind='frames',newName='',newKind='frames',connections=[])
         self.options={**defaults,**context.settings()};self.ctx.save_settings(self.options)
         for name,handler in [('refresh',self.refresh),('save',self.save),('add-export',self.add_export),('remove-export',self.remove_export),('select-export',self.select_export),('plan',self.review),('start',self.start),('stop',self.stop),('copy',self.copy),('connect',self.connect),('select-remote',self.select_remote),('attach',self.attach),('create',self.create),('refresh-index',self.refresh_index),('status',self.status)]:context.command(name,handler)
+        self.smb_starting = False
+        self.local = LocalPanel(context, self.folder, smb_active=self.smb_active)
         self.publish();self.thread=threading.Thread(target=self.watch,daemon=True,name='SharedArchives-status');self.thread.start()
 
     def values(self,p):return p.get('values',p)
@@ -116,14 +119,21 @@ class SharedArchives:
         self.plan_text=json.dumps(plan,ensure_ascii=False,indent=2);atomic(self.folder/'last-plan.json',plan);self.publish()
         return dict(message='Планът е готов за преглед. Не са създавани дялове или правила във Firewall.')
 
+    def smb_active(self):
+        return self.smb_starting or self.controller.status()['state'] not in ('off','stopped','error')
+
     def start(self,p):
+        if self.local.host or self.smb_active():
+            raise ValueError('Първо спри активното споделяне.')
         self.save(p)
         if self.values(p).get(self.consent_id) is not True:raise ValueError('Прегледай плана и потвърди точно описаните Windows дялове и LAN правило.')
         plan=self.plan();self.plan_text=json.dumps(plan,ensure_ascii=False,indent=2);atomic(self.folder/'last-plan.json',plan)
         if self.reviewed!=hashlib.sha256(json.dumps(plan,sort_keys=True).encode()).hexdigest():raise ValueError('Планът е променен. Прегледай и потвърди актуалните папки, права и мрежа.')
         self.reviewed=None;self.consent_id='host-approved-'+uuid.uuid4().hex[:12]
+        self.smb_starting = True
         def work(cancel,progress):
             try:
+                if cancel.is_set():raise InterruptedError('Включването е отменено.')
                 for item in plan['exports']:
                     path=Path(item['path'])
                     if item['kind']=='workspace':path.mkdir(parents=False,exist_ok=True)
@@ -134,7 +144,12 @@ class SharedArchives:
                     atomic(target,{k:item[k] for k in ('kind','name','id','type') if k in item}|dict(version=1,hostId=plan['hostId']))
                 result=self.controller.start(plan,cancel,progress);self.ctx.archives('hold',dict(active=True));self.publish();return result
             except Exception as error:self.problem=str(error);self.publish();raise
-        return self.ctx.task('Включване на шифровани LAN архиви',work,'archive')
+            finally:self.smb_starting = False
+        try:
+            return self.ctx.task('Включване на шифровани LAN архиви',work,'archive')
+        except BaseException:
+            self.smb_starting = False
+            raise
 
     def stop(self,p):
         self.controller.stop()
@@ -221,7 +236,7 @@ class SharedArchives:
         fields=[field('text','intro',span=2,value='Shared Archives свързва отделни Windows инстанции на Astro Archive през домашната LAN мрежа. Всеки компютър запазва собствения си профил и индекс; SQLite базата на програмата не се споделя.'),
             field('group','host',label='1 · Хоствай архив от този компютър',span=2,children=[
                 field('select','host-address',label='LAN интерфейс',value=o['address'] if any(n['address']==o['address'] for n in networks) else (networks[0]['address'] if networks else ''),options=[option(n['address'],f"{n['interface']} · {n['address']}/{n['prefix']}") for n in networks] or [option('','Няма активна домашна LAN мрежа')],command='save'),
-                field('input','host-account',label='Разрешен Windows потребител',value=o['account'],maxLength=120,command='save',help='Пример: MONI\\simon. Използва се Windows паролата, а не PIN. Не се дава достъп на Everyone или Guests.'),
+                field('input','host-account',label='Разрешен Windows потребител',value=o['account'],maxLength=120,command='save',help='Пример: HOSTPC\\observer. Използва се Windows паролата, а не PIN. Не се дава достъп на Everyone или Guests.'),
                 field('table','exports',label='Архиви, включени в плана',span=2,columns=[dict(key='name',label='Архив'),dict(key='path',label='Папка'),dict(key='share',label='Име на мрежов дял'),dict(key='rights',label='Права')],rows=exports,command='select-export'),
                 field('select','host-archive',label='Добави локален архив',value=archives[0]['id'] if archives else '',options=[option(a['id'],a['name']) for a in archives] or [option('','Няма зададен локален архив')],disabled=running),
                 field('input','share-name',label='Име на новия дял',value='AstroArchive-archive',maxLength=61,disabled=running),
@@ -239,7 +254,7 @@ class SharedArchives:
                 field('button','copy',label='Копирай адресите за другата инстанция',command='copy'),
             ]),
             field('group','client',label='2 · Свържи архив от друг компютър',span=2,children=[
-                field('input','client-root',label='Адрес, копиран от хоста',value=o['clientRoot'],maxLength=1000,placeholder='\\\\MONI\\AstroArchive-frames',command='save',span=2),
+                field('input','client-root',label='Адрес, копиран от хоста',value=o['clientRoot'],maxLength=1000,placeholder='\\\\HOSTPC\\AstroArchive-frames',command='save',span=2),
                 field('button','connect',label='Свържи и открий архивите',command='connect',tone='primary'),
                 field('text','client-security',span=2,value='Windows ще поиска потребител и парола в собствен защитен прозорец. Добавянето се отказва, ако връзката не е шифрована SMB 3. Големите FITS файлове се четат от обичайните функции при нужда; не се копира целият архив.'),
                 field('table','remote-archives',label='Архиви в свързаната папка',span=2,columns=[dict(key='name',label='Архив'),dict(key='type',label='Вид'),dict(key='path',label='Мрежово място')],rows=self.remote,command='select-remote'),
@@ -257,6 +272,7 @@ class SharedArchives:
     def watch(self):
         while not self.closed.wait(4):
             try:
+                self.local.tick()
                 state=self.status({});fingerprint=json.dumps(state,sort_keys=True)
                 if state['state'] in ('off','stopped','error'):self.ctx.archives('hold',dict(active=False))
                 if fingerprint!=self.last_status:self.last_status=fingerprint;self.publish_header()
@@ -272,7 +288,7 @@ class SharedArchives:
             except Exception:pass
 
     def close(self):
-        self.closed.set();self.controller.stop()
+        self.closed.set();self.local.close();self.controller.stop()
         if self.thread.is_alive():self.thread.join(2)
 
 def setup(context):
