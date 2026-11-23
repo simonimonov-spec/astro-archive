@@ -16,7 +16,7 @@ class Catalog:
     def __init__(self,store,settings,events):
         self.store,self.settings,self.events=store,settings,events
         self.scan_locks={};self.scan_states={};self.operation_lock=threading.RLock()
-        self.browse=BrowseIndex(self)
+        self.browse=BrowseIndex(self);self.shared_sources=None
     def index_status(self,archive):
         state=self.scan_states.get(archive)
         if state is None:
@@ -43,10 +43,16 @@ class Catalog:
                         a['path']=str(candidate);self.settings.save();root=candidate;break
         if not root.is_dir():raise FileNotFoundError('Архивът не е достъпен. Посочи новото му местоположение от Настройки.')
         return root.resolve()
-    def resolve(self,archive,relative):return within(self.root(archive),relative)
+    def resolve(self,archive,relative):
+        if self.shared_sources and self.shared_sources.get(archive):
+            return self.shared_sources.materialize(archive,relative)
+        return within(self.root(archive),relative)
     def record(self,ident):
+        if self.shared_sources and ident.startswith('shared-'):
+            return self.shared_sources.record(ident)
         with self.store.db() as db:row=db.execute('SELECT f.*,d.decision FROM files f LEFT JOIN decisions d ON d.file=f.id WHERE f.id=? AND f.deleted=0',(ident,)).fetchone()
-        if not row:raise FileNotFoundError('Кадърът вече не е в активния архив.')
+        if not row or (self.shared_sources and self.shared_sources.get(row['archive'])):
+            raise FileNotFoundError('Кадърът вече не е в активния архив.')
         row=dict(row);row['meta']=json.loads(row['meta']);return row
     def path(self,ident):
         row=self.record(ident);return self.resolve(row['archive'],row['relative'])
@@ -139,6 +145,9 @@ class Catalog:
             self.events.emit('archive.changed');self.events.emit('archive.summary.changed',archiveId=archive)
     def query(self,filters=None,slim=False):
         filters=filters or {};where=['f.deleted=0'];args=[]
+        shared=[row['id'] for row in self.settings.value['archives'] if row.get('sharedSource')]
+        if shared:
+            where.append('f.archive NOT IN ('+','.join('?' for _ in shared)+')');args.extend(shared)
         for key in ['archive','telescope','object','night','kind']:
             value=filters.get(key)
             if value not in (None,''):
@@ -153,6 +162,10 @@ class Catalog:
         result=[]
         for row in rows:
             r=dict(row);r['meta']=json.loads(r['meta']);result.append(r)
+        if self.shared_sources:
+            for archive in shared:
+                if not filters.get('archive') or filters['archive']==archive:
+                    result.extend(self.shared_sources.records(archive,filters))
         return result
     @staticmethod
     def totals(rows):
@@ -202,13 +215,21 @@ class Catalog:
             db.executemany('UPDATE files SET fingerprint=? WHERE id=?',hashes)
         return duplicate
     def import_files(self,paths,cancel,progress,forced_archive=None,context=None):
-        imported=[];duplicates=[];errors=[];context=context or {};touched=set()
+        imported=[];duplicates=[];errors=[];context=context or {};touched=set();shared_touched=set();verified_sources={}
+        sources={row['id']:row.get('sharedSource') for row in self.settings.value['archives']}
         for index,source in enumerate(map(Path,paths),1):
             if cancel.is_set():raise InterruptedError()
             try:
                 if source.suffix.lower() not in IMAGES or source.is_symlink():raise ValueError('Неподдържан файл.')
                 m=metadata(source);fingerprint=digest(source)
                 archive=forced_archive or ('stacks' if m['kind']=='stack' else 'photos' if m['kind']=='photo' else 'frames')
+                if self.shared_sources and (sources.get(archive) or self.shared_sources.get(archive)):
+                    remote_ids,duplicate=self.shared_sources.import_file(archive,source,fingerprint,context,sources.get(archive))
+                    imported.extend(remote_ids)
+                    if remote_ids:shared_touched.add(archive)
+                    verified_sources[str(source)]=fingerprint
+                    if duplicate:duplicates.append(str(source))
+                    continue
                 root=self.root(archive)
                 with self.operation_lock:
                     if self.duplicate(archive,source,fingerprint):duplicates.append(str(source));continue
@@ -254,10 +275,15 @@ class Catalog:
                     finally:temporary.unlink(missing_ok=True)
             except Exception as error:errors.append(dict(path=str(source),problem=str(error)))
             finally:progress(index,len(paths),'Внасяне с проверка за дубликати')
+        for archive in shared_touched:
+            try:self.shared_sources.refresh(archive)
+            except (OSError,ValueError):pass # The host already acknowledged the import.
         for archive in touched:self.browse.cache.pop(archive,None)
         self.events.emit('archive.changed');self.events.emit('archive.summary.changed')
         self.store.history('import',imported=imported,duplicates=duplicates,errors=errors)
-        return dict(imported=imported,duplicates=duplicates,errors=errors)
+        result=dict(imported=imported,duplicates=duplicates,errors=errors)
+        if verified_sources:result['verifiedSourceHashes']=verified_sources
+        return result
     def decide(self,ids,decision):
         if decision not in ('approved','excluded','review'):raise ValueError('Невалидно решение.')
         with self.store.db() as db:
@@ -266,6 +292,8 @@ class Catalog:
         return dict(updated=len(ids))
     def trash(self,ids,confirmed=False):
         if not confirmed:raise ValueError('Необходимо е потвърждение за кошчето.')
+        if any(ident.startswith('shared-') for ident in ids):
+            raise ValueError('Споделените оригинали се преместват в кошчето от хоста.')
         result=[];folder=self.store.folder/'Trash';folder.mkdir(exist_ok=True)
         for ident in ids:
             with self.operation_lock:

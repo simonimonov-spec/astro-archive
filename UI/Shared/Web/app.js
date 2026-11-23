@@ -56,6 +56,11 @@
       return;
     }
     if (message.type === "event" && message.name === "activity.changed") { activity.update(message.snapshot); window.AstroArchiveMonitoring.updateActivity(message.snapshot); if(message.snapshot?.tasks?.some(task=>task.state==='blocked'))window.AstroArchiveMonitoring.checkPending(); window.AstroArchiveExtensions.broadcast("activity",message.snapshot); return; }
+    if (message.type === "event" && message.name === "archive.source.changed") {
+      if(message.message)window.dispatchEvent(new CustomEvent('astroarchive-plugin-message',{detail:{message:message.message}}));
+      if(state.entered&&state.archives.some(a=>a.id===state.archiveId&&a.sharedSource))loadFolder(true);
+      return;
+    }
     if (message.type === "event" && message.name === "archive.summary.changed") { window.AstroArchiveMonitoring.reloadSummary(); refreshRows(); return; }
     if (message.type === "event" && message.name === "archive.changed") { call('plugin.archives').then(result=>{state.archives=result.archives;return loadFolder(true);}).catch(problem); return; }
     if (message.type === "event" && message.name === "function.navigate") { showRoute(message.section); return; }
@@ -120,9 +125,9 @@
     if (state.folder) drawFiles(state.folder);
     else {
       const selected = state.archives.find(item => item.id === state.archiveId);
-      $("empty-message").textContent = t(webview ? (selected?.path ? "folder.loadingPaths" : "folder.notConfigured") : "offline.description");
+      $("empty-message").textContent = t(webview ? ((selected?.path || selected?.sharedSource) ? "folder.loadingPaths" : "folder.notConfigured") : "offline.description");
       $("folder-counts").textContent = t("folder.direct");
-      if (!selected?.path) $("folder-path").textContent = t("folder.noArchive");
+      if (!selected?.path && !selected?.sharedSource) $("folder-path").textContent = t("folder.noArchive");
     }
   }
 
@@ -146,7 +151,7 @@
     const selected = state.archives.find(item => item.id === state.archiveId);
     if(archiveFilter)return;
     archiveNavigation?.update({entered: state.entered, archiveId: state.archiveId, archives: state.archives,
-      root: selected?.path || "", path: state.path, folder: state.folder, unavailable: !selected?.path || !webview}, force);
+      root: selected?.path || selected?.sharedSource?.name || "", path: state.path, folder: state.folder, unavailable: !(selected?.path || selected?.sharedSource) || !webview}, force);
   }
 
   function drawBreadcrumbs() {
@@ -262,14 +267,14 @@
     if (!state.entered) $("folder-counts").textContent = new Intl.NumberFormat(i18n.locale).format(state.archives.length) + ' ' + (i18n.locale.startsWith('en') ? 'archives' : 'архива');
   }
 
-  function refreshRows(){const version=state.version;if(webview&&state.folder)window.AstroArchiveArchiveRows.watch(state.folder,call,()=>version===state.version,()=>drawFiles(state.folder));}
+  function refreshRows(){const version=state.version;if(webview&&state.folder&&!state.folder.shared)window.AstroArchiveArchiveRows.watch(state.folder,call,()=>version===state.version,()=>drawFiles(state.folder));}
   async function loadFolder(refresh = false) {
     const version = ++state.version;
     window.AstroArchiveArchiveRows.stop();
     const selected = state.archives.find(item => item.id === state.archiveId);
     window.AstroArchiveMonitoring.select({ archiveId: state.archiveId, relativePath: state.path,
       name: state.entered ? state.path.split(/[\\/]/).filter(Boolean).at(-1) || archiveName(selected) : t("folder.choose"),
-      rootName: archiveName(selected), root: selected?.path || "", enabled: !!webview && !!selected?.path, summaryEnabled: state.entered }, refresh);
+      rootName: archiveName(selected), root: selected?.path || "", enabled: !!webview && !!(selected?.path || selected?.sharedSource), summaryEnabled: state.entered }, refresh);
     $("error-banner").hidden = true;
     drawBreadcrumbs();
     $("previous").disabled = $("next").disabled = true;
@@ -282,7 +287,8 @@
       $("loading").hidden = true; $("files").setAttribute("aria-busy", "false"); archiveNavigation?.busy(false);
       drawRoots(refresh); drawFiles(state.folder); refreshRows(); return;
     }
-    if (!selected?.path || !webview) {
+    sharedSourceButton();
+    if (!(selected?.path || selected?.sharedSource) || !webview) {
       state.folder = null;
       $("loading").hidden = true;
       $("files").setAttribute("aria-busy", "false");
@@ -299,8 +305,8 @@
     $("files").setAttribute("aria-busy", "true");
     archiveNavigation?.busy(true);
     try {
-      const folder = archiveFilter ? await call('archive.filtered',{filters:archiveFilter,offset:state.offset,search:state.search}) : await call("archive.list", { archiveId: state.archiveId, relativePath: state.path, offset: state.offset, search: state.search, refresh });
-      if(archiveFilter)window.dispatchEvent(new CustomEvent('astroarchive-archive-filter-statistics',{detail:folder.statistics}));
+      const folder = archiveFilter && !selected.sharedSource ? await call('archive.filtered',{filters:archiveFilter,offset:state.offset,search:state.search}) : await call("archive.list", { archiveId: state.archiveId, relativePath: state.path, offset: state.offset, search: state.search, refresh });
+      if(archiveFilter&&!selected.sharedSource)window.dispatchEvent(new CustomEvent('astroarchive-archive-filter-statistics',{detail:folder.statistics}));
       if (version !== state.version) return;
       state.folder = folder;
       state.offset = folder.offset;
@@ -317,7 +323,7 @@
       $("empty-message").textContent = t("folder.failed");
       $("folder-counts").textContent = t("folder.noContent");
       $("page-label").textContent = "";
-      $("folder-path").textContent = selected.path;
+      $("folder-path").textContent = selected.path || selected.sharedSource?.name || "";
       drawRoots(refresh);
       problem(error);
     } finally {
@@ -388,6 +394,16 @@
   });
   $("previous").addEventListener("click", () => { if (state.folder) { state.offset = Math.max(0, state.offset - state.folder.pageSize); loadFolder(); } });
   $("next").addEventListener("click", () => { if (state.folder) { state.offset += state.folder.pageSize; loadFolder(); } });
+  function sharedSourceButton(){const selected=state.archives.find(row=>row.id===state.archiveId);$("empty-shared-source").hidden=!(webview&&selected&&!selected.path&&!selected.sharedSource&&window.AstroArchiveArchiveSchema.usesSharedSource(selected.id));}
+  window.addEventListener('astroarchive-extensions-rendered',sharedSourceButton);
+  $("empty-shared-source").onclick=async()=>{
+    const archive=state.archives.find(row=>row.id===state.archiveId);
+    if(!archive)return;
+    try{await window.AstroArchiveArchiveSchema.chooseShared(archive,async source=>{
+      const result=await call("archive.shared.bind",{archiveId:archive.id,sourceId:source.id});
+      window.AstroArchiveCustomization.locationsSaved(result.archives);
+    });}catch(error){problem(error);}
+  };
   for (const button of document.querySelectorAll("[data-storage-settings]")) { button.disabled = !webview; button.addEventListener("click", openStorage); }
   $("archive-import").disabled = !webview;
   window.AstroArchiveFunctions.connect({ call, log, desktop: !!webview, navigate: showRoute });
@@ -402,7 +418,7 @@
   window.addEventListener('astroarchive-locations-saved',event=>{state.archives=event.detail.archives;window.AstroArchiveAnalysis.reset();window.AstroArchivePreparation.reset();if(!state.archives.some(a=>a.id===state.archiveId))showArchiveHome();else loadFolder(true);});
   window.AstroArchiveArchiveView={
     navigate:navigateFolder,
-    current:()=>({archiveId:state.archiveId,path:state.path,entered:state.entered}),
+    current:()=>({archiveId:state.archiveId,path:state.path,entered:state.entered,shared:!!state.archives.find(row=>row.id===state.archiveId)?.sharedSource}),
     filter(filters){if(filters&&!archiveFilter){manualArchive={archiveId:state.archiveId,entered:state.entered,path:state.path,offset:state.offset,search:state.search};state.search='';}archiveFilter=filters;if(filters){state.archiveId=filters.archive;state.entered=true;state.path='';state.offset=0;}else if(manualArchive){Object.assign(state,manualArchive);manualArchive=null;}$("search").value=state.search;window.AstroArchiveSession?.changed('archive');return loadFolder(true);}
   };
   window.AstroArchiveSession.register('route',{read:()=>({section:state.route}),write:value=>showRoute(value.section)});

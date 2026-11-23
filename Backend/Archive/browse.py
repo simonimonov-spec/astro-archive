@@ -21,6 +21,9 @@ def accumulate(out,row):
 class BrowseIndex:
     def __init__(self,catalog):self.catalog=catalog;self.lock=threading.RLock();self.cache={}
     def get(self,archive):
+        root=next((entry for entry in self.catalog.settings.value['archives'] if entry['id']==archive),{})
+        if root.get('sharedSource'):
+            return dict(revision=0,rows=[],files={},groups={'':blank()},children={})
         with self.lock:
             old=self.cache.get(archive)
             if old and time.monotonic()-old.get('validated',0)<.2:return old

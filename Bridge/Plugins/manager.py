@@ -4,7 +4,7 @@ import base64, collections, contextvars, copy, hashlib, importlib.util, io, json
 from pathlib import Path
 from Backend.Foundation.runtime import ROOT,atomic_json,read_json,within
 from Bridge.Core.protocol import Caller,data_only
-from Bridge.Plugins.contracts import PluginGateway,Request,SLOTS,ui_document,ui_values
+from Bridge.Plugins.contracts import ANCHORS,PluginGateway,Request,SLOTS,contribution_layout,theme_tokens,ui_actions,ui_document,ui_values
 
 IDENTIFIER=re.compile(r'^[a-z][a-z0-9_-]{0,63}$')
 PERMISSIONS={'analysis.inspect','archive.manage','archive.read','analysis.read','preparation.read','capabilities.invoke','processing.manage','remote.host'}
@@ -21,6 +21,8 @@ class PluginContext:
         def guarded(parameters):self._check();return handler(parameters)
         self.manager.gateway.register(self.id,name,guarded)
     def publish(self,contribution,elements):self._check();return self.manager.publish(self.id,contribution,elements)
+    def theme(self,tokens=None,scope='plugin'):self._check();return self.manager.set_theme(self.id,tokens,scope)
+    def notify(self,message,tone='normal'):self._check();return self.manager.notify(self.id,message,tone)
     def settings(self):self._check();return read_json(self.manager.settings_path(self.id),{})
     def save_settings(self,values):
         self._check();data_only(values,100_000)
@@ -95,6 +97,7 @@ class PluginManager:
             if 'clients' in c and (not isinstance(c['clients'],list) or not c['clients'] or any(x not in ('desktop','remote') for x in c['clients'])):raise ValueError('Невалиден вид клиент за UI допълнението.')
             if 'archiveKey' in c and (c['slot']!='customization' or not isinstance(c['archiveKey'],str) or not re.fullmatch(r'[a-z][a-z0-9_-]{0,39}',c['archiveKey'])):raise ValueError('Невалидна връзка към настройки на плъгин архив.')
             if 'order' in c and (type(c['order']) is not int or not -1000<=c['order']<=1000):raise ValueError('Невалиден ред на визуалното допълнение.')
+            contribution_layout(c)
             ids.add(c['id'])
         capabilities=m.get('capabilities',[])
         if not isinstance(capabilities,list) or len(capabilities)>24:raise ValueError('Максимум 24 плъгин възможности.')
@@ -146,7 +149,8 @@ class PluginManager:
                 result.append(dict(id=ident,name=m['name'],description=m['description'],version=m['version'],author=m.get('author',''),folder=m['folder'],
                     kind='declarative',available=True,enabled=bool(runtime),busy=False,uiAllowed=bool(runtime and state.get('uiAllowed')),
                     uiRevision=m['uiRevision'],contributions=contributions,permissions=[dict(id=p,label=PERMISSION_LABELS[p]) for p in m['permissions']],
-                    capabilities=m.get('capabilities',[]),problem=m.get('problem'),logoDataUrl=self.logo(m)))
+                    capabilities=m.get('capabilities',[]),problem=m.get('problem'),logoDataUrl=self.logo(m),
+                    theme=copy.deepcopy(runtime.get('theme')) if runtime else None))
         return result
     def logo(self,m):
         if not m.get('logo'):return None
@@ -238,6 +242,23 @@ class PluginManager:
             live['documents'][contribution]=elements
         if self.state(ident).get('uiAllowed'):self.events.emit('plugin.ui.changed',plugin=ident,contribution=contribution,elements=elements,revision=live['revision'])
         return dict(accepted=True)
+    def set_theme(self,ident,tokens,scope='plugin'):
+        live=self.active(ident)
+        theme=None if tokens is None else theme_tokens(tokens,scope)
+        with self.lock:live['theme']=theme
+        if self.state(ident).get('uiAllowed'):self.events.emit('plugin.theme.changed',plugin=ident,theme=copy.deepcopy(theme),revision=live['revision'])
+        return dict(accepted=True)
+    def notify(self,ident,message,tone='normal'):
+        live=self.active(ident)
+        if not isinstance(message,str) or not message.strip() or len(message)>500:raise ValueError('Известието трябва да е текст до 500 знака.')
+        if tone not in ('normal','primary','success','warning','error'):raise ValueError('Невалиден стил на известие.')
+        if self.state(ident).get('uiAllowed'):self.events.emit('plugin.message',plugin=ident,message=message,tone=tone,revision=live['revision'])
+        return dict(accepted=True)
+    @staticmethod
+    def response(result):
+        """Keep plugin results as data and validate optional UI follow-up actions."""
+        if isinstance(result,dict) and 'uiActions' in result:result=dict(result,uiActions=ui_actions(result['uiActions']))
+        return result
     def image_asset(self,ident,key):
         if not isinstance(ident,str) or not IDENTIFIER.fullmatch(ident) or not isinstance(key,str) or not re.fullmatch('[a-f0-9]{64}',key):raise ValueError('Невалиден ресурс на плъгин.')
         live=self.active(ident)
@@ -282,13 +303,15 @@ class PluginManager:
         if row is not None:
             if target['type']!='table' or type(row) is not int or not 0<=row<len(target['rows']):raise ValueError('Невалиден ред.')
             parameters.update(row=row,selected=target['rows'][row])
-        return self.invoke(ident,target['command'],parameters)
+        return self.response(self.invoke(ident,target['command'],parameters))
     def ui_context(self,ident,value):
         value=value or {}
         if not isinstance(value,dict):raise ValueError('Невалиден подбор за добавката.')
         ids=value.get('ids',[])
         if 'viewerId' in value and (not isinstance(value['viewerId'],str) or not re.fullmatch('[a-f0-9]{32}',value['viewerId'])):raise ValueError('Невалиден идентификатор на преглед.')
-        if not isinstance(value,dict) or set(value)-{'ids','archiveId','stage','viewerId'} or not isinstance(ids,list) or len(ids)>50000 or any(not isinstance(i,str) or len(i)>80 for i in ids):raise ValueError('Невалиден подбор за добавката.')
+        if 'anchor' in value and (not isinstance(value['anchor'],str) or value['anchor'] not in ANCHORS):raise ValueError('Невалидна котва в интерфейса.')
+        if 'archiveId' in value and (not isinstance(value['archiveId'],str) or len(value['archiveId'])>120):raise ValueError('Невалиден архив за добавката.')
+        if not isinstance(value,dict) or set(value)-{'ids','archiveId','stage','viewerId','anchor'} or not isinstance(ids,list) or len(ids)>50000 or any(not isinstance(i,str) or len(i)>80 for i in ids):raise ValueError('Невалиден подбор за добавката.')
         if ids and 'archive.read' not in self.active(ident)['permissions']:raise PermissionError('Плъгинът няма разрешение за подбора от архива.')
         return copy.deepcopy(value)
     def activate(self,ident,contribution,context):
@@ -297,7 +320,7 @@ class PluginManager:
         entry=next((c for c in self.records[ident]['contributions'] if c['id']==contribution),None)
         if not entry:raise ValueError('Непознато допълнение.')
         if not entry.get('activate'):return dict(accepted=True)
-        return self.invoke(ident,entry['activate'],dict(context=self.ui_context(ident,context)),wait=True)
+        return self.response(self.invoke(ident,entry['activate'],dict(context=self.ui_context(ident,context)),wait=True))
     def capabilities(self):
         with self.lock:return [dict(c,pluginId=ident,pluginName=self.records[ident]['name']) for ident in self.live for c in self.records[ident].get('capabilities',[])]
     def invoke_capability(self,capability,parameters=None,plugin=None):

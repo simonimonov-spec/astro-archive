@@ -101,6 +101,61 @@ class PluginTests(unittest.TestCase):
         self.assertFalse(self.manager.state('sample')['enabled'])
         self.assertFalse(self.manager.state('sample')['uiAllowed'])
 
+    def ui_fixture(self, contributions, source):
+        folder = self.fixture('visual', source)
+        manifest = json.loads((folder/'plugin.json').read_text(encoding='utf-8'))
+        manifest.update(contributions=contributions, capabilities=[])
+        (folder/'plugin.json').write_text(json.dumps(manifest), encoding='utf-8')
+        self.manager.scan()
+        self.manager.toggle('visual', True, confirmed=True)
+        self.manager.allow_ui('visual', self.manager.records['visual']['uiRevision'], True)
+        return folder
+
+    def test_anchor_contributions_are_validated(self):
+        from Bridge.Plugins.contracts import contribution_layout
+        contribution_layout(dict(id='a', slot='anchor', title='A', anchor='archive.empty', mode='replace', presentation='inline'))
+        contribution_layout(dict(id='a', slot='archive', title='A'))
+        for bad in (dict(slot='anchor', anchor='archive.unknown'),
+                    dict(slot='anchor', anchor='archive.layout', mode='replace'),
+                    dict(slot='anchor', anchor='archive.empty', presentation='html'),
+                    dict(slot='archive', anchor='archive.empty')):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                contribution_layout(dict(id='a', title='A', **bad))
+        self.ui_fixture([dict(id='empty', slot='anchor', title='Empty', anchor='archive.empty', mode='replace')],
+                        'def setup(ctx):\n    ctx.publish("empty", [{"type": "text", "id": "t", "value": "x"}])\n')
+        listed = self.manager.list()[0]['contributions'][0]
+        self.assertEqual((listed['anchor'], listed['mode'], listed['elements'][0]['id']), ('archive.empty', 'replace', 't'))
+
+    def test_theme_and_notify_are_tokens_only_and_follow_unload(self):
+        self.ui_fixture([], (
+            'def setup(ctx):\n'
+            '    ctx.command("theme", lambda p: ctx.theme(p["tokens"], p.get("scope", "plugin")))\n'
+            '    ctx.command("say", lambda p: ctx.notify(p["text"], "success"))\n'))
+        self.manager.invoke('visual', 'theme', {'tokens': {'accent': '#AABBCC', 'radius': 4}, 'scope': 'app'})
+        self.assertEqual(self.manager.list()[0]['theme'], {'scope': 'app', 'tokens': {'accent': '#aabbcc', 'radius': 4}})
+        self.assertEqual(self.manager.events.items[-1]['name'], 'plugin.theme.changed')
+        for tokens in ({'accent': 'red'}, {'accent': '#fff;}body{'}, {'radius': 99}, {'font-family': 'x'}):
+            with self.subTest(tokens=tokens), self.assertRaises(ValueError):
+                self.manager.invoke('visual', 'theme', {'tokens': tokens})
+        self.manager.invoke('visual', 'say', {'text': 'Готово'})
+        self.assertEqual(self.manager.events.items[-1]['name'], 'plugin.message')
+        self.manager.toggle('visual', False)
+        self.assertIsNone(self.manager.list()[0]['theme'])
+
+    def test_ui_actions_in_responses_are_validated(self):
+        self.ui_fixture([dict(id='tools', slot='anchor', title='Tools', anchor='archive.location', mode='after', presentation='inline')], (
+            'def setup(ctx):\n'
+            '    ctx.publish("tools", [{"type": "button", "id": "go", "command": "go"}])\n'
+            '    ctx.command("go", lambda p: {"uiActions": p["context"].get("archiveId") == "frames" and '
+            '[{"type": "choose-archive-source", "archiveId": "frames"}, {"type": "open-settings", "tab": "plugins"}] '
+            'or [{"type": "eval", "code": "x"}]})\n'))
+        result = self.manager.input('visual', 'tools', 'go', context={'anchor': 'archive.location', 'archiveId': 'frames'})
+        self.assertEqual([a['type'] for a in result['uiActions']], ['choose-archive-source', 'open-settings'])
+        with self.assertRaisesRegex(ValueError, 'Непознато UI действие'):
+            self.manager.input('visual', 'tools', 'go', context={'anchor': 'archive.location', 'archiveId': 'stacks'})
+        with self.assertRaisesRegex(ValueError, 'котва'):
+            self.manager.input('visual', 'tools', 'go', context={'anchor': 'nowhere'})
+
     def test_install_from_github_folder_and_remove_preserves_data(self):
         original = self.fixture()
         download = self.root/'repository-main'

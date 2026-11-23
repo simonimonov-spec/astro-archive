@@ -76,7 +76,7 @@ def background_statistics(image):
     per_row=np.nanmedian(np.where(np.isfinite(delta),delta,np.nan),axis=1)
     sigma=float(np.nanmedian(per_row))*(1.482602218505602/math.sqrt(6))
     if not math.isfinite(sigma) or sigma<=0:sigma=float(fallback)
-    return median,max(sigma,np.finfo(np.float32).eps)
+    return median,max(sigma,float(np.finfo(np.float32).eps))
 
 
 def saturation_level(header):

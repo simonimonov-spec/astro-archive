@@ -23,7 +23,7 @@
   document.querySelector('.archive-actions').append(toggle,button('Кошче',()=>trash()));
   const importButton=$('archive-import'),importWrap=node('div',null,'archive-import-choice'),importMenu=node('div',null,'archive-import-menu');importButton.before(importWrap);importWrap.append(importButton,importMenu);importMenu.id='archive-import-menu';importMenu.hidden=true;importMenu.setAttribute('role','menu');importMenu.setAttribute('aria-label','Избор за внасяне');
   const closeImport=(focus=false)=>{importMenu.hidden=true;importButton.setAttribute('aria-expanded','false');if(focus)importButton.focus();};
-  for(const[folder,title,description]of [[false,'Избери файлове…','Един или повече кадри и изображения'],[true,'Избери папка…','Включва изображенията от подпапките']]){const item=button('',async()=>{closeImport();await P.task('archive.import',{folder,onlyFrames:$('archive-only-frames').checked});});item.setAttribute('role','menuitem');item.append(window.AstroArchiveArchiveIcons.create(folder?'folder':'fits'),node('span',title),node('small',description));importMenu.append(item);}
+  for(const[folder,title,description]of [[false,'Избери файлове…','Един или повече кадри и изображения'],[true,'Избери папка…','Включва изображенията от подпапките']]){const item=button('',async()=>{closeImport();const current=window.AstroArchiveArchiveView.current();await P.task('archive.import',{folder,archiveId:current.entered&&current.shared?current.archiveId:undefined,onlyFrames:$('archive-only-frames').checked});});item.setAttribute('role','menuitem');item.append(window.AstroArchiveArchiveIcons.create(folder?'folder':'fits'),node('span',title),node('small',description));importMenu.append(item);}
   function openImport(){importMenu.hidden=false;importButton.setAttribute('aria-expanded','true');const rect=importButton.getBoundingClientRect();importMenu.style.left=Math.max(12,Math.min(rect.left,innerWidth-importMenu.offsetWidth-12))+'px';importMenu.style.top=Math.max(12,Math.min(rect.bottom+8,innerHeight-importMenu.offsetHeight-12))+'px';importMenu.querySelector('button').focus();}
   importButton.onclick=()=>importMenu.hidden?openImport():closeImport();importButton.addEventListener('keydown',event=>{if(event.key==='ArrowDown'){event.preventDefault();openImport();}});
   importMenu.onkeydown=event=>{const items=[...importMenu.querySelectorAll('button')],at=items.indexOf(document.activeElement);if(event.key==='Escape'){event.preventDefault();closeImport(true);}else if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();items[(at+(event.key==='ArrowDown'?1:items.length-1))%items.length].focus();}};
@@ -44,7 +44,20 @@
   async function settingsDialog(){const configuration=await P.call('python.settings.get');let archives=structuredClone(configuration.archives),programs=structuredClone(configuration.programs);
     U.modal('Папки, програми и производителност',(body,dialog)=>{
       const error=node('p',null,'error-banner');error.hidden=true;body.append(error,node('h3','Архиви'));const archiveList=node('div');body.append(archiveList);
-      function renderArchives(){archiveList.replaceChildren();for(const a of archives.filter(a=>!a.hidden)){const row=node('div',null,'py-settings-row'),name=field('Име','text',a.name),path=field('Папка','text',a.path);name.input.oninput=()=>a.name=name.input.value;path.input.oninput=()=>a.path=path.input.value;row.append(name.wrap,path.wrap,button('Избери…',async()=>{a.path=(await P.call('python.settings.choose',{kind:'folder'})).path;path.input.value=a.path;}));archiveList.append(row);}}
+      function renderArchives(){
+        archiveList.replaceChildren();
+        for(const a of archives.filter(a=>!a.hidden)){
+          const row=node('div',null,'py-settings-row'),name=field('Име','text',a.name),path=field('Папка','text',a.path);
+          const source=window.AstroArchiveArchiveSchema, actions=node('div',null,'archive-location-actions');
+          const setPath=()=>{path.input.value=a.path||'';path.input.placeholder=a.sharedSource?'Споделен: '+a.sharedSource.name:'';};
+          setPath();
+          name.input.oninput=()=>a.name=name.input.value;
+          path.input.oninput=()=>{a.path=path.input.value;delete a.sharedSource;path.input.placeholder='';};
+          actions.append(button('Избери…',async()=>{const {path:chosen}=await P.call('python.settings.choose',{kind:'folder'});if(chosen){a.path=chosen;delete a.sharedSource;setPath();}}));
+          if(source.usesSharedSource(a.id))actions.append(button('Избери споделен…',()=>source.chooseShared(a,selected=>{a.path='';a.sharedSource=selected;setPath();})));
+          window.AstroArchiveExtensions?.anchor?.(actions,'archive.location',{archiveId:a.id});row.append(name.wrap,path.wrap,actions);archiveList.append(row);
+        }
+      }
       renderArchives();body.append(button('Добави архив',()=>{archives.push({id:'library-'+crypto.randomUUID().replaceAll('-',''),name:'Нов архив',path:''});renderArchives();}));
       body.append(node('h3','Програми и работни папки'));const programList=node('div');body.append(programList);
       function renderPrograms(){programList.replaceChildren();for(const p of programs){const row=node('div',null,'py-settings-program');const name=field('Име','text',p.name),exe=field('Изпълним файл','text',p.executable),folder=field('Работна папка','text',p.workingFolder);name.input.oninput=()=>p.name=name.input.value;exe.input.oninput=()=>p.executable=exe.input.value;folder.input.oninput=()=>p.workingFolder=folder.input.value;

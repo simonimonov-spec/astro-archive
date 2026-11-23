@@ -20,6 +20,8 @@
 | `context.settings()` | Чете собствените запазени настройки. |
 | `context.save_settings(dict)` | Записва собствените настройки. |
 | `context.storage()` | Дава собствената папка за данни на плъгина. |
+| `context.theme(tokens, scope)` | Дизайн токени за полетата на плъгина или за цялото приложение. |
+| `context.notify(text, tone)` | Кратко известие в интерфейса. |
 | `context.host(command, parameters)` | Извиква именувана основна услуга само ако разрешението я допуска. |
 | `context.capability(id, parameters)` | Използва декларирана възможност на друг включен плъгин. Изисква `capabilities.invoke`. |
 | `context.task(title, work, section)` | Пуска собствена фонова задача. `work(cancel, progress)` следи `cancel.is_set()` и извиква `progress(done, total, description)`. |
@@ -54,6 +56,59 @@ Handler връща JSON-съвместим резултат; `message` пока�
 - `header`: компактни индикатори под информацията за диска.
 
 Едно допълнение има `id`, `slot`, `title`; по желание `description`, `activate` (команда при отваряне), `clients: ["desktop", "remote"]`. Ако `clients` липсва, важи за двата вида интерфейс. Например индикаторът на Remote Operation е само за `remote`.
+
+## Котви в основния интерфейс (`slot: "anchor"`)
+
+Плъгинът може да добави свой декларативен блок на точно определено място в основния интерфейс или да замести съдържанието там. Без включен и одобрен плъгин основният интерфейс остава непроменен. Блокът е невидим, докато плъгинът не публикува поне един елемент.
+
+```json
+{"id": "shared-empty", "slot": "anchor", "title": "Споделен архив",
+ "anchor": "archive.empty", "mode": "append", "presentation": "inline", "activate": "refresh"}
+```
+
+- `mode`: `append`, `prepend` (вътре), `replace` (скрива основните елементи вътре, докато блокът има съдържание), `before`, `after` (до елемента).
+- `presentation`: `bare` (по подразбиране, без заглавие), `inline` (хоризонтално, за ленти с бутони), `panel` (панел със заглавие и лого).
+- Командите получават `context.anchor` и при `archive.location` — `context.archiveId`.
+
+| Котва | Място | Режими |
+|---|---|---|
+| `header.actions` | до бутона „Настройки“ | before, after |
+| `archive.heading` | заглавие на архива | append, prepend, replace |
+| `archive.actions` | лента „Само кадри / Внеси / Обнови“ | всички |
+| `archive.layout` | над/под архивните панели | before, after |
+| `archive.sidebar` | лявата навигация | append, prepend, replace |
+| `archive.navigation` | около списъка с архиви | before, after |
+| `archive.summary` | справката за избраната папка | всички |
+| `archive.toolbar` | лентата с пътя и търсенето | append, prepend, replace |
+| `archive.empty` | празното състояние на архива | append, prepend, replace |
+| `archive.footer` | долната лента на таблицата | append, prepend, replace |
+| `archive.location` | до „Избери…“ при местоположението на всеки архив | всички |
+| `analysis.heading`, `preparation.heading` | заглавия на изгледите | append, prepend, replace |
+| `viewer.sidebar` | страничната лента на прегледа | append, prepend, replace |
+| `settings.appearance` | раздел „Облик“ | append, prepend, replace |
+
+## Тема и известия
+
+- `context.theme(tokens, scope="plugin")` задава дизайн токени. `scope="plugin"` важи само за полетата на плъгина, `"app"` — за цялото приложение. `context.theme(None)` премахва темата. При изключване на плъгина темата изчезва и потребителският облик се връща.
+  Цветове `#rrggbb`: `background`, `surface`, `surface-raised`, `surface-hover`, `border`, `text`, `muted`, `accent`, `accent-surface`, `on-accent`, `success`, `warning`, `error`, `error-surface`. Размери (цели px): `radius` 0–32, `space` 2–24, `font-size` 10–22. CSS текст, селектори и скриптове не се приемат.
+- `context.notify(text, tone="normal")` показва кратко известие (до 500 знака) без нужда от действие на потребителя.
+
+## UI действия в отговорите (`uiActions`)
+
+Отговорът на команда от контрол или от `activate` може да съдържа `"uiActions": [...]` (до 16). Bridge ги валидира; непознато действие е грешка.
+
+| `type` | Полета | Действие |
+|---|---|---|
+| `message` | `text` | Известие |
+| `copy` | `text` | Копиране в клипборда |
+| `navigate` | `route`: archive / analysis / preparation | Смяна на изгледа |
+| `open-archive` | `archiveId`, `relativePath` | Отваряне на папка в архива |
+| `open-settings` | `tab`: appearance / customization / plugins / language / diagnostics | Отваряне на настройките |
+| `open-contribution` | `contributionId` | Отваряне на собствено поле в анализ/подготовка |
+| `refresh` | `target`: archive / plugins | Опресняване |
+| `choose-archive-source` | `archiveId` | Отваря основния избор на споделен източник за frames/stacks/photos; потребителят избира и потвърждава |
+
+Бутонът „Избери споделен…“ в основните настройки се показва само когато включен плъгин предоставя възможността `archives.sharing.source`.
 
 ## Библиотека от UI контроли
 

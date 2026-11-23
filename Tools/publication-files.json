@@ -155,6 +155,10 @@
         "destination": "Bridge/Plugins/inspection_services.py"
       },
       {
+        "source": "Bridge/Plugins/shared_sources.py",
+        "destination": "Bridge/Plugins/shared_sources.py"
+      },
+      {
         "source": "Bridge/Plugins/manager.py",
         "destination": "Bridge/Plugins/manager.py"
       },

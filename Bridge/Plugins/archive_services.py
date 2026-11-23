@@ -126,6 +126,36 @@ class ArchiveServices:
     def invoke(self, owner, action, p):
         if action == 'register':
             return self.register(owner,p)
+        if action in ('source-metadata','source-ingest') and owner == 'shared-archives':
+            archive = p['archiveId']
+            root = self.service.catalog.root(archive)
+            if root != Path(p['root']).resolve(strict=True):
+                raise ValueError('Архивната папка на хоста е променена.')
+            if action == 'source-metadata':
+                keys = ('object','telescope','realTelescope','night','filter','sensor','width','height',
+                        'kind','frames','framesKnown','exposure','totalExposure','observed','created',
+                        'sourceNights','sourceStackCount','telescopes')
+                return {path: dict(mtime=row['mtime'], added=row['added'],
+                                   fields={key:row['meta'][key] for key in keys if key in row['meta']})
+                        for path,row in self.service.catalog.browse.get(archive)['files'].items()}
+            file = Path(p['path']).resolve(strict=True)
+            staging = (self.service.plugins.settings_path(owner).parent/'Incoming').resolve(strict=True)
+            if not file.is_relative_to(staging) or not file.is_file():
+                raise PermissionError('Файлът е извън входящата папка на плъгина.')
+            with self.service.catalog.operation_lock:
+                if self.service.catalog.root(archive) != root:
+                    raise ValueError('Архивната папка на хоста е променена.')
+                result = self.service.catalog.import_files([file], threading.Event(), lambda *_:None,
+                                                           forced_archive=archive, context=p.get('context'))
+            if result['errors']:
+                raise ValueError('Хостът не успя да внесе файла: '+result['errors'][0]['problem'].replace(str(file),file.name))
+            return dict(paths=[self.service.catalog.record(ident)['relative'] for ident in result['imported']],
+                        duplicate=bool(result['duplicates']))
+        if action == 'source-changed' and owner == 'shared-archives':
+            message = p.get('message')
+            if not isinstance(message, str) or len(message)>500:raise ValueError('Невалидно известие за архив.')
+            self.service.events.emit('archive.source.changed', message=message)
+            return dict(updated=True)
         if action == 'hold':
             if type(p.get('active')) is not bool:
                 raise ValueError('Очаква се отметка за жизнения цикъл на плъгина.')

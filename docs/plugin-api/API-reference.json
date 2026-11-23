@@ -10,7 +10,8 @@
     "customization",
     "header",
     "viewer-tools",
-    "preparation-activity"
+    "preparation-activity",
+    "anchor"
   ],
   "clients": [
     "desktop",
@@ -42,6 +43,8 @@
   "sdk": [
     "command",
     "publish",
+    "theme",
+    "notify",
     "settings",
     "save_settings",
     "storage",
@@ -97,5 +100,136 @@
     "maxLength": 64000,
     "plainTextOnly": true,
     "autosave": true
-  }
+  },
+  "anchors": {
+    "header.actions": [
+      "before",
+      "after"
+    ],
+    "archive.heading": [
+      "append",
+      "prepend",
+      "replace"
+    ],
+    "archive.actions": [
+      "append",
+      "prepend",
+      "replace",
+      "before",
+      "after"
+    ],
+    "archive.layout": [
+      "before",
+      "after"
+    ],
+    "archive.sidebar": [
+      "append",
+      "prepend",
+      "replace"
+    ],
+    "archive.navigation": [
+      "before",
+      "after"
+    ],
+    "archive.summary": [
+      "append",
+      "prepend",
+      "replace",
+      "before",
+      "after"
+    ],
+    "archive.toolbar": [
+      "append",
+      "prepend",
+      "replace"
+    ],
+    "archive.empty": [
+      "append",
+      "prepend",
+      "replace"
+    ],
+    "archive.footer": [
+      "append",
+      "prepend",
+      "replace"
+    ],
+    "archive.location": [
+      "append",
+      "prepend",
+      "replace",
+      "before",
+      "after"
+    ],
+    "analysis.heading": [
+      "append",
+      "prepend",
+      "replace"
+    ],
+    "preparation.heading": [
+      "append",
+      "prepend",
+      "replace"
+    ],
+    "viewer.sidebar": [
+      "append",
+      "prepend",
+      "replace"
+    ],
+    "settings.appearance": [
+      "append",
+      "prepend",
+      "replace"
+    ]
+  },
+  "presentations": [
+    "panel",
+    "inline",
+    "bare"
+  ],
+  "theme": {
+    "scopes": [
+      "plugin",
+      "app"
+    ],
+    "colors": [
+      "background",
+      "surface",
+      "surface-raised",
+      "surface-hover",
+      "border",
+      "text",
+      "muted",
+      "accent",
+      "accent-surface",
+      "on-accent",
+      "success",
+      "warning",
+      "error",
+      "error-surface"
+    ],
+    "sizes": {
+      "radius": [
+        0,
+        32
+      ],
+      "space": [
+        2,
+        24
+      ],
+      "font-size": [
+        10,
+        22
+      ]
+    }
+  },
+  "uiActions": [
+    "message",
+    "copy",
+    "navigate",
+    "open-archive",
+    "open-settings",
+    "open-contribution",
+    "refresh",
+    "choose-archive-source"
+  ]
 }

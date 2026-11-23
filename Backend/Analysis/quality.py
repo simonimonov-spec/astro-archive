@@ -186,14 +186,14 @@ class Quality:
         for row in records:
             try:
                 path=self.catalog.path(row['id']);stat=path.stat()
-                if (stat.st_size,stat.st_mtime_ns)!=(row['size'],row['mtime']):
+                if not row.get('shared') and (stat.st_size,stat.st_mtime_ns)!=(row['size'],row['mtime']):
                     self.catalog.put(row['archive'],path,metadata(path));row.update(self.catalog.record(row['id']))
             except (OSError,ValueError) as error:
                 results[row['id']]=dict(id=row['id'],error=str(error),warnings=[dict(type='unavailable',severity='high',confidence='confirmed',message=str(error))],starList=[],stars=0,transform=None);continue
             signature=f"{VERSION}:{kind}:{detector_key}:{row['size']}:{row['mtime']}";signatures[row['id']]=signature
             with self.store.db() as db:saved=db.execute('SELECT result FROM measurements WHERE file=? AND signature=?',(row['id'],signature)).fetchone()
             if saved and not force:results[row['id']]=json.loads(saved[0])
-            else:needed.append((row['id'],str(self.catalog.path(row['id'])),kind,{k:v for k,v in detector.items() if k!='profile'}))
+            else:needed.append((row['id'],str(path),kind,{k:v for k,v in detector.items() if k!='profile'}))
         maximum=max((r['meta'].get('width',1)*r['meta'].get('height',1)*32 for r in records),default=1)
         workers=max(1,min(self.catalog.settings.value['workers'],self.catalog.settings.value['memoryMb']*1024**2//max(1,maximum)))
         for argument,result in parallel(measure_safe,needed,workers,cancel,processes=True):

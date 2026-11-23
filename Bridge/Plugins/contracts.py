@@ -6,7 +6,75 @@ from Bridge.Core.protocol import data_only
 
 ELEMENT_ID=re.compile(r'^[a-zA-Z][a-zA-Z0-9_-]{0,63}$')
 UI_TYPES={'button','table','list','text','select','checkbox','number','input','textarea','chart','group','metric','console','image'}
-SLOTS={'archive','analysis','analysis-tools','viewer-tools','preparation','preparation-activity','settings','customization','header'}
+SLOTS={'archive','analysis','analysis-tools','viewer-tools','preparation','preparation-activity','settings','customization','header','anchor'}
+# Named points in the core UI where an approved plugin may add or replace a
+# declarative block. Without an active plugin the core markup stays unchanged.
+INSIDE=('append','prepend','replace');AROUND=INSIDE+('before','after')
+# `replace` hides only the core children of the anchor while the plugin block
+# has content; the anchor element itself keeps its core visibility rules.
+SIBLING=('before','after')
+ANCHORS={
+    'header.actions':SIBLING,'archive.heading':INSIDE,'archive.actions':AROUND,'archive.layout':SIBLING,
+    'archive.sidebar':INSIDE,'archive.navigation':SIBLING,'archive.summary':AROUND,'archive.toolbar':INSIDE,
+    'archive.empty':INSIDE,'archive.footer':INSIDE,'archive.location':AROUND,
+    'analysis.heading':INSIDE,'preparation.heading':INSIDE,'viewer.sidebar':INSIDE,'settings.appearance':INSIDE,
+}
+PRESENTATIONS=('panel','inline','bare')
+THEME_COLORS=('background','surface','surface-raised','surface-hover','border','text','muted','accent','accent-surface','on-accent','success','warning','error','error-surface')
+THEME_SIZES={'radius':(0,32),'space':(2,24),'font-size':(10,22)}
+SETTINGS_TABS=('appearance','customization','plugins','language','diagnostics')
+
+def theme_tokens(value,scope='plugin'):
+    """Validated design tokens; only CSS custom properties, never selectors or CSS text."""
+    if scope not in ('plugin','app'):raise ValueError('Темата е за „plugin“ или „app“.')
+    if not isinstance(value,dict) or len(value)>len(THEME_COLORS)+len(THEME_SIZES):raise ValueError('Темата трябва да е обект с токени.')
+    result={}
+    for name,token in value.items():
+        if name in THEME_COLORS:
+            if not isinstance(token,str) or not re.fullmatch(r'#[0-9a-fA-F]{6}',token):raise ValueError('Цветът на темата трябва да е #rrggbb: '+str(name))
+            result[name]=token.lower()
+        elif name in THEME_SIZES:
+            low,high=THEME_SIZES[name]
+            if type(token) is not int or not low<=token<=high:raise ValueError(f'Размерът {name} трябва да е цяло число {low}–{high}.')
+            result[name]=token
+        else:raise ValueError('Непознат токен на темата: '+str(name))
+    return dict(scope=scope,tokens=result)
+
+def ui_actions(actions):
+    """Fixed follow-up actions a plugin response may ask the UI to perform."""
+    if not isinstance(actions,list) or len(actions)>16:raise ValueError('UI действията трябва да са списък до 16 елемента.')
+    def text(value,limit):
+        if not isinstance(value,str) or len(value)>limit:raise ValueError('Невалиден текст в UI действие.')
+        return value
+    result=[]
+    for action in actions:
+        if not isinstance(action,dict) or not isinstance(action.get('type'),str):raise ValueError('Невалидно UI действие.')
+        kind=action['type'];allowed={
+            'message':{'text'},'copy':{'text'},'navigate':{'route'},'open-archive':{'archiveId','relativePath'},
+            'open-settings':{'tab'},'open-contribution':{'contributionId'},'refresh':{'target'},'choose-archive-source':{'archiveId'},
+        }.get(kind)
+        if allowed is None:raise ValueError('Непознато UI действие: '+kind)
+        if set(action)-allowed-{'type'}:raise ValueError('Непозволени свойства на UI действие.')
+        if kind=='message':text(action.get('text'),500)
+        if kind=='copy':text(action.get('text'),100_000)
+        if kind=='navigate' and action.get('route') not in ('archive','analysis','preparation'):raise ValueError('Непознат изглед.')
+        if kind in ('open-archive','choose-archive-source'):
+            if not isinstance(action.get('archiveId'),str) or not re.fullmatch(r'[a-zA-Z0-9_-]{1,120}',action['archiveId']):raise ValueError('Невалиден архив.')
+            if kind=='open-archive':text(action.get('relativePath',''),2000)
+        if kind=='open-settings' and action.get('tab') not in SETTINGS_TABS:raise ValueError('Непознат раздел с настройки.')
+        if kind=='open-contribution' and (not isinstance(action.get('contributionId'),str) or not re.fullmatch(r'[a-z][a-z0-9_-]{0,63}',action['contributionId'])):raise ValueError('Невалидно поле.')
+        if kind=='refresh' and action.get('target') not in ('archive','plugins'):raise ValueError('Непознато опресняване.')
+        result.append(copy.deepcopy(action))
+    return result
+
+def contribution_layout(c):
+    """Validate the optional anchor placement of a manifest contribution."""
+    if c.get('slot')=='anchor':
+        modes=ANCHORS.get(c.get('anchor'))
+        if not modes:raise ValueError('Непозната котва в интерфейса: '+str(c.get('anchor')))
+        if c.get('mode','append') not in modes:raise ValueError('Котвата '+c['anchor']+' приема: '+', '.join(modes))
+        if c.get('presentation','bare') not in PRESENTATIONS:raise ValueError('Невалиден изглед на допълнението.')
+    elif any(k in c for k in ('anchor','mode','presentation')):raise ValueError('anchor, mode и presentation са само за slot „anchor“.')
 
 def ui_document(elements):
     """Declarative data only: fixed controls, no markup, scripts or arbitrary URLs."""

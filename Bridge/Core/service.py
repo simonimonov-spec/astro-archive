@@ -19,6 +19,7 @@ from Bridge.Core.session import SharedSession
 from Bridge.Core.viewer_state import ViewerState
 from Bridge.Plugins.manager import PluginManager
 from Bridge.Plugins.host_services import HostServices
+from Bridge.Plugins.shared_sources import SharedSources
 
 class Service:
     def __init__(self,store=None,plugin_folder=None,desktop_actions=None):
@@ -28,6 +29,7 @@ class Service:
         self.viewer_state=ViewerState(self.store);self.viewer_epoch=0;self.viewer_loading_epoch=None;self.viewer_guard=threading.RLock()
         self.viewer=Viewer(self.catalog,self.events,self.viewer_state.display);self.workflow=Workflow(self.catalog,self.jobs);self.exchange=Exchange(self)
         self.bridge=Router();self.plugins=PluginManager(self,plugin_folder);self.host_services=HostServices(self);self.desktop_actions=desktop_actions or {};self._dialogs=None
+        self.shared_sources=SharedSources(self);self.catalog.shared_sources=self.shared_sources
         self.index_started=set();self.index_tasks={};self.index_guard=threading.RLock();self.audit=read_json(self.store.folder/'archive-check.json',None)
         from Backend.Foundation.resources import Sampler
         self.sampler=Sampler()
@@ -54,6 +56,8 @@ class Service:
             'ui.appearance.get':lambda p:self.configuration(),
             'ui.appearance.save':lambda p:save_appearance(self,p),
             'archive.filtered':lambda p:self.catalog.filtered(p.get('filters',{}),p.get('offset',0),p.get('search','')),
+            'archive.shared.choices':lambda p:self.shared_sources.choices(p['archiveId']),
+            'archive.shared.bind':lambda p:self.shared_sources.bind(p['archiveId'],p['sourceId']),
             'archive.structure.sample':lambda p:self.archive_editor.sample(p['archiveId']),
             'archive.structure.preview':lambda p:self.structure_preview(p),
             'archive.metadata.describe':lambda p:self.archive_editor.describe(p['archiveId'],p.get('relativePath','')),
@@ -335,9 +339,13 @@ class Service:
 
     def _archive_command(self, method, p):
         if method=='archive.list':
+            if self.shared_sources.get(p['archiveId']):return self.shared_sources.listing(p['archiveId'],p)
             self.catalog.root(p['archiveId']);self.ensure_index(p['archiveId'])
             return self.catalog.listing(p['archiveId'],p.get('relativePath',''),int(p.get('offset',0)),p.get('search',''))
         if method=='archive.navigation':
+            if self.shared_sources.get(p['archiveId']):
+                page=self.shared_sources.listing(p['archiveId'],dict(p, search='', offset=0))
+                return dict(relativePath=page['relativePath'],totalFolders=page['directFolders'],offset=0,entries=[entry for entry in page['entries'] if entry['kind']=='folder'],problem=None)
             entries=self.catalog.listing_menu(p['archiveId'],p.get('relativePath',''))
             return dict(relativePath=p.get('relativePath',''),totalFolders=len(entries),offset=0,entries=entries,problem=None)
         if method=='archive.rows':
@@ -349,9 +357,13 @@ class Service:
                     result.append(dict(**item,**{k:entry[k] for k in ('bytes','modified','info','details')}))
                 except (OSError,ValueError) as error:result.append(dict(**item,bytes=None,modified=None,info={},details=dict(kind='folder',frames=None,totalExposure=None,problem=str(error),building=False,stale=True)))
             return result
-        if method=='archive.summary':return self.catalog.summary(p['archiveId'],p.get('relativePath',''))
+        if method=='archive.summary':
+            if self.shared_sources.get(p['archiveId']):return self.shared_sources.summary(p['archiveId'],p)
+            return self.catalog.summary(p['archiveId'],p.get('relativePath',''))
         if method in ('archive.summary.refresh','python.archive.scan'):
             archive=p.get('archiveId','frames')
+            if method=='archive.summary.refresh' and self.shared_sources.get(archive):
+                return self.shared_sources.summary(archive,p)
             started=self.start_index(archive,verify=True)
             if method=='archive.summary.refresh':self.wait_task(started);return self.catalog.summary(archive,p.get('relativePath',''))
             return started
@@ -387,7 +399,8 @@ class Service:
         if method=='python.archive.query':
             rows=self.catalog.query(p.get('filters',{}),slim=True);return dict(rows=[self.row(r) for r in rows],statistics=self.catalog.totals(rows))
         if method=='python.archive.facets':
-            rows=self.catalog.browse.get(p.get('filters',{}).get('archive','frames'))['rows']
+            archive=p.get('filters',{}).get('archive','frames')
+            rows=self.catalog.query(dict(archive=archive),slim=True) if self.shared_sources.get(archive) else self.catalog.browse.get(archive)['rows']
             return {key:sorted({r['meta'].get(key,'') for r in rows if r['meta'].get(key)}) for key in ('telescope','object','night')}
         if method=='python.archive.rename':return self.catalog.rename(p['archiveId'],p['relativePath'],p['name'])
         if method=='python.archive.info':return self.catalog.record(p['id'])
@@ -456,6 +469,11 @@ class Service:
 
     def _viewer_command(self, method, p):
         if method in ('function.image','image.open'):
+            if p.get('id','').startswith('shared-'):
+                row=self.catalog.record(p['id'])
+                return self.shared_sources.open(row['archive'],row['relative'])
+            if not p.get('id') and self.shared_sources.get(p.get('archiveId')):
+                return self.shared_sources.open(p['archiveId'],p['relativePath'])
             path=self.catalog.path(p['id']) if p.get('id') else self.catalog.resolve(p['archiveId'],p['relativePath'])
             return self.viewer.open(path,p.get('id'))
         if method=='viewer.render':return self.viewer.render(p['id'],p.get('options',{}),p.get('edge',1600),p.get('debayer'),p.get('pattern'))
@@ -518,6 +536,8 @@ class Service:
             a['type']=a.get('type',a['id'] if a['id'] in ('frames','stacks','photos') else 'frames')
             if a['type'] not in ('frames','stacks','photos'):raise ValueError('Избери готов тип на архива.')
             a['structure']=validate(a.get('structure'),a['type'])
+            previous=next((old for old in self.settings.value['archives'] if old['id']==a['id']),None)
+            self.shared_sources.validate(a,previous)
             if a.get('path'):
                 root=Path(a['path']).resolve()
                 if not root.is_dir():raise ValueError('Папката на архива не съществува: '+str(root))
@@ -540,11 +560,12 @@ class Service:
         aliases=p.get('aliases',self.settings.value['aliases'])
         if not isinstance(aliases,dict) or any(not isinstance(k,str) or not isinstance(v,str) for k,v in aliases.items()):raise ValueError('Имената на телескопите трябва да са текстови двойки.')
         workers=max(1,min(os.cpu_count() or 1,int(p.get('workers',self.settings.value['workers']))));memory=max(128,min(65536,int(p.get('memoryMb',self.settings.value['memoryMb']))))
-        for path,value in markers:atomic_json(path,value)
-        self.settings.value.update(archives=archives,programs=programs,aliases=p.get('aliases',self.settings.value['aliases']),
-            workers=workers,memoryMb=memory)
-        if 'preferences' in p:self.set_ui_preferences(p['preferences'])
-        self.settings.save();self.catalog.browse.cache.clear();self.events.emit('archive.changed')
+        with self.catalog.operation_lock:
+            for path,value in markers:atomic_json(path,value)
+            self.settings.value.update(archives=archives,programs=programs,aliases=p.get('aliases',self.settings.value['aliases']),
+                workers=workers,memoryMb=memory)
+            if 'preferences' in p:self.set_ui_preferences(p['preferences'])
+            self.settings.save();self.catalog.browse.cache.clear();self.events.emit('archive.changed')
         for a in archives:
             if a.get('path') and not a.get('hidden'):self.start_index(a['id'])
         return self.settings.value

@@ -10,7 +10,7 @@ class Viewer:
         self.catalog=catalog;self.events=events;self.display_preferences=display_preferences;self.frames=collections.OrderedDict();self.lock=threading.RLock();self.assets={}
     def open(self,path,source_id=None,can_navigate=True,display_name=None):
         path=Path(path);ident=uuid.uuid4().hex
-        self.events.emit('viewer.loading',id=ident,fileName=display_name or path.name)
+        self.events.emit('viewer.loading',id=ident,fileName=display_name or path.name,sourceId=source_id)
         try:
             data,header,shape=pixels(path)
             with self.lock:

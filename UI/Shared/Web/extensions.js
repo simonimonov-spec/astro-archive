@@ -7,6 +7,12 @@
   const key=(p,c)=>p.id+':'+c.id;
   const approved=slot=>plugins.filter(p=>p.enabled&&p.available&&p.uiAllowed).flatMap(p=>(p.contributions||[]).filter(c=>c.slot===slot&&(!c.clients||c.clients.includes(window.AstroArchiveRemote?'remote':'desktop'))).map(c=>({p,c}))).sort((a,b)=>(a.c.order||0)-(b.c.order||0));
   const color=name=>getComputedStyle(document.documentElement).getPropertyValue('--'+name).trim();
+  // Named core anchors. Dynamic anchors (e.g. archive.location) register through
+  // AstroArchiveExtensions.anchor(). Without an approved plugin nothing is added.
+  const ANCHORS={'header.actions':'#settings-open','archive.heading':'#page-archive .page-heading','archive.actions':'#page-archive .archive-actions','archive.layout':'#page-archive .archive-layout','archive.sidebar':'#page-archive .archive-sidebar','archive.navigation':'#archive-roots','archive.summary':'#folder-summary','archive.toolbar':'#page-archive .content-toolbar','archive.empty':'#empty','archive.footer':'#page-archive .table-footer','analysis.heading':'#page-analysis .page-heading','preparation.heading':'#page-preparation .page-heading','viewer.sidebar':'#v-sidebar','settings.appearance':'#settings-panel-appearance'};
+  const THEME_COLORS=['background','surface','surface-raised','surface-hover','border','text','muted','accent','accent-surface','on-accent','success','warning','error','error-surface'],THEME_SIZES={radius:[0,32],space:[2,24],'font-size':[10,22]};
+  const anchorContexts=new WeakMap(),anchorHosts=new Map(),hostTargets=new WeakMap(),containerContexts=new WeakMap();
+  let appTheme=null;
   function layout(){
     if(!$('header-extensions')&&document.querySelector('.header-disk-copy')){const host=node('div');host.id='header-extensions';host.hidden=true;document.querySelector('.header-disk-copy').append(host);}
     for(const slot of ['analysis','preparation']){
@@ -27,9 +33,34 @@
   async function returnToPicker(){await window.AstroArchivePreparation?.newSelection?.();select('preparation',null,false);}
   async function leavePreparation(p,c){for(const[id,pending]of [...saveTimers])if(id.startsWith(key(p,c)+':')){clearTimeout(pending.timer);pending.flush();}await actionQueues.get(p.id);await returnToPicker();}
   function finishNavigation(tasks){for(const task of tasks||[])if(returnTasks.has(task.id)&&task.state!=='running'){returnTasks.delete(task.id);if(task.state==='completed')returnToPicker().catch(error=>U.error('preparation',error));}}
-  function action(p,c,e,row,itemId){
-    const context=p.id==='shared-archives'&&c.id==='local-library'?{}:selection(c.slot);
-    const parameters={pluginId:p.id,contributionId:c.id,element:e.id,values:readValues(p,c),row,itemId,context};
+  async function runActions(p,c,response){
+    const actions=Array.isArray(response?.uiActions)?response.uiActions.slice(0,16):[];
+    for(const item of actions){
+      if(!item||typeof item!=='object')continue;
+      if(item.type==='message'&&typeof item.text==='string')window.dispatchEvent(new CustomEvent('astroarchive-plugin-message',{detail:{plugin:p.id,message:item.text}}));
+      else if(item.type==='copy'&&typeof item.text==='string')await navigator.clipboard.writeText(item.text);
+      else if(item.type==='navigate'&&['archive','analysis','preparation'].includes(item.route))window.AstroArchivePython.navigate(item.route);
+      else if(item.type==='open-archive'&&typeof item.archiveId==='string'){window.AstroArchiveArchiveView.navigate(item.archiveId,typeof item.relativePath==='string'?item.relativePath:'');window.AstroArchivePython.navigate('archive');}
+      else if(item.type==='open-settings'&&!window.AstroArchiveRemote)window.AstroArchivePreferences.open(item.tab);
+      else if(item.type==='open-contribution'){
+        const target=['analysis','preparation'].map(slot=>({slot,item:approved(slot).find(x=>x.p.id===p.id&&x.c.id===item.contributionId)})).find(x=>x.item);
+        if(!target)throw Error('Непознато поле на добавката: '+item.contributionId);
+        select(target.slot,key(target.item.p,target.item.c));window.AstroArchivePython.navigate(target.slot);
+      }else if(item.type==='refresh'&&item.target==='archive'){const current=window.AstroArchiveArchiveView.current();window.AstroArchiveArchiveView.navigate(current.archiveId,current.path);}
+      else if(item.type==='refresh'&&item.target==='plugins'){const state=await U.call('plugin.ui.state');window.AstroArchiveExtensions.update(state.plugins);}
+      else if(item.type==='choose-archive-source'&&!window.AstroArchiveRemote){
+        // The user picks and confirms in the core dialog; the plugin never binds by itself.
+        const schema=window.AstroArchiveArchiveSchema,archive={id:item.archiveId};
+        if(!schema?.chooseShared||!schema.usesSharedSource(item.archiveId))throw Error('Този архив не приема споделен източник.');
+        await schema.chooseShared(archive,async source=>{const result=await U.call('archive.shared.bind',{archiveId:item.archiveId,sourceId:source.id});window.AstroArchiveCustomization?.locationsSaved(result.archives);});
+      }
+    }
+  }
+  function action(p,c,e,row,itemId,context){
+    const scope=context?{...context}:{...selection(c.slot)};
+    // Selected catalog IDs are sent only to plugins allowed to read the archive.
+    if(!(p.permissions||[]).some(x=>(x?.id||x)==='archive.read'))delete scope.ids;
+    const parameters={pluginId:p.id,contributionId:c.id,element:e.id,values:readValues(p,c),row,itemId,context:scope};
     const perform=async()=>{try{
       const response=await U.call('plugin.ui.input',parameters);
       if(response?.returnToPreparation===true&&c.slot==='preparation'&&typeof response.taskId==='string'){returnTasks.add(response.taskId);U.call('activity.state').then(state=>finishNavigation(state.tasks)).catch(()=>{});}
@@ -39,6 +70,7 @@
       if(response?.navigation){window.AstroArchiveArchiveView.navigate(response.navigation.archiveId,response.navigation.relativePath);window.AstroArchivePython.navigate('archive');}
       if(response?.advanceViewer===true&&p.id==='ai-training'&&c.id==='rating'&&c.slot==='viewer-tools'&&viewerContext?.viewerId===parameters.context.viewerId)await window.AstroArchiveViewer?.next(parameters.context.viewerId);
       if(response?.message)window.dispatchEvent(new CustomEvent('astroarchive-plugin-message',{detail:{plugin:p.id,message:response.message}}));
+      await runActions(p,c,response);
     }catch(error){U.modal(p.name,body=>body.append(node('p',error.message,'error-banner')));}};
     const next=(actionQueues.get(p.id)||Promise.resolve()).then(perform);actionQueues.set(p.id,next.catch(()=>{}));return next;
   }
@@ -70,18 +102,18 @@
     }
     draw();
   }
-  function controls(p,c,elements,host,imageNodes=new Map()){
+  function controls(p,c,elements,host,imageNodes=new Map(),context=undefined){
     const saved=fields(p,c);
     if(!publishedDefaults.has(key(p,c)))publishedDefaults.set(key(p,c),new Map());const previous=publishedDefaults.get(key(p,c));
     for(const declared of elements){
       const e={...declared,...clientValues.get(key(p,c))?.get(declared.id)};
       if(e.visible===false)continue;const box=node('div',null,'extension-control');box.dataset.element=e.id;if(e.span===2)box.classList.add('extension-span');
-      if(e.type==='group'){box.classList.add('extension-group');box.append(node('h3',e.label||''));const grid=node('div',null,'extension-grid');box.append(grid);controls(p,c,e.children||[],grid,imageNodes);}
+      if(e.type==='group'){box.classList.add('extension-group');box.append(node('h3',e.label||''));const grid=node('div',null,'extension-grid');box.append(grid);controls(p,c,e.children||[],grid,imageNodes,context);}
       else if(e.type==='text')box.append(node('p',e.value??e.label??'','extension-tone-'+(e.tone||'normal')));
       else if(e.type==='metric'){box.classList.add('extension-metric');box.dataset.tone=e.tone||'normal';box.append(node('small',e.label),node('strong',String(e.value??'—')+(e.unit?' '+e.unit:''),'extension-tone-'+(e.tone||'normal')));}
       else if(e.type==='button'){
         const button=node('button',e.label||'Изпълни',e.tone==='primary'?'primary-button':'quiet-button');button.disabled=!!e.disabled;button.dataset.unavailable=String(!!e.disabled);
-        button.onclick=async()=>{for(const[id,pending]of [...saveTimers])if(id.startsWith(key(p,c)+':')){clearTimeout(pending.timer);pending.flush();}button.disabled=true;try{await action(p,c,e);}finally{if(button.isConnected)button.disabled=!!e.disabled;button.dataset.unavailable=String(!!e.disabled);}};box.append(button);
+        button.onclick=async()=>{for(const[id,pending]of [...saveTimers])if(id.startsWith(key(p,c)+':')){clearTimeout(pending.timer);pending.flush();}button.disabled=true;try{await action(p,c,e,undefined,undefined,context);}finally{if(button.isConnected)button.disabled=!!e.disabled;button.dataset.unavailable=String(!!e.disabled);}};box.append(button);
       }else if(['input','textarea','number','checkbox','select'].includes(e.type)){
         const published=JSON.stringify(e.value);if(previous.has(e.id)&&previous.get(e.id)!==published)saved.delete(e.id);previous.set(e.id,published);
         const label=node('label',null,e.type==='checkbox'?'checkbox-field':'function-field');const input=node(e.type==='select'?'select':e.type==='textarea'?'textarea':'input');input.dataset.pluginField=e.id;input.setAttribute('aria-label',e.label||e.id);input.disabled=!!e.disabled;input.dataset.unavailable=String(!!e.disabled);
@@ -92,17 +124,17 @@
         const value=saved.has(e.id)?saved.get(e.id):e.value??(e.type==='checkbox'?false:e.type==='number'?Math.max(e.min??-Infinity,Math.min(e.max??Infinity,0)):e.type==='select'?e.options?.[0]?.value??'':'');
         if(e.type==='checkbox')input.checked=!!value;else input.value=String(value);
         const capture=()=>saved.set(e.id,e.type==='checkbox'?input.checked:e.type==='number'?input.valueAsNumber:input.value);
-        const timerKey=key(p,c)+':'+e.id;capture();input.oninput=()=>{capture();if(e.command&&['input','textarea','number'].includes(e.type)){clearTimeout(saveTimers.get(timerKey)?.timer);if(e.type!=='number'||Number.isFinite(input.valueAsNumber)){const flush=()=>{saveTimers.delete(timerKey);action(p,c,e);};saveTimers.set(timerKey,{timer:setTimeout(flush,400),flush});}}};input.onchange=()=>{clearTimeout(saveTimers.get(timerKey)?.timer);saveTimers.delete(timerKey);capture();if(e.command)action(p,c,e);};
+        const timerKey=key(p,c)+':'+e.id;capture();input.oninput=()=>{capture();if(e.command&&['input','textarea','number'].includes(e.type)){clearTimeout(saveTimers.get(timerKey)?.timer);if(e.type!=='number'||Number.isFinite(input.valueAsNumber)){const flush=()=>{saveTimers.delete(timerKey);action(p,c,e,undefined,undefined,context);};saveTimers.set(timerKey,{timer:setTimeout(flush,400),flush});}}};input.onchange=()=>{clearTimeout(saveTimers.get(timerKey)?.timer);saveTimers.delete(timerKey);capture();if(e.command)action(p,c,e,undefined,undefined,context);};
         if(e.type==='checkbox')label.append(input,node('span',e.label));else label.append(node('span',e.label),input);box.append(label);
       }else if(e.type==='list'){
         box.classList.add('extension-span');if(e.label)box.append(node('h3',e.label));const list=node('ul',null,'extension-list');box.append(list);
         for(const item of e.items||[]){const row=node('li',null,'extension-list-item'),copy=node('div',null,'extension-list-copy');row.dataset.itemId=item.id;copy.append(node('strong',item.label||item.id));if(item.description)copy.append(node('small',item.description));row.append(copy);
           if(item.status)row.append(node('span',item.status,'extension-list-status extension-tone-'+(item.tone||'normal')));
-          if(e.command){const button=node('button',e.actionLabel||'Изпълни','quiet-button');button.disabled=!!e.disabled||!!item.disabled;button.dataset.unavailable=String(button.disabled);button.setAttribute('aria-label',(e.actionLabel||'Изпълни')+' · '+(item.label||item.id));button.onclick=async()=>{button.disabled=true;try{await action(p,c,e,undefined,item.id);}finally{if(button.isConnected)button.disabled=!!e.disabled||!!item.disabled;}};row.append(button);}list.append(row);}
+          if(e.command){const button=node('button',e.actionLabel||'Изпълни','quiet-button');button.disabled=!!e.disabled||!!item.disabled;button.dataset.unavailable=String(button.disabled);button.setAttribute('aria-label',(e.actionLabel||'Изпълни')+' · '+(item.label||item.id));button.onclick=async()=>{button.disabled=true;try{await action(p,c,e,undefined,item.id,context);}finally{if(button.isConnected)button.disabled=!!e.disabled||!!item.disabled;}};row.append(button);}list.append(row);}
         if(!e.items?.length)list.append(node('li','Списъкът е празен.','settings-note'));
       }else if(e.type==='table'){
         box.classList.add('extension-span');box.append(node('h3',e.label||''));const table=node('div');box.append(table);
-        U.table(table,e.columns.map(column=>({title:column.label,value:row=>column.format==='number'?U.number(row[column.key]):column.format==='exposure'?U.time(row[column.key]):row[column.key]})),e.rows,e.command?row=>action(p,c,e,e.rows.indexOf(row)):undefined);
+        U.table(table,e.columns.map(column=>({title:column.label,value:row=>column.format==='number'?U.number(row[column.key]):column.format==='exposure'?U.time(row[column.key]):row[column.key]})),e.rows,e.command?row=>action(p,c,e,e.rows.indexOf(row),undefined,context):undefined);
       }else if(e.type==='console'){box.classList.add('extension-span');box.append(node('h3',e.label||'Конзола'),node('pre',e.value||'','extension-console'));
       }else if(e.type==='image'){box.classList.add('extension-span');const src=e.assetId?'plugin-image/'+encodeURIComponent(p.id)+'/'+e.assetId:e.value,old=imageNodes.get(e.id),img=old?.getAttribute('src')===src?old:node('img');if(img.getAttribute('src')!==src)img.src=src;img.dataset.uiImage=e.id;img.loading='lazy';img.decoding='async';img.alt=e.label||'Резултат';img.className='extension-result-image';box.append(img);
       }else if(e.type==='chart'){box.classList.add('extension-span');chart(e,box);}
@@ -117,9 +149,49 @@
     const known=new Set();const visit=items=>{for(const e of items){if(e.type==='group')visit(e.children||[]);else if(['input','textarea','number','select','checkbox'].includes(e.type))known.add(e.id);}};visit(c.elements||[]);
     for(const id of fields(p,c).keys())if(!known.has(id))fields(p,c).delete(id);
     const focused=container.contains(document.activeElement)?document.activeElement.dataset.pluginField:null;const offsets=new Map([...container.querySelectorAll('.extension-console,[data-element]')].map(e=>[e.dataset.element||'console',e.scrollTop]));
-    container.replaceChildren();const title=node('header',null,'extension-heading');if(p.logoDataUrl){const logo=node('img');logo.src=p.logoDataUrl;logo.alt='';logo.className='extension-logo';title.append(logo);}title.append(node('span',p.name+' · ПЛЪГИН','eyebrow'),node('h2',c.title));if(c.description)title.append(node('p',c.description,'settings-note'));container.append(title);
-    const grid=node('div',null,'extension-grid'+(c.layout==='workbench'?' extension-workbench':''));container.append(grid);controls(p,c,c.elements||[],grid,imageNodes);for(const e of container.querySelectorAll('.extension-console,[data-element]'))e.scrollTop=offsets.get(e.dataset.element||'console')||0;if(focused){const input=[...container.querySelectorAll('[data-plugin-field]')].find(e=>e.dataset.pluginField===focused);input?.focus({preventScroll:true});}
-    if(!c.elements?.length)grid.append(node('p','Добавката още не е предоставила данни.','settings-note'));
+    container.replaceChildren();
+    const anchored=c.slot==='anchor',presentation=anchored?(c.presentation||'bare'):'panel';
+    if(presentation==='panel'){const title=node('header',null,'extension-heading');if(p.logoDataUrl){const logo=node('img');logo.src=p.logoDataUrl;logo.alt='';logo.className='extension-logo';title.append(logo);}title.append(node('span',p.name+' · ПЛЪГИН','eyebrow'),node('h2',c.title));if(c.description)title.append(node('p',c.description,'settings-note'));container.append(title);}
+    const grid=node('div',null,(presentation==='inline'?'extension-inline':'extension-grid')+(c.layout==='workbench'?' extension-workbench':''));container.append(grid);controls(p,c,c.elements||[],grid,imageNodes,containerContexts.get(container));for(const e of container.querySelectorAll('.extension-console,[data-element]'))e.scrollTop=offsets.get(e.dataset.element||'console')||0;if(focused){const input=[...container.querySelectorAll('[data-plugin-field]')].find(e=>e.dataset.pluginField===focused);input?.focus({preventScroll:true});}
+    // Anchored blocks stay invisible until the plugin publishes content, so the
+    // core look is unchanged while a plugin loads or has nothing to show.
+    if(anchored){container.hidden=!c.elements?.length;const target=hostTargets.get(container);if(target)syncReplace(target);}
+    else if(!c.elements?.length)grid.append(node('p','Добавката още не е предоставила данни.','settings-note'));
+  }
+  function syncReplace(target){target.classList.toggle('plugin-replacing',(anchorHosts.get(target)||[]).some(host=>host.isConnected&&host.dataset.anchorMode==='replace'&&!host.hidden));}
+  function clearAnchor(target){for(const host of anchorHosts.get(target)||[])host.remove();anchorHosts.delete(target);target.classList.remove('plugin-replacing');}
+  function renderAnchor(target,activate){
+    clearAnchor(target);const name=target.dataset.pluginAnchor,hosts=[];let after=target,prepend=null;
+    for(const{p,c}of approved('anchor').filter(x=>x.c.anchor===name)){
+      const mode=c.mode||'append',host=node('section',null,'plugin-anchor plugin-anchor-'+(c.presentation||'bare')+(c.presentation==='panel'?' panel declarative-plugin':''));
+      host.dataset.pluginAnchorHost=key(p,c);host.dataset.anchorMode=mode;host.hidden=true;
+      const context={...(anchorContexts.get(target)||{}),anchor:name};containerContexts.set(host,context);hostTargets.set(host,target);
+      if(mode==='before')target.before(host);else if(mode==='after'){after.after(host);after=host;}
+      else if(mode==='prepend'){if(prepend)prepend.after(host);else target.prepend(host);prepend=host;}else target.append(host);
+      hosts.push(host);anchorHosts.set(target,hosts);mount(host,p,c);
+      if(activate&&c.activate)U.call('plugin.ui.activate',{pluginId:p.id,contributionId:c.id,context}).then(response=>runActions(p,c,response)).catch(error=>console.warn(error.message));
+    }
+    if(!hosts.length)anchorHosts.delete(target);syncReplace(target);
+  }
+  function renderAnchors(root=document,activate=true){
+    for(const target of [...anchorHosts.keys()])if(!target.isConnected)clearAnchor(target);
+    for(const[name,selector]of Object.entries(ANCHORS)){const target=document.querySelector(selector);if(target)target.dataset.pluginAnchor=name;}
+    const targets=[...root.querySelectorAll('[data-plugin-anchor]')];if(root!==document&&root.dataset?.pluginAnchor)targets.unshift(root);
+    for(const target of targets)if(approved('anchor').some(x=>x.c.anchor===target.dataset.pluginAnchor)||anchorHosts.has(target))renderAnchor(target,activate);
+  }
+  function applyThemes(){
+    const active=plugins.filter(p=>p.enabled&&p.available&&p.uiAllowed&&p.theme&&typeof p.theme==='object').sort((a,b)=>a.id.localeCompare(b.id));
+    const declarations=theme=>Object.entries(theme?.tokens||{}).flatMap(([name,value])=>THEME_COLORS.includes(name)&&/^#[0-9a-f]{6}$/i.test(value)?[['--'+name,value]]:THEME_SIZES[name]&&Number.isInteger(value)&&value>=THEME_SIZES[name][0]&&value<=THEME_SIZES[name][1]?[['--'+name,value+'px']]:[]);
+    // App-wide tokens live in one constructable sheet; removing the plugin drops
+    // the sheet and the user's own appearance settings apply again unchanged.
+    const global=active.filter(p=>p.theme.scope==='app').flatMap(p=>declarations(p.theme));
+    if('adoptedStyleSheets' in document&&typeof CSSStyleSheet==='function'){
+      try{if(!appTheme){appTheme=new CSSStyleSheet();document.adoptedStyleSheets=[...document.adoptedStyleSheets,appTheme];}appTheme.replaceSync(global.length?'html:root{'+global.map(([n,v])=>n+':'+v+' !important').join(';')+'}':'');}catch(error){console.warn(error.message);}
+    }
+    for(const[id,holders]of mounts){
+      const plugin=active.find(p=>id.startsWith(p.id+':')&&p.theme.scope==='plugin'),values=plugin?declarations(plugin.theme):[];
+      for(const holder of holders){for(const property of [...holder.style])if(property.startsWith('--'))holder.style.removeProperty(property);for(const[n,v]of values)holder.style.setProperty(n,v);}
+    }
   }
   function select(slot,id,notify=true){
     active[slot]=id;$(slot+'-content').hidden=!!id;const host=$(slot+'-extensions');host.hidden=!id;host.replaceChildren();
@@ -142,20 +214,14 @@
       if(selected)select(slot,selected,false);else{$(slot+'-content').hidden=false;$(slot+'-extensions').hidden=true;active[slot]=null;base.setAttribute('aria-pressed','true');}
     }
     renderActivities();
-    const archive=$('archive-extensions'), sharedArchives=$('shared-archive-extensions');
-    archive.replaceChildren();
-    sharedArchives?.replaceChildren();
-    for(const {p,c} of approved('archive')){
-      const section=node('section',null,'panel declarative-plugin');
-      const isSharedArchive=p.id==='shared-archives'&&c.id==='local-library';
-      if(isSharedArchive)section.hidden=!c.elements?.length;
-      (isSharedArchive&&sharedArchives?sharedArchives:archive).append(section);
-      mount(section,p,c);
-    }
+    const archive=$('archive-extensions');archive.replaceChildren();
+    for(const{p,c}of approved('archive')){const section=node('section',null,'panel declarative-plugin');archive.append(section);mount(section,p,c);}
     const analysisTools=$('q-plugin-tools');if(analysisTools){analysisTools.replaceChildren();for(const{p,c}of approved('analysis-tools')){const section=node('section',null,'analysis-plugin-tool');analysisTools.append(section);mount(section,p,c);}analysisTools.hidden=!analysisTools.children.length;}
     const custom=$('custom-plugin-panels');if(custom){custom.replaceChildren();for(const{p,c}of approved('customization').filter(x=>!x.c.archiveKey)){const section=node('section',null,'declarative-plugin');custom.append(section);mount(section,p,c);}if(!custom.children.length)custom.append(node('p','Няма други включени добавки с визуални настройки. Настройките на плъгин архивите са при архивните места.','settings-note'));}
     const pending=plugins.filter(p=>p.enabled&&!p.uiAllowed&&p.contributions?.length),notice=$('extension-permission-notice');notice.hidden=!pending.length;notice.querySelector('span').textContent=pending.map(p=>p.name).join(', ')+' иска разрешение да добави полета към интерфейса.';
+    renderAnchors(document,true);
     for(const[id,holders]of mounts){for(const holder of holders)if(!holder.isConnected)holders.delete(holder);if(!holders.size)mounts.delete(id);}
+    applyThemes();
     for(const id of values.keys())if(!plugins.some(p=>p.enabled&&id.startsWith(p.id+':'))){values.delete(id);publishedDefaults.delete(id);}
     for(const id of clientValues.keys())if(!plugins.some(p=>p.enabled&&p.uiAllowed&&id.startsWith(p.id+':')))clientValues.delete(id);
     renderViewer(true);
@@ -181,7 +247,7 @@
   function renderHeader(){const host=$('header-extensions');if(!host)return;host.replaceChildren();for(const{p,c}of approved('header')){const section=node('section');section.dataset.plugin=p.id;section.dataset.contribution=c.id;controls(p,c,c.elements||[],section);host.append(section);}host.hidden=!host.children.length;}
   window.AstroArchiveSession.register('extensions',{read:()=>({...active}),write:async value=>{for(const slot of ['analysis','preparation']){const id=value[slot]||null;if(active[slot]===id)continue;if(id&&!approved(slot).some(x=>key(x.p,x.c)===id))continue;select(slot,id,false);}}});
   window.AstroArchiveExtensions={
-    viewerReady(dialog,data){const changed=viewerContext?.viewerId!==data.id;viewerContext={ids:data.sourceId?[data.sourceId]:[],stage:'viewer',viewerId:data.id};viewerHost=dialog.querySelector('#v-plugin-tools');if(changed)renderViewer(true);},
+    viewerReady(dialog,data){const changed=viewerContext?.viewerId!==data.id;viewerContext={ids:data.sourceId?[data.sourceId]:[],stage:'viewer',viewerId:data.id};viewerHost=dialog.querySelector('#v-plugin-tools');if(changed){renderViewer(true);renderAnchors(dialog,true);applyThemes();}},
     viewerClosed(){viewerContext=null;if(viewerHost)viewerHost.replaceChildren();viewerHost=null;},
     connect(bindings){api=bindings;},update(value){plugins=value||[];loaded=true;render();},
     toolsStatus(slot,pluginId=null){
@@ -202,6 +268,9 @@
       clientValues.set(key(item.p,item.c),mapped);renderHeader();return true;
     },
     select,isActive:slot=>!!active[slot],
+    // Core code may register a dynamic anchor; plugins add/replace only while approved.
+    anchor(element,name,context={}){if(!(element instanceof Element)||typeof name!=='string'||!/^[a-z]+\.[a-z-]+$/.test(name))return;element.dataset.pluginAnchor=name;anchorContexts.set(element,{...context});if(loaded){renderAnchor(element,true);applyThemes();}},
+    hasCapability:id=>plugins.some(p=>p.enabled&&p.available&&(p.capabilities||[]).some(c=>c.id===id)),
     broadcast(){},theme(){for(const[id,holders]of mounts){const item=plugins.flatMap(p=>(p.contributions||[]).map(c=>({p,c}))).find(x=>key(x.p,x.c)===id);if(item)for(const holder of holders)if(holder.isConnected)renderDocument(holder,item.p,item.c);}}
   };
   window.addEventListener('astroarchive-python-event',async event=>{
@@ -213,28 +282,21 @@
     if(data.name==='plugin.ui.changed'){
       const plugin=plugins.find(p=>p.id===data.plugin&&p.uiAllowed&&p.enabled&&p.uiRevision===data.revision),c=plugin?.contributions.find(c=>c.id===data.contribution);
       if(c){
-        const isSharedArchive=plugin.id==='shared-archives'&&c.id==='local-library';
-        if(isSharedArchive){
-          const previous=c.elements?.find(element=>element.id==='shared-change')?.value;
-          const current=data.elements.find(element=>element.id==='shared-change')?.value;
-          if(current&&current!==previous){
-            window.dispatchEvent(new CustomEvent('astroarchive-plugin-message',{detail:{plugin:plugin.id,message:current}}));
-          }
-        }
         c.elements=data.elements;
         if(c.slot==='header')renderHeader();
         if(c.slot==='preparation-activity')renderActivities();
         else for(const holder of mounts.get(key(plugin,c))||[]){
           if(!holder.isConnected)continue;
-          if(isSharedArchive)holder.hidden=!c.elements.length;
           renderDocument(holder,plugin,c);
         }
       }
     }
+    if(data.name==='plugin.theme.changed'){const plugin=plugins.find(p=>p.id===data.plugin&&p.uiRevision===data.revision);if(plugin){plugin.theme=data.theme||null;applyThemes();}}
+    if(data.name==='plugin.message'){const plugin=plugins.find(p=>p.id===data.plugin&&p.enabled&&p.uiAllowed&&p.uiRevision===data.revision);if(plugin&&typeof data.message==='string')window.dispatchEvent(new CustomEvent('astroarchive-plugin-message',{detail:{plugin:plugin.id,message:data.message.slice(0,500),tone:data.tone}}));}
     if(data.name==='plugin.ui.removed'){plugins=plugins.map(p=>p.id===data.plugin?{...p,enabled:false}:p);render();}
   });
   window.addEventListener('astroarchive-locations-saved',event=>{for(const archive of event.detail.archives||[])for(const{p,c}of approved('customization').filter(x=>x.p.id===archive.ownerPlugin&&x.c.archiveKey===archive.pluginArchiveKey&&x.c.activate))U.call('plugin.ui.activate',{pluginId:p.id,contributionId:c.id,context:{archiveId:archive.id}}).catch(error=>console.warn(error.message));});
   let messageTimer;
-  window.addEventListener('astroarchive-plugin-message',event=>{let status=$('extension-message');if(!status){status=node('div',null,'extension-message');status.id='extension-message';status.setAttribute('role','status');document.body.append(status);}status.textContent=event.detail.message;status.hidden=false;clearTimeout(messageTimer);messageTimer=setTimeout(()=>{status.hidden=true;},4500);});
+  window.addEventListener('astroarchive-plugin-message',event=>{let status=$('extension-message');if(!status){status=node('div',null,'extension-message');status.id='extension-message';status.setAttribute('role','status');document.body.append(status);}status.textContent=event.detail.message;status.dataset.tone=['success','warning','error','primary'].includes(event.detail.tone)?event.detail.tone:'normal';status.hidden=false;clearTimeout(messageTimer);messageTimer=setTimeout(()=>{status.hidden=true;},4500);});
   layout();
 })();

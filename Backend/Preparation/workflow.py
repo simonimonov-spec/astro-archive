@@ -123,7 +123,10 @@ class Workflow:
                     candidate=Path(parent)/name
                     if candidate.is_symlink():continue
                     p=within(folder,candidate.relative_to(folder).as_posix());s=p.stat();baseline[p.relative_to(folder).as_posix()]=dict(size=s.st_size,mtime=s.st_mtime_ns)
+            target_archive='stacks' if as_stack else result_archive
+            shared=self.catalog.shared_sources
             job=dict(id=queue_id or uuid.uuid4().hex,state='copying',ids=[r['id'] for r in rows],program=program,workspace=str(folder),
+                resultSource=shared.get(target_archive) if shared and expects_return else None,
                 object=next(iter(objects)),telescope=next(iter(telescopes)),nights=sorted({night for r in rows for night in (r['meta'].get('sourceNights') or [r['meta']['night']])}),
                 baseline=baseline,baselineDirectories=baseline_dirs,created=[],createdDirectories=[],dataOnly=all(r['meta']['kind']=='data' for r in rows),expectsReturn=expects_return,asStack=bool(as_stack),resultArchive='stacks' if as_stack else result_archive,started=time.time())
             if queue_id:job['queueOrder']=self.get(queue_id).get('queueOrder',time.time())
@@ -180,6 +183,9 @@ class Workflow:
             job=self.get(ident);folder=Path(job['workspace'])
             if job['state'] not in ('waiting','returning','cleanup-required'):raise ValueError('Тази задача не чака резултат.')
             if not job.get('expectsReturn',True):raise ValueError('Тази задача е без връщане на резултати.')
+            shared=self.catalog.shared_sources
+            if 'resultSource' in job and shared and shared.get(job['resultArchive'])!=job['resultSource']:
+                raise ValueError('Източникът за резултатите е сменен. Върни първоначалното архивно място.')
             available={f['id']:f for f in self.outputs(ident)['files']};paths=[]
             for output in outputs:
                 f=available.get(output)
@@ -190,7 +196,11 @@ class Workflow:
             if not job.get('imported'):
                 context=result_context([self.record(i) for i in job['ids']],job['asStack'])
                 if not job['asStack']:
-                    destination=self.catalog.settings.archive(job['resultArchive']);kind=destination.get('type',destination['id'])
+                    archive=job['resultArchive']
+                    if self.catalog.shared_sources and self.catalog.shared_sources.get(archive):
+                        kind=archive
+                    else:
+                        destination=self.catalog.settings.archive(archive);kind=destination.get('type',destination['id'])
                     context['kind']='photo' if kind=='photos' else 'frame' if kind=='frames' else None
                 result=dict(imported=[],duplicates=[],errors=[])
                 # Journal every returned file so a retry cannot re-import earlier files.
@@ -208,7 +218,10 @@ class Workflow:
                         # Journal before reading the archived copy: a retry must not
                         # import twice if it becomes unavailable during hashing.
                         self.save(job)
-                        if part['imported']:
+                        verified=part.get('verifiedSourceHashes',{}).get(str(path))
+                        if verified:
+                            job.setdefault('returnedFingerprints',{})[relative]=verified;self.save(job)
+                        elif part['imported']:
                             job.setdefault('returnedFingerprints',{})[relative]=digest(self.path(part['imported'][0]));self.save(job)
                         else:
                             # import_files only reports a duplicate after matching the

@@ -12,3 +12,21 @@
 .extension-multiline:focus{outline:1px solid var(--accent);border-color:var(--accent);}
 .extension-group .extension-control{min-width:0}.extension-group p{overflow-wrap:anywhere}
 .preparation-activity{margin-top:1.5rem;display:grid;gap:1rem;}
+
+/* Plugin anchors: added only while an approved plugin publishes content. */
+.plugin-anchor[hidden]{display:none!important}
+.plugin-replacing>:not(.plugin-anchor){display:none!important}
+.plugin-anchor-bare,.plugin-anchor-panel{min-width:0}
+.plugin-anchor-panel{margin:0 0 16px}
+.plugin-anchor-inline{display:inline-flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;vertical-align:middle}
+.extension-inline{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}
+.extension-inline .extension-control{min-width:0}
+.extension-inline .extension-control>.settings-note{display:none}
+.extension-inline .function-field{display:flex;align-items:center;gap:6px;margin:0}
+.extension-inline p{margin:0}
+.extension-message[data-tone=success]{border-color:var(--success)}
+.extension-message[data-tone=warning]{border-color:var(--warning)}
+.extension-message[data-tone=error]{border-color:var(--error)}
+.extension-inline .extension-metric{display:inline-flex;align-items:baseline;gap:6px;padding:6px 10px;margin:0}
+.extension-inline .extension-metric small{margin:0}
+.extension-inline .extension-metric strong{font-size:13px;line-height:1.3}
