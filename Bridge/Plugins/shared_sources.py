@@ -88,16 +88,19 @@ class SharedSources:
                 document = json.loads(payload)
                 if document.get("format") != 1:
                     return None
-                groups = {}
+                groups = {"": blank()}
                 for row in document["rows"]:
-                    if row["kind"] != "file":
+                    if row["kind"] == "folder":
+                        groups.setdefault(row["path"], blank())
                         continue
                     item = dict(meta=self.file_metadata(row, archive), size=row["bytes"], mtime=row["modified"])
                     parent = row["path"].rpartition("/")[0]
-                    while parent:
+                    while True:
                         group = groups.setdefault(parent, blank())
                         accumulate(group, item)
                         group["modified"] = max(group.get("modified", 0), item["mtime"])
+                        if not parent:
+                            break
                         parent = parent.rpartition("/")[0]
                 for group in groups.values():
                     group["info"] = {name: ", ".join(sorted(values)) for name, values in group["info"].items()}
@@ -105,6 +108,44 @@ class SharedSources:
                 return groups
         except (OSError, ValueError, KeyError, TypeError, AttributeError):
             return None
+
+    @staticmethod
+    def modified_date(value):
+        return dt.datetime.fromtimestamp(value / 1e9, dt.timezone.utc).isoformat() if value is not None else None
+
+    def folder_fields(self, group, kind):
+        if group is None:
+            return dict(bytes=None, modified=None, info={}, details=dict(kind=kind))
+        info = dict(group["info"])
+        if "telescope" in info:
+            info.setdefault("realTelescope", info["telescope"])
+        return dict(bytes=group["bytes"], modified=self.modified_date(group.get("modified")),
+                    info=info, details=group_details(group, kind))
+
+    def file_fields(self, row, archive):
+        meta = self.file_metadata(row, archive)
+        group = blank()
+        accumulate(group, dict(meta=meta, size=row["bytes"], mtime=row["modified"]))
+        info = {key: ", ".join(map(str, value)) if isinstance(value, list) else str(value)
+                for key, value in meta.items()}
+        if "telescope" in info:
+            info.setdefault("realTelescope", info["telescope"])
+        return dict(bytes=row["bytes"], modified=self.modified_date(row["modified"]), info=info,
+                    details=dict(meta, **group_details(group, meta["kind"], meta)))
+
+    def entry_metadata(self, archive, relative):
+        if REMOTE_CONTEXT.get():
+            raise PermissionError("Споделеният източник се използва от одобреното настолно копие.")
+        source = self.get(archive)
+        ident = source["id"]
+        relative = relative.replace(chr(92), "/").strip("/")
+        groups = self.folder_groups(archive, ident) or {}
+        if not relative or relative in groups:
+            self.request("browse", id=ident, path=relative)
+            return self.folder_fields(groups.get(relative), "folder" if relative else "archive")
+        token = self.file_id(archive, ident, relative).rsplit("-", 1)[1]
+        row = self.request("record", id=ident, token=token)
+        return self.file_fields(row, archive)
 
     def listing(self, archive, p):
         source = self.get(archive)
@@ -123,25 +164,12 @@ class SharedSources:
             level = levels[depth] if folder and depth < len(levels) else {}
             if folder:
                 kind_name = "day" if level.get("field") == "night" else "folder"
-                group = groups.get(path, blank()) if groups is not None else None
-                info = dict(group["info"]) if group else {}
-                details = group_details(group, kind_name) if group else dict(kind=kind_name)
-                size, modified = (group["bytes"], group.get("modified")) if group else (None, None)
+                fields = self.folder_fields(groups.get(path) if groups is not None else None, kind_name)
             else:
-                meta = self.file_metadata(row, archive)
-                group = blank()
-                accumulate(group, dict(meta=meta, size=row["bytes"], mtime=row["modified"]))
-                details = dict(meta, **group_details(group, meta["kind"], meta))
-                info = {key: ", ".join(map(str, value)) if isinstance(value, list) else str(value)
-                        for key, value in meta.items()}
-                size, modified = row["bytes"], row["modified"]
-            date = dt.datetime.fromtimestamp(modified / 1e9, dt.timezone.utc).isoformat() if modified is not None else None
-            if "telescope" in info:
-                info.setdefault("realTelescope", info["telescope"])
+                fields = self.file_fields(row, archive)
             entries.append(dict(archiveId=archive, relativePath=path, name=name, kind=kind,
                                 id=None if folder else self.file_id(archive, source["id"], path),
-                                bytes=size, modified=date, isLink=False, icon=level.get("icon"),
-                                info=info, details=details))
+                                isLink=False, icon=level.get("icon"), **fields))
         return dict(archiveId=archive, relativePath=page["path"], fullPath=" / ".join(
                     part for part in (source["name"], page["path"]) if part),
                     entries=entries, total=page["total"], offset=page["offset"], pageSize=100,
@@ -188,7 +216,7 @@ class SharedSources:
                         telescope="Неизвестен телескоп", object="Неизвестен обект", night="", filter="",
                         width=1, height=1, observed="", frames=1, framesKnown=False,
                         exposure=None, totalExposure=None)
-        metadata.update({key:value for key,value in row.get("meta", {}).items() if value is not None})
+        metadata.update(self.file_metadata(row, archive))
         relative = row["path"]
         ident = self.file_id(archive, source["id"], relative)
         return dict(id=ident, archive=archive, relative=relative, name=Path(relative).name, size=row["bytes"],

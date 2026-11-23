@@ -223,6 +223,30 @@ class CoreIntegrationTests(unittest.TestCase):
             self.assertEqual((changed['bytes'], changed['details']['frames'], changed['details']['totalExposure']), (11520, 2, 240))
             self.assertTrue(all(call.args == ('browse',) for call in request.call_args_list))
 
+    def test_shared_archive_rows_read_root_and_file_metadata_without_opening_files(self):
+        from unittest.mock import patch
+        service, _, folder, file = self.shared_archive()
+
+        def provider(action, **p):
+            if action == 'browse':
+                return dict(path='', rows=[folder], total=1, offset=0, files=0, folders=1)
+            if action == 'record':
+                return file
+            raise ValueError(f'Unexpected provider operation: {action}')
+
+        requests = [{'archiveId':'frames', 'relativePath':''},
+                    {'archiveId':'frames', 'relativePath':'Telescope/capture.fit'}]
+        with patch.object(service.shared_sources, 'request', side_effect=provider) as request:
+            root, row = service.call('archive.rows', {'rows':requests})
+            self.assertEqual((root['bytes'], root['details']['kind'], root['details']['frames']), (5760, 'archive', 1))
+            self.assertEqual(root['details']['totalExposure'], 120)
+            self.assertIsNotNone(root['modified'])
+            self.assertEqual((row['bytes'], row['info']['resolution']), (5760, '16 × 12'))
+            file_id = service.shared_sources.file_id('frames', 'a'*64, file['path'])
+            info = service.call('python.archive.info', {'id': file_id})
+            self.assertEqual(info['meta']['resolution'], '16 × 12')
+            self.assertNotIn('open', [call.args[0] for call in request.call_args_list])
+
     def test_shared_archive_refresh_routes_to_provider(self):
         from unittest.mock import patch
         service, _, _, _ = self.shared_archive()

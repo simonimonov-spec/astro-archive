@@ -58,7 +58,7 @@
     if (message.type === "event" && message.name === "activity.changed") { activity.update(message.snapshot); window.AstroArchiveMonitoring.updateActivity(message.snapshot); if(message.snapshot?.tasks?.some(task=>task.state==='blocked'))window.AstroArchiveMonitoring.checkPending(); window.AstroArchiveExtensions.broadcast("activity",message.snapshot); return; }
     if (message.type === "event" && message.name === "archive.source.changed") {
       if(message.message)window.dispatchEvent(new CustomEvent('astroarchive-plugin-message',{detail:{message:message.message}}));
-      if(state.entered&&state.archives.some(a=>a.id===state.archiveId&&a.sharedSource))loadFolder(true);
+      if(state.archives.some(a=>a.sharedSource&&(!state.entered||a.id===state.archiveId)))loadFolder(true);
       return;
     }
     if (message.type === "event" && message.name === "archive.summary.changed") { window.AstroArchiveMonitoring.reloadSummary(); refreshRows(); return; }

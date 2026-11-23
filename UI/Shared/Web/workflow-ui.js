@@ -19,7 +19,7 @@
       $(this.prefix+'-days').textContent='Зареждане на запазената информация…';
       try{
         const settings=await P.call('python.settings.get');if(revision!==this.revision)return;
-        this.archives=settings.archives.filter(a=>a.path&&!a.hidden);this.input.kind.replaceChildren(...this.archives.map(a=>option(a.id,a.name)));
+        this.archives=settings.archives.filter(a=>!a.hidden&&(a.path||a.sharedSource));this.input.kind.replaceChildren(...this.archives.map(a=>option(a.id,a.name)));
         this.input.kind.value=kind||'frames';if(!this.input.kind.value)this.input.kind.selectedIndex=0;
         if(!this.input.kind.value){this.rows=[];this.selected.clear();this.loaded=true;this.objects();return;}
         const data=await P.call('python.archive.query',{filters:{archive:this.input.kind.value},view:'picker'});if(revision!==this.revision)return;

@@ -352,9 +352,13 @@ class Service:
             result=[]
             for item in p.get('requests',p.get('rows',[])):
                 try:
-                    path=self.catalog.resolve(item['archiveId'],item['relativePath'])
-                    entry=self.catalog.entry(item['archiveId'],item['relativePath'].replace('\\','/'),path)
-                    result.append(dict(**item,**{k:entry[k] for k in ('bytes','modified','info','details')}))
+                    archive, relative = item['archiveId'], item['relativePath']
+                    if self.shared_sources.get(archive):
+                        entry = self.shared_sources.entry_metadata(archive, relative)
+                    else:
+                        path = self.catalog.resolve(archive, relative)
+                        entry = self.catalog.entry(archive, relative.replace('\\','/'), path)
+                    result.append(dict(item, **{k:entry[k] for k in ('bytes','modified','info','details')}))
                 except (OSError,ValueError) as error:result.append(dict(**item,bytes=None,modified=None,info={},details=dict(kind='folder',frames=None,totalExposure=None,problem=str(error),building=False,stale=True)))
             return result
         if method=='archive.summary':

@@ -80,7 +80,7 @@
           button.dataset.navKey = entry.kind==='archive' ? 'archive:' + entry.archiveId : pathKey(entry.relativePath);
           const entryIcon = entry.kind==='archive' ? role(entry.archiveId, '', 'archive') : entry.icon||role(context.archiveId, entry.relativePath);
           const caption = make('span', 'archive-nav-caption'); caption.append(make('strong', '', entry.displayName||(!entry.archiveId&&parts(entry.relativePath).length===1?window.AstroArchiveCustomization.telescope(entry.name):entry.name)));
-          if (entry.kind==='archive') caption.append(make('small', '', window.AstroArchiveI18n.t(entry.configured ? 'archive.savedPath' : 'archive.chooseSettings')));
+          if (entry.kind==='archive') caption.append(make('small', '', entry.shared ? tr('Споделен архив', 'Shared archive') : window.AstroArchiveI18n.t(entry.configured ? 'archive.savedPath' : 'archive.chooseSettings')));
           button.append(icon(entryIcon), caption, make('span', 'archive-nav-chevron', '›')); button.title = entry.name;
           if (entry.isLink) { button.disabled = true; button.title = window.AstroArchiveI18n.t('file.linkBlocked'); }
           const archiveId = context.archiveId;
@@ -137,7 +137,7 @@
       function update(next, force = false) {
         const anchor = anchorParts(next.path,next.archiveId).join('\\'), newKey = JSON.stringify([next.entered, next.archiveId, next.root, pathKey(anchor)]);
         const navigation = next.folder?.navigation;
-        let incoming = !next.entered ? next.archives.map(a => ({name: actions.name(a),kind:'archive', archiveId: a.id, configured: !!a.path}))
+        let incoming = !next.entered ? next.archives.map(a => ({name: actions.name(a),kind:'archive', archiveId: a.id, configured: !!(a.path || a.sharedSource), shared: !!a.sharedSource}))
           : navigation?.entries || (pathKey(anchor) === pathKey(next.path) ? (next.folder?.entries || []).filter(e => e.kind === 'folder') : []);
         const incomingTotal = !next.entered ? incoming.length : navigation?.totalFolders ?? next.folder?.directFolders ?? 0;
         if (newKey === key && !force && entries.length >= incoming.length && incoming.every((entry, i) => entry.name === entries[i]?.name && pathKey(entry.relativePath) === pathKey(entries[i]?.relativePath)) && total === incomingTotal) {
