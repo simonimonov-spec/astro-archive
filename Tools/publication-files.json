@@ -905,6 +905,10 @@
         "destination": "logo.png"
       },
       {
+        "source": "Plugins/shared-archives/catalog_documents.py",
+        "destination": "catalog_documents.py"
+      },
+      {
         "source": "Plugins/shared-archives/local_panel.py",
         "destination": "local_panel.py"
       },

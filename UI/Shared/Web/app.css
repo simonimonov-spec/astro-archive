@@ -39,6 +39,7 @@ main { padding: 8px 32px 22px; flex: 1; min-width: 0; }
 .subtitle { color: var(--muted); margin-top: 5px; }
 .panel { border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius); min-width: 0; }
 .panel-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 17px 20px; }
+#shared-archive-extensions:has(> :not([hidden])) { margin-bottom: 18px; }
 .archive-layout { display: grid; grid-template-columns: 245px minmax(0, 1fr); gap: 18px; }
 .archive-sidebar { display: flex; flex-direction: column; }
 .roots { padding: 0 10px 14px; }

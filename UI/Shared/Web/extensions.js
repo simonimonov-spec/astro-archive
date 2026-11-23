@@ -28,7 +28,8 @@
   async function leavePreparation(p,c){for(const[id,pending]of [...saveTimers])if(id.startsWith(key(p,c)+':')){clearTimeout(pending.timer);pending.flush();}await actionQueues.get(p.id);await returnToPicker();}
   function finishNavigation(tasks){for(const task of tasks||[])if(returnTasks.has(task.id)&&task.state!=='running'){returnTasks.delete(task.id);if(task.state==='completed')returnToPicker().catch(error=>U.error('preparation',error));}}
   function action(p,c,e,row,itemId){
-    const parameters={pluginId:p.id,contributionId:c.id,element:e.id,values:readValues(p,c),row,itemId,context:selection(c.slot)};
+    const context=p.id==='shared-archives'&&c.id==='local-library'?{}:selection(c.slot);
+    const parameters={pluginId:p.id,contributionId:c.id,element:e.id,values:readValues(p,c),row,itemId,context};
     const perform=async()=>{try{
       const response=await U.call('plugin.ui.input',parameters);
       if(response?.returnToPreparation===true&&c.slot==='preparation'&&typeof response.taskId==='string'){returnTasks.add(response.taskId);U.call('activity.state').then(state=>finishNavigation(state.tasks)).catch(()=>{});}
@@ -141,8 +142,16 @@
       if(selected)select(slot,selected,false);else{$(slot+'-content').hidden=false;$(slot+'-extensions').hidden=true;active[slot]=null;base.setAttribute('aria-pressed','true');}
     }
     renderActivities();
-    const archive=$('archive-extensions');archive.replaceChildren();
-    for(const{p,c}of approved('archive')){const section=node('section',null,'panel declarative-plugin');archive.append(section);mount(section,p,c);}
+    const archive=$('archive-extensions'), sharedArchives=$('shared-archive-extensions');
+    archive.replaceChildren();
+    sharedArchives?.replaceChildren();
+    for(const {p,c} of approved('archive')){
+      const section=node('section',null,'panel declarative-plugin');
+      const isSharedArchive=p.id==='shared-archives'&&c.id==='local-library';
+      if(isSharedArchive)section.hidden=!c.elements?.length;
+      (isSharedArchive&&sharedArchives?sharedArchives:archive).append(section);
+      mount(section,p,c);
+    }
     const analysisTools=$('q-plugin-tools');if(analysisTools){analysisTools.replaceChildren();for(const{p,c}of approved('analysis-tools')){const section=node('section',null,'analysis-plugin-tool');analysisTools.append(section);mount(section,p,c);}analysisTools.hidden=!analysisTools.children.length;}
     const custom=$('custom-plugin-panels');if(custom){custom.replaceChildren();for(const{p,c}of approved('customization').filter(x=>!x.c.archiveKey)){const section=node('section',null,'declarative-plugin');custom.append(section);mount(section,p,c);}if(!custom.children.length)custom.append(node('p','Няма други включени добавки с визуални настройки. Настройките на плъгин архивите са при архивните места.','settings-note'));}
     const pending=plugins.filter(p=>p.enabled&&!p.uiAllowed&&p.contributions?.length),notice=$('extension-permission-notice');notice.hidden=!pending.length;notice.querySelector('span').textContent=pending.map(p=>p.name).join(', ')+' иска разрешение да добави полета към интерфейса.';
@@ -203,7 +212,24 @@
     }
     if(data.name==='plugin.ui.changed'){
       const plugin=plugins.find(p=>p.id===data.plugin&&p.uiAllowed&&p.enabled&&p.uiRevision===data.revision),c=plugin?.contributions.find(c=>c.id===data.contribution);
-      if(c){c.elements=data.elements;if(c.slot==='header')renderHeader();if(c.slot==='preparation-activity')renderActivities();else for(const holder of mounts.get(key(plugin,c))||[])if(holder.isConnected)renderDocument(holder,plugin,c);}
+      if(c){
+        const isSharedArchive=plugin.id==='shared-archives'&&c.id==='local-library';
+        if(isSharedArchive){
+          const previous=c.elements?.find(element=>element.id==='shared-change')?.value;
+          const current=data.elements.find(element=>element.id==='shared-change')?.value;
+          if(current&&current!==previous){
+            window.dispatchEvent(new CustomEvent('astroarchive-plugin-message',{detail:{plugin:plugin.id,message:current}}));
+          }
+        }
+        c.elements=data.elements;
+        if(c.slot==='header')renderHeader();
+        if(c.slot==='preparation-activity')renderActivities();
+        else for(const holder of mounts.get(key(plugin,c))||[]){
+          if(!holder.isConnected)continue;
+          if(isSharedArchive)holder.hidden=!c.elements.length;
+          renderDocument(holder,plugin,c);
+        }
+      }
     }
     if(data.name==='plugin.ui.removed'){plugins=plugins.map(p=>p.id===data.plugin?{...p,enabled:false}:p);render();}
   });
