@@ -129,7 +129,7 @@
         const host=U.node('div');body.append(host);
         const rows=data.fields.filter(field=>data.values[field.key]!=null&&data.values[field.key]!=='');
         if(rows.length)U.table(host,[
-          {title:text('Поле','Field'),value:field=>field.title},
+          {title:text('Поле','Field'),value:field=>window.AstroArchiveArchiveSchema.fieldTitle(field.key,field.title)},
           {title:text('Стойност','Value'),value:field=>String(data.values[field.key])}
         ],rows);
         if(!shared&&data.count)body.append(modalAction(text('Редактирай информацията…','Edit information…'),async()=>{

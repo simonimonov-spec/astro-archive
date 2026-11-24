@@ -85,8 +85,9 @@ class Settings:
         self.path=store.folder/'profile.json';self.lock=threading.RLock()
         self.value=read_json(self.path,dict(version=1,archives=[dict(id=i,name=n,path='',identity=None) for i,n in
              [('frames','Архив на кадри'),('stacks','Архив на стакове'),('photos','Архив на снимки')]],
-             programs=[],aliases={},preferences=dict(themeId='builtin.night',languageId='bg',backgroundMode='theme',backgroundColor='#0c111a',animations=True),
+             programs=[],aliases={},preferences=dict(themeId='builtin.night',languageId='en',backgroundMode='theme',backgroundColor='#0c111a',animations=True),
              workers=max(1,min(8,(os.cpu_count() or 2)-1)),memoryMb=1024,cloudPolicy='review',approvedPluginPermissions={}))
+        self.value.setdefault('preferences', {}).setdefault('languageId', 'en')
     def save(self):
         with self.lock:atomic_json(self.path,self.value)
     def archive(self,ident):

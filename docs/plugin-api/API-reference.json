@@ -1,6 +1,11 @@
 {
   "apiVersion": 1,
   "entry": "setup(context) -> cleanup",
+  "translations": {
+    "manifestField": "translations",
+    "optional": true,
+    "shape": {"locale": {"sourceText": "translatedText"}}
+  },
   "slots": [
     "archive",
     "analysis",

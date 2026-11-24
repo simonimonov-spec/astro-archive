@@ -11,6 +11,18 @@ PERMISSIONS={'analysis.inspect','archive.manage','archive.read','analysis.read',
 CALL_CHAIN=contextvars.ContextVar('astroarchive_plugin_chain',default=())
 PERMISSION_LABELS={'analysis.inspect':'Четене на избрани кадри и измервания за инспекция и публикуване на предупреждения без промяна на подбора','archive.manage':'Добавяне и обновяване на допълнителни архивни папки чрез архивния SDK; мрежовото споделяне е в плъгина','remote.host':'Локален уеб сървър с удостоверени сесии и ограничени дистанционни команди','archive.read':'Четене на индексите и статистиката на архивите','analysis.read':'Четене на създадени отчети за анализ','preparation.read':'Четене на състоянието на опашката','capabilities.invoke':'Използване на разрешени възможности на други плъгини','processing.manage':'Работни копия, избрани външни програми и потвърдено прибиране на резултати'}
 
+def validate_translations(value):
+    """Display-only dictionaries, keyed by locale and original text."""
+    if not isinstance(value, dict) or len(value) > 32:
+        raise ValueError('Невалидни преводи на плъгин.')
+    for locale, strings in value.items():
+        if not re.fullmatch(r'[a-zA-Z]{2,8}(?:-[a-zA-Z0-9]{1,8})*', locale) or not isinstance(strings, dict) or len(strings) > 1000:
+            raise ValueError('Невалиден език на плъгин.')
+        if any(not source or len(source) > 4000 or not isinstance(text, str) or not text.strip() or len(text) > 4000
+               for source, text in strings.items()):
+            raise ValueError('Невалиден превод на текст в плъгин.')
+    return value
+
 class PluginContext:
     """The documented SDK: commands, UI data, settings, tasks and host calls."""
     def __init__(self,manager,ident,generation):self.manager=manager;self.id=ident;self.generation=generation
@@ -85,6 +97,7 @@ class PluginManager:
         if not isinstance(m,dict) or m.get('apiVersion')!=1 or not IDENTIFIER.fullmatch(m.get('id','')):raise ValueError('Невалиден плъгин манифест / API версия.')
         for field in ('name','description','version'):
             if not isinstance(m.get(field),str) or len(m[field])>2000:raise ValueError('Липсва име, описание или версия.')
+        validate_translations(m.get('translations', {}))
         entry=within(folder,m.get('entry','main.py'))
         if entry.suffix!='.py' or not entry.is_file():raise ValueError('Липсва Python входният файл на плъгина.')
         permissions=m.get('permissions',[])
@@ -149,7 +162,7 @@ class PluginManager:
                 result.append(dict(id=ident,name=m['name'],description=m['description'],version=m['version'],author=m.get('author',''),folder=m['folder'],
                     kind='declarative',available=True,enabled=bool(runtime),busy=False,uiAllowed=bool(runtime and state.get('uiAllowed')),
                     uiRevision=m['uiRevision'],contributions=contributions,permissions=[dict(id=p,label=PERMISSION_LABELS[p]) for p in m['permissions']],
-                    capabilities=m.get('capabilities',[]),problem=m.get('problem'),logoDataUrl=self.logo(m),
+                    capabilities=m.get('capabilities',[]),translations=m.get('translations',{}),problem=m.get('problem'),logoDataUrl=self.logo(m),
                     theme=copy.deepcopy(runtime.get('theme')) if runtime else None))
         return result
     def logo(self,m):

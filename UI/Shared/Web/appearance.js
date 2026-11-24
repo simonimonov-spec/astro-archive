@@ -9,7 +9,7 @@
   };
   const labels={night:['Нощен','Night'],day:['Дневен','Day'],custom:['Персонален','Custom'],red:['Червен · наблюдения','Red · observing']};
   let config, preferences, change;
-  const en = () => window.AstroArchiveI18n.locale.startsWith('en');
+  const en = () => !window.AstroArchiveI18n.isBulgarian;
   const label = pair => pair[en()?1:0];
   const valid = value => /^#[0-9a-f]{6}$/i.test(value);
   function render(data,prefs,onChange){

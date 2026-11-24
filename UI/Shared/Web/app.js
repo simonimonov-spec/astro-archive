@@ -109,7 +109,7 @@
     return window.AstroArchiveFunctions.show(route).then(()=>window.AstroArchiveSession?.activate(route)).catch(problem);
   }
 
-  function archiveName(archive) {const defaults={frames:'Архив на кадри',stacks:'Архив на стакове',photos:'Архив на снимки'};return archive ? defaults[archive.id]===archive.name ? t('archive.'+archive.id) : archive.name : t('nav.archive');}
+  const archiveName = i18n.archiveName;
 
   function languageChanged() {
     number = new Intl.NumberFormat(i18n.locale);
@@ -117,9 +117,10 @@
     date = new Intl.DateTimeFormat(i18n.locale, { dateStyle: "short", timeStyle: "short" });
     activity.languageChanged();
     window.AstroArchiveFunctions.languageChanged();
+    window.AstroArchivePython.translateArchiveDashboard?.();
     window.AstroArchiveMonitoring.translate();
     window.AstroArchiveViewer.languageChanged();
-    window.AstroArchiveExtensions.theme();
+    window.AstroArchiveExtensions.translate();
     archiveNavigation?.translate(); drawBreadcrumbs();
     if (!state.entered && state.folder) { loadFolder(); return; }
     if (state.folder) drawFiles(state.folder);
@@ -164,8 +165,8 @@
     if(archiveFilter){
       fragment.append(element('strong','filter-results-title',t('archive.filteredResults')),element('span','filter-results-badge',t('archive.filterOn')));
       const clear=element('button','filter-clear',t('archive.filterOff'));clear.type='button';clear.onclick=()=>$('archive-filter-toggle').click();fragment.append(clear);$('breadcrumbs').replaceChildren(fragment);
-      const labels={archive:'Архив',telescope:'Телескоп',object:'Обект',night:'Нощ',since:'Добавени',tag:'Етикет'},roles={archive:'archive',telescope:'telescope',object:'object',night:'day',since:'day',tag:'fits'};
-      for(const[key,value]of Object.entries(archiveFilter)){if(!value)continue;const chip=element('span','archive-filter-chip'),copy=element('span','');chip.append(window.AstroArchiveArchiveIcons.create(roles[key]||'folder'));copy.append(element('small','',labels[key]||key),element('strong','',key==='archive'?archiveName(archive):key==='since'?`Последните ${Math.max(1,Math.round((Date.now()/1000-value)/86400))} дни`:key==='telescope'?window.AstroArchiveCustomization.telescope(value):key==='tag'?({astro:'Астрофотография',photometry:'Фотометрия',variable:'Променливи звезди',exoplanet:'Екзопланети',other:'Друго',none:'Без етикет'}[value]||String(value)):String(value)));chip.append(copy);filterSummary.append(chip);}
+      const labels={archive:'nav.archive',telescope:'picker.telescope',object:'picker.object',night:'analysis.night',since:'archive.added',tag:'tag.label'},roles={archive:'archive',telescope:'telescope',object:'object',night:'day',since:'day',tag:'fits'};
+      for(const[key,value]of Object.entries(archiveFilter)){if(!value)continue;const chip=element('span','archive-filter-chip'),copy=element('span','');chip.append(window.AstroArchiveArchiveIcons.create(roles[key]||'folder'));copy.append(element('small','',labels[key]?t(labels[key]):key),element('strong','',key==='archive'?archiveName(archive):key==='since'?t('archive.recentDays',{days:number.format(Math.max(1,Math.round((Date.now()/1000-value)/86400)))}):key==='telescope'?window.AstroArchiveCustomization.telescope(value):key==='tag'?(['astro','photometry','variable','exoplanet','other','none'].includes(value)?t('tag.'+value):String(value)):String(value)));chip.append(copy);filterSummary.append(chip);}
       return;
     }
     function crumb(label, path) {
@@ -217,7 +218,10 @@
   function drawFiles(folder) {
     const fragment = document.createDocumentFragment();
     const rowContext=window.AstroArchiveArchiveRows.context(folder);
-    const columns = !window.AstroArchiveCustomization.archiveVariant(rowContext)&&folder.columns ? folder.columns.map(key=>({key,title:window.AstroArchiveArchiveSchema.titles[key]||key})) : window.AstroArchiveCustomization.archiveColumns(rowContext);
+    const configured = !window.AstroArchiveCustomization.archiveVariant(rowContext) && folder.columns
+      ? folder.columns.map(key => ({key}))
+      : window.AstroArchiveCustomization.archiveColumns(rowContext);
+    const columns = configured.map(column => ({...column, title: window.AstroArchiveArchiveSchema.fieldTitle(column.key,column.title)}));
     const headings = document.querySelector('#page-archive .content-panel thead tr');
     const sorting = window.AstroArchiveArchiveSort, redraw = () => drawFiles(folder);
     headings.replaceChildren(...columns.map(c=>sorting.heading(c,window.AstroArchiveArchiveRows.columnTitle(c,folder.entries,folder),redraw)),element('th','',''));
@@ -238,7 +242,7 @@
           : column.key === 'size' ? formatSize(entry.bytes) : window.AstroArchiveArchiveRows.cell(entry,column.key,columns,folder);
         const cell=element('td','muted',value);
         if(column.key==='date'||column.key==='modified')cell.title=window.AstroArchiveArchiveRows.label(window.AstroArchiveArchiveRows.dateKind(entry,folder));
-        if(entry.details?.building||entry.details?.stale)cell.title+=(cell.title?' · ':'')+'Справката се обновява';
+        if(entry.details?.building||entry.details?.stale)cell.title+=(cell.title?' · ':'')+t('archive.summaryRefreshing');
         if(entry.details?.problem)cell.title+=(cell.title?' · ':'')+entry.details.problem;
         row.append(cell);
       }
@@ -250,8 +254,8 @@
         action.setAttribute("aria-label", t(openFolder ? "file.openName" : "file.previewName", { name: entry.name }));
         action.addEventListener("click", event => { event.stopPropagation(); activateEntry(folder.archiveId, entry); });
         actionCell.append(action);
-        if(folder.filtered){const location=element('button','row-action filter-folder-action','Към папката');location.type='button';location.onclick=event=>{event.stopPropagation();navigateFolder(entry.archiveId||folder.archiveId,entry.relativePath.split(/[\\/]/).slice(0,-1).join('/'));};actionCell.append(location);}
-        if(entry.details?.kind==='stack'&&entry.id){const source=element('button','row-action','Изходни нощи');source.type='button';source.onclick=event=>{event.stopPropagation();window.AstroArchiveArchiveSchema.sourceNights(entry.id).catch(problem);};actionCell.append(source);}
+        if(folder.filtered){const location=element('button','row-action filter-folder-action',t('archive.toFolder'));location.type='button';location.onclick=event=>{event.stopPropagation();navigateFolder(entry.archiveId||folder.archiveId,entry.relativePath.split(/[\\/]/).slice(0,-1).join('/'));};actionCell.append(location);}
+        if(entry.details?.kind==='stack'&&entry.id){const source=element('button','row-action',t('archive.sourceNights'));source.type='button';source.onclick=event=>{event.stopPropagation();window.AstroArchiveArchiveSchema.sourceNights(entry.id).catch(problem);};actionCell.append(source);}
       }
       row.append(actionCell);
       attachArchiveMenu(row,entry.archiveId||folder.archiveId,entry);
@@ -264,9 +268,9 @@
     }
     $("files").replaceChildren(fragment);
     $("empty").hidden = folder.entries.length !== 0;
-    document.querySelector('#empty h2').textContent=folder.filtered?'Няма намерени файлове':t('folder.emptyTitle');
-    $("empty-message").textContent = folder.filtered?'Няма файлове, които съвпадат с избраните филтри.':t(state.search ? "folder.noMatches" : "folder.empty");
-    $("folder-counts").textContent = folder.filtered?`Намерени ${number.format(folder.total)} файла · всички папки в избрания архив`:t("folder.counts", { files: number.format(folder.directFiles), folders: number.format(folder.directFolders) });
+    document.querySelector('#empty h2').textContent=folder.filtered?t('archive.noResults'):t('folder.emptyTitle');
+    $("empty-message").textContent = folder.filtered?t('archive.noFilterMatches'):t(state.search ? "folder.noMatches" : "folder.empty");
+    $("folder-counts").textContent = folder.filtered?t('archive.filterCount',{count:number.format(folder.total)}):t("folder.counts", { files: number.format(folder.directFiles), folders: number.format(folder.directFolders) });
     $("page-label").textContent = folder.total ? t("folder.page", { first: number.format(folder.offset + 1), last: number.format(folder.offset + folder.entries.length), total: number.format(folder.total) }) : "";
     $("previous").disabled = folder.offset === 0;
     $("next").disabled = folder.offset + folder.pageSize >= folder.total;

@@ -3,7 +3,7 @@
   const $ = id => document.getElementById(id);
   const i18n = window.AstroArchiveI18n;
   const t = (key, values) => i18n.t(key, values);
-  const defaults = () => ({ themeId: "builtin.night", customColors: {}, redImageTint: false, languageId: "bg", backgroundMode: "theme", backgroundColor: "#0c111a", backgroundImage: null, animations: true, customization: window.AstroArchiveCustomization?.defaults(), islands: {version:1,sections:{}} });
+  const defaults = () => ({ themeId: "builtin.night", customColors: {}, redImageTint: false, languageId: i18n.defaultLanguage, backgroundMode: "theme", backgroundColor: "#0c111a", backgroundImage: null, animations: true, customization: window.AstroArchiveCustomization?.defaults(), islands: {version:1,sections:{}} });
   const appearanceOnly = () => !!window.AstroArchiveRemote;
   const appearanceFields = ['themeId','customColors','redImageTint','backgroundMode','backgroundColor','animations'];
   let refreshingAppearance = null;
@@ -17,9 +17,9 @@
     controlsChanged: () => setBusy(busy),
     download: id => mutatePlugins('ui.plugins.download',{id}),
     update: updatePlugin,
-    toggle: async (id, enabled) => {const plugin=configuration.plugins.find(p=>p.id===id);if(enabled&&!await window.AstroArchiveFunctions.confirm('Включване на добавка',plugin.name+' изпълнява собствен Python код на този компютър. Включвай добавки от доверен източник. Заявени команди: '+((plugin.permissions||[]).map(p=>p.label).join('; ')||'Без достъп до основните команди.')+' Визуализацията се разрешава отделно.','Включи')){drawPlugins();return;}return mutatePlugins("ui.plugins.toggle", { id, enabled, confirmed:true, revision:plugin.uiRevision });},
-    remove: async id => {if(await window.AstroArchiveFunctions.confirm('Премахване на добавка','Добавката ще се изключи и ще се прибере в резервната папка. Настройките ѝ се запазват.','Премахни'))return mutatePlugins("ui.plugins.remove", { id, confirmed:true });},
-      permission: async (plugin, allowed) => {if(allowed&&!await window.AstroArchiveFunctions.confirm('Допълнение към интерфейса',plugin.name+' иска да добави: '+plugin.contributions.map(c=>c.title).join(', ')+'. Ще използва готовите компоненти и текущата тема на приложението.','Разреши'))return;return mutatePlugins("ui.plugins.permission", { id:plugin.id, revision:plugin.uiRevision, allowed });},
+    toggle: async (id, enabled) => {const plugin=configuration.plugins.find(p=>p.id===id);if(enabled&&!await window.AstroArchiveFunctions.confirm(t('plugins.enableTitle'),t('plugins.enableBody',{name:i18n.pluginText(plugin,plugin.name),commands:(plugin.permissions||[]).map(i18n.permissionText).join('; ')||t('plugins.noCoreCommands')}),t('plugins.enable'))){drawPlugins();return;}return mutatePlugins("ui.plugins.toggle", { id, enabled, confirmed:true, revision:plugin.uiRevision });},
+    remove: async id => {if(await window.AstroArchiveFunctions.confirm(t('plugins.removeTitle'),t('plugins.removeBody'),t('plugins.remove')))return mutatePlugins("ui.plugins.remove", { id, confirmed:true });},
+      permission: async (plugin, allowed) => {if(allowed&&!await window.AstroArchiveFunctions.confirm(t('plugins.permissionTitle'),t('plugins.permissionBody',{name:i18n.pluginText(plugin,plugin.name),areas:plugin.contributions.map(c=>i18n.pluginText(plugin,c.title)).join(', ')}),t('plugins.allow')))return;return mutatePlugins("ui.plugins.permission", { id:plugin.id, revision:plugin.uiRevision, allowed });},
       archive: (id, contributionId) => mutatePlugins("ui.plugins.archive", { id, contributionId })
   });
 
@@ -65,10 +65,13 @@
     const stamp = generation + ":" + preferences.languageId;
     if (stamp !== languageStamp) {
       languageStamp = stamp;
-      i18n.select(configuration.languages.find(item => item.id === preferences.languageId) || configuration.languages[0]);
+      i18n.select(configuration.languages.find(item => item.id === preferences.languageId));
       bindings?.languageChanged();
       translateOptions();
       drawPlugins();
+      renderPluginStatus();
+      renderUpdateStatus();
+      if (updateTransfer.phase!=='idle') drawUpdateDownload(updateTransfer);
       if (messageKey) message(t(messageKey), messageTone);
     }
     window.AstroArchiveIslands?.accept(preferences.islands);
@@ -93,8 +96,12 @@
     bindings?.pluginsChanged(configuration.plugins);
     fillControls();
     drawProblems();
-    $("ui-plugin-folder-path").textContent = configuration.plugins?.length ? configuration.pluginsFolder : 'Папката Plugins ще се създаде при първото инсталиране.';
-    $("ui-plugin-catalog-status").textContent=configuration.catalogProblem || 'Официални плъгини от GitHub. Изтеглянето не ги включва автоматично.';
+    renderPluginStatus();
+  }
+
+  function renderPluginStatus() {
+    $("ui-plugin-folder-path").textContent = configuration.plugins?.length ? configuration.pluginsFolder : t('plugins.folderEmpty');
+    $("ui-plugin-catalog-status").textContent = configuration.catalogProblem || t('plugins.catalogInfo');
   }
 
   function option(select, value, text) {
@@ -389,7 +396,12 @@
     } catch (error) { report(error); }
     finally { setBusy(false); }
   });
-  let checkingUpdates=false;
+  let checkingUpdates=false, updateCheckState=null;
+  function renderUpdateStatus() {
+    if(!updateCheckState)return;
+    const {key,values,problem}=updateCheckState;
+    $('app-update-status').textContent=problem||t(key,values);
+  }
   let updateDownloadable=false,updateTransfer={phase:'idle'},pollingDownload=false;
   function drawUpdateDownload(value){
     updateTransfer=value;
@@ -399,7 +411,7 @@
     $('app-update-folder').hidden=!complete;
     $('app-update-progress').hidden=!active;
     $('app-update-progress').value=value.percent||0;
-    $('app-update-download-status').textContent=active?'Изтегляне: '+(value.percent||0)+'% · '+Math.round((value.received||0)/1024)+' / '+Math.round((value.total||0)/1024)+' KB':complete?'Изтеглен и проверен ZIP: '+value.path+'. Разархивирай го в отделна папка, за да използваш новата версия.':value.phase==='error'?'Изтеглянето не завърши: '+value.problem:value.phase==='cancelled'?'Изтеглянето е спряно. Можеш да опиташ отново.':'';
+    $('app-update-download-status').textContent=active?t('updates.progress',{percent:value.percent||0,received:Math.round((value.received||0)/1024),total:Math.round((value.total||0)/1024)}):complete?t('updates.complete',{path:value.path}):value.phase==='error'?t('updates.error',{problem:value.problem}):value.phase==='cancelled'?t('updates.cancelled'):'';
     setBusy(busy);
   }
   async function monitorUpdateDownload(){
@@ -418,15 +430,15 @@
   async function checkUpdates(){
     if(checkingUpdates||!bindings?.desktop)return;
     checkingUpdates=true;
-    const status=$('app-update-status'),link=$('app-update-link');
-    status.textContent='Проверка за нова версия…';
+    const link=$('app-update-link');
+    updateCheckState={key:'updates.checking'};renderUpdateStatus();
     try{
       const result=await bindings.call('app.updates.check');
       updateDownloadable=!!result.downloadable&&(result.available||!result.currentKnown);
       drawUpdateDownload(updateTransfer);
-      status.textContent=result.problem || (result.available?'Налична е нова версия: '+result.latest:!result.currentKnown?'Последна публикувана версия: '+(result.latest||'няма')+'. Това копие няма идентификатор на издание.':'Текуща версия: '+result.current+'. Няма по-ново публикувано издание.');
+      updateCheckState={key:result.available?'updates.available':!result.currentKnown?'updates.latest':'updates.current',values:{version:(result.available||!result.currentKnown?result.latest:result.current)||'—'},problem:result.problem};renderUpdateStatus();
       link.hidden=!result.latest||!!result.problem;
-    }catch(error){status.textContent='Проверката за версии е недостъпна. Опитай отново.';link.hidden=true;}
+    }catch(error){updateCheckState={key:'updates.unavailable'};renderUpdateStatus();link.hidden=true;}
     finally{checkingUpdates=false;}
   }
   window.AstroArchivePreferences = {

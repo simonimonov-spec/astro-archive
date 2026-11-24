@@ -455,6 +455,10 @@
         "destination": "tests/test_publication.py"
       },
       {
+        "source": "tests/test_language_preferences.py",
+        "destination": "tests/test_language_preferences.py"
+      },
+      {
         "source": "Tools/Launcher/Launcher.cs",
         "destination": "Tools/Launcher/Launcher.cs"
       },

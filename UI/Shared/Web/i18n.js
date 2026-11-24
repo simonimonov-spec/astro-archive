@@ -154,18 +154,19 @@
     "table.sort": "Sort by this column. Click again to reverse the order.",
     "table.date": "Date", "table.observingNight": "Observation night", "table.modificationDay": "Modification day"
   });
-  const { languages, messages } = window.AstroArchiveLocales;
+  const { languages, messages, pluginEnglish } = window.AstroArchiveLocales;
   const staticText = {
     ".skip-link":"skip", ".brand strong":"app.brand", "[data-route='archive']":"nav.archive", "[data-route='analysis']":"nav.analysis", "[data-route='preparation']":"nav.preparation", "#settings-open":"nav.settings",
     "#page-archive .eyebrow":"archive.eyebrow", "#archive-heading":"archive.title", "#page-archive .subtitle":"archive.subtitle", "#refresh span":"archive.refresh", ".sidebar-note .eyebrow":"archive.fast", ".sidebar-note p":"archive.lazy", "#loading":"folder.loading", "#empty h2":"folder.emptyTitle", "#empty [data-workspace]":"legacy.open",
     "#page-analysis .page-heading .eyebrow":"analysis.eyebrow", "#analysis-heading":"analysis.title", "#page-analysis .subtitle":"analysis.subtitle", "#page-analysis .tag":"analysis.tag", "#page-analysis .migration-card:not(.detail-card) h2":"analysis.measurements", "#page-analysis .migration-card:not(.detail-card) p":"analysis.body", "[data-workspace='analysis']":"analysis.open", "#page-analysis .detail-card .eyebrow":"analysis.migration", "#page-analysis .detail-card h2":"analysis.separation", "#page-analysis .detail-card p:not(.eyebrow)":"analysis.existing", "#page-analysis li:nth-child(1)":"analysis.backend", "#page-analysis li:nth-child(2)":"analysis.frontend", "#page-analysis li:nth-child(3)":"analysis.settings",
     "#page-preparation .page-heading .eyebrow":"preparation.eyebrow", "#preparation-heading":"preparation.title", "#page-preparation .subtitle":"preparation.subtitle", "#page-preparation .tag":"preparation.tag", "#page-preparation .migration-card:not(.detail-card) h2":"preparation.queue", "#page-preparation .migration-card:not(.detail-card) p":"preparation.body", "[data-workspace='preparation']":"preparation.open", "#page-preparation .detail-card .eyebrow":"preparation.foundation", "#page-preparation .detail-card h2":"preparation.separation", "#page-preparation .detail-card p:not(.eyebrow)":"preparation.existing", ".workflow-steps span:nth-child(1)":"preparation.step1", ".workflow-steps span:nth-child(2)":"preparation.step2", ".workflow-steps span:nth-child(3)":"preparation.step3", ".journal h2":"journal.title", "#clear-journal":"journal.clear"
   };
-  let selected = { id: "bg", locale: "bg", messages: {} };
+  const defaultLanguage = "en";
+  let selected = { id: defaultLanguage, locale: defaultLanguage, messages: {} };
   function t(key, parameters = {}) {
     const fallback = selected.locale.toLowerCase().startsWith("bg") ? bg : en;
     const text = (Object.hasOwn(selected.messages, key) ? selected.messages[key] : undefined)
-      ?? messages[selected.id]?.[key] ?? fallback[key] ?? en[key] ?? bg[key] ?? key;
+      ?? messages[selected.id]?.[key] ?? fallback[key] ?? messages.en[key] ?? en[key] ?? messages.bg[key] ?? bg[key] ?? key;
     return String(text).replace(/\{([A-Za-z0-9_]+)\}/g, (match, name) => Object.hasOwn(parameters, name) ? String(parameters[name]) : match);
   }
   function apply() {
@@ -173,19 +174,47 @@
     document.title = t("app.title") + installationSuffix;
     for (const [selector, key] of Object.entries(staticText)) for (const node of document.querySelectorAll(selector)) node.textContent = t(key);
     for (const node of document.querySelectorAll("[data-i18n]")) node.textContent = t(node.dataset.i18n);
-    for (const node of document.querySelectorAll("[data-i18n-aria-label]")) node.setAttribute("aria-label", t(node.dataset.i18nAriaLabel));
+    for (const node of document.querySelectorAll("[data-i18n-text]")) {
+      const text = [...node.childNodes].find(child => child.nodeType === Node.TEXT_NODE && child.data.trim());
+      if (text) text.data = text.data.replace(text.data.trim(), () => t(node.dataset.i18nText));
+    }
+    for (const attribute of ["aria-label", "title", "placeholder", "alt"]) {
+      const marker = "data-i18n-" + attribute;
+      for (const node of document.querySelectorAll(`[${marker}]`)) node.setAttribute(attribute, t(node.getAttribute(marker)));
+    }
     document.getElementById("refresh").title = t("archive.refresh");
     const labels = [[".navigation", "nav.label"], [".archive-sidebar", "archive.select"], [".content-panel", "folder.content"], ["#breadcrumbs", "folder.current"], ["#search", "folder.search"], ["#previous", "page.previous"], ["#next", "page.next"], [".journal", "journal.label"], ["#journal-entries", "journal.entries"]];
     for (const [selector, key] of labels) document.querySelector(selector)?.setAttribute("aria-label", t(key));
     document.getElementById("search").placeholder = t("folder.search");
   }
+  function archiveName(archive) {
+    if (!archive) return t("nav.archive");
+    const key = "archive." + archive.id;
+    return typeof archive.name === "string" && bg[key] === archive.name ? t(key) : archive.name;
+  }
+  function pluginText(plugin, source) {
+    if (typeof source !== "string" || !source) return source;
+    const locale = selected.locale.toLowerCase();
+    const base = locale.split("-")[0];
+    const get = entries => entries && Object.hasOwn(entries, source) ? entries[source] : undefined;
+    const translations = plugin?.translations || {};
+    const inLocale = id => get(translations[Object.keys(translations).find(key => key.toLowerCase() === id)]);
+    return inLocale(locale) ?? (base !== locale ? inLocale(base) : undefined) ??
+      (base === "bg" ? source : inLocale("en") ?? get(pluginEnglish[plugin?.id]) ?? source);
+  }
+  function permissionText(permission) {
+    const key = "plugins.permission." + permission.id;
+    const value = t(key);
+    return value === key ? permission.label : value;
+  }
   window.AstroArchiveI18n = {
-    t, apply, languages, get locale() { return selected.locale; },
+    t, apply, archiveName, pluginText, permissionText, languages, defaultLanguage, get locale() { return selected.locale; },
+    get isBulgarian() { return selected.locale.toLowerCase().startsWith("bg"); },
     select(language) {
       // Invalid or unfamiliar locale identifiers still get a readable fallback.
-      let locale = language?.locale || "bg";
+      let locale = language?.locale || defaultLanguage;
       try { new Intl.NumberFormat(locale); } catch { locale = "en"; }
-      selected = { id: language?.id || "bg", locale, messages: language?.messages || {} };
+      selected = { id: language?.id || defaultLanguage, locale, messages: language?.messages || {} };
       apply();
     }
   };

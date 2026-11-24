@@ -1,7 +1,7 @@
 "use strict";
 (() => {
   const $ = id => document.getElementById(id);
-  const tr = (bg, en) => window.AstroArchiveI18n.locale.startsWith('en') ? en : bg;
+  const tr = (bg, en) => !window.AstroArchiveI18n.isBulgarian ? en : bg;
   let api, usage = null, disk = null, selection = null, summary = null, recovery = null;
   let summaryKey, summaryVersion = 0, resourceBusy = false, diskBusy = false, pendingBusy = false;
   let diagnostics = false, timer, diskTime = 0, pendingTime = 0, diskVersion = 0, diskError = '';

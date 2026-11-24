@@ -3,7 +3,7 @@
 // nodes/listeners; resetting unwraps them at their original DOM anchors.
 (() => {
   const U=window.AstroArchiveFunctions,{$,node}=U,clone=value=>JSON.parse(JSON.stringify(value));
-  const tr=(bg,en)=>window.AstroArchiveI18n.locale.startsWith('en')?en:bg;
+  const tr=(bg,en)=>!window.AstroArchiveI18n.isBulgarian?en:bg;
   const sections=new Map();let model={version:1,sections:{}},revision=0,saved=0,saving=null,timer;
   const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
   function clean(value){

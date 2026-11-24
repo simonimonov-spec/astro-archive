@@ -2,7 +2,7 @@
 (() => {
   let api;
   const $ = id => document.getElementById(id);
-  const tr = (bg, en) => window.AstroArchiveI18n.locale.startsWith('en') ? (en || bg) : bg;
+  const tr = (bg, en) => !window.AstroArchiveI18n.isBulgarian ? (en || bg) : bg;
   const number = (value, digits = 3) => typeof value === 'number' && Number.isFinite(value) ? new Intl.NumberFormat(window.AstroArchiveI18n.locale, { maximumFractionDigits: digits }).format(value) : '—';
   const time = seconds => seconds == null ? '—' : `${Math.floor(seconds / 3600)}:${String(Math.floor(seconds % 3600 / 60)).padStart(2, '0')}:${String(Math.round(seconds % 60)).padStart(2, '0')}`;
   function node(tag, text, className) { const element = document.createElement(tag); if (text != null) element.textContent = text; if (className) element.className = className; return element; }

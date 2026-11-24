@@ -58,6 +58,19 @@ class PluginTests(unittest.TestCase):
     def enable(self, ident='sample'):
         self.manager.toggle(ident, True, confirmed=True)
 
+    def test_manifest_translations_are_available_to_the_interface(self):
+        folder = self.fixture()
+        manifest = folder / 'plugin.json'
+        original = json.loads(manifest.read_text(encoding='utf-8'))
+        translations = {'en': {'Sample': 'Example'}, 'pt-BR': {'Sample': 'Exemplo'}}
+        manifest.write_text(json.dumps({**original, 'translations': translations}), encoding='utf-8')
+        self.assertEqual(self.manager.scan()[0]['translations'], translations)
+        self.assertEqual(self.manager.scan()[0]['name'], 'Sample')
+        for invalid in ({'en': {'Sample': ['Example']}}, {'../en': {'Sample': 'Example'}}):
+            manifest.write_text(json.dumps({**original, 'translations': invalid}), encoding='utf-8')
+            self.assertEqual(self.manager.scan(), [])
+            self.assertTrue(self.manager.problems)
+
     def test_all_shipped_plugin_manifests_are_valid(self):
         plugin_root = Path(__file__).resolve().parents[1]/'Plugins'
         folders = [p.parent for p in plugin_root.glob('*/plugin.json') if not p.parent.name.startswith('.')]

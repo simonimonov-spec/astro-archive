@@ -1,7 +1,7 @@
 "use strict";
 (() => {
   const i18n = window.AstroArchiveI18n;
-  const locale=()=>i18n.locale, en=()=>locale().startsWith('en');
+  const locale=()=>i18n.locale, en=()=>!window.AstroArchiveI18n.isBulgarian;
   const duration=value=>{const s=Math.round(value);return `${Math.floor(s/3600)} ч ${Math.floor(s%3600/60)} мин ${s%60} сек`;};
   const n=value=>new Intl.NumberFormat(locale(),{maximumFractionDigits:3}).format(value);
   const label=kind=>i18n.t(kind === 'observation' ? 'table.observingNight' : 'table.modificationDay');
