@@ -14,8 +14,11 @@
   const number=(v,d=3)=>new Intl.NumberFormat('bg',{maximumFractionDigits:d}).format(v);
   const point=e=>{const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};};
   const css=name=>getComputedStyle(document.documentElement).getPropertyValue('--'+name).trim();
-  const seriesColor=()=>document.documentElement.dataset.theme==='builtin.red'?css('accent'):'#a981e8';
-  const sortedColor=()=>document.documentElement.dataset.theme==='builtin.red'?css('success'):'#45b97a';
+  // Beta 1.3 UI: Siril-like plot (see docs/BETA-1.3-UI.md).
+  const day=()=>document.documentElement.dataset.theme==='builtin.day',red=()=>document.documentElement.dataset.theme==='builtin.red';
+  const seriesColor=()=>red()?css('accent'):'#a43cf0';
+  const sortedColor=()=>red()?css('success'):'#22a884';
+  const frameColor=()=>day()?css('border'):'#8b9098',gridColor=()=>day()?css('border'):'#4a4e55',tickColor=()=>day()?css('muted'):'#a3a7ae';
   const rows=()=>spec.rows.filter(row=>spec.showExcluded===true||row.decision!=='excluded').map(row=>({row,x:spec.xValue(row),y:spec.yValue(row)})).filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.y));
   function fullBounds(data){
    if(!data.length)return{x0:0,x1:1,y0:0,y1:1};
@@ -64,13 +67,18 @@
    const c=canvas.getContext('2d');c.setTransform(ratio,0,0,ratio,0,0);c.clearRect(0,0,w,h);
    const data=rows(),extra=comparisonRows(),full=fullBounds(data.concat(extra)),win=spec.window||[0,1,0,1];
    c.font='11px Segoe UI';const ylo=full.y0+(full.y1-full.y0)*win[2],yhi=full.y0+(full.y1-full.y0)*win[3],labelWidth=Math.max(c.measureText(axisNumber(ylo,ylo,yhi,3)).width,c.measureText(axisNumber(yhi,ylo,yhi,3)).width);
-   const left=Math.max(w<520?54:62,Math.min(w*.32,Math.ceil(labelWidth)+13)),top=40,right=38,bottom=52,size=Math.max(1,Math.min(w-left-right,h-top-bottom)),width=size,height=size;
+   const left=Math.max(w<520?66:74,Math.min(w*.32,Math.ceil(labelWidth)+34)),top=30,right=30,bottom=56,width=Math.max(1,w-left-right),height=Math.max(1,h-top-bottom);
    surface={left,top,width,height,full,x0:full.x0+(full.x1-full.x0)*win[0],x1:full.x0+(full.x1-full.x0)*win[1],y0:full.y0+(full.y1-full.y0)*win[2],y1:full.y0+(full.y1-full.y0)*win[3]};
    const s=surface,muted=css('muted'),border=css('border'),text=css('text');
-   c.fillStyle=document.documentElement.dataset.theme==='builtin.day'?css('background'):'#000';c.fillRect(left,top,width,height);c.strokeStyle=border;c.lineWidth=1;c.fillStyle=muted;c.font='11px Segoe UI';
-   for(const x of axisTicks(s.x0,s.x1,5)){const p=coordinates(x,s.y0);c.beginPath();c.moveTo(p.x,top);c.lineTo(p.x,top+height);c.stroke();c.textAlign='center';c.fillText(axisNumber(x,s.x0,s.x1,2),p.x,top+height+16);}
-   for(const y of axisTicks(s.y0,s.y1,5)){const p=coordinates(s.x0,y);c.beginPath();c.moveTo(left,p.y);c.lineTo(left+width,p.y);c.stroke();c.textAlign='right';c.fillText(axisNumber(y,s.y0,s.y1,3),left-8,p.y+4);}
-   c.fillStyle=text;c.textAlign='left';c.font='12px Segoe UI';c.fillText(spec.yLabel,left,17);c.textAlign='center';c.fillText(spec.xLabel,left+width/2,top+height+34);
+   c.fillStyle=day()?css('background'):'#000';c.fillRect(left,top,width,height);c.lineWidth=1;c.font='11px Segoe UI';
+   // Dotted grid inside a light frame, grey tick labels (as in Siril).
+   c.strokeStyle=gridColor();c.setLineDash([1,3]);c.fillStyle=tickColor();
+   const xt=axisTicks(s.x0,s.x1,Math.max(4,Math.round(width/140))),yt=axisTicks(s.y0,s.y1,Math.max(4,Math.round(height/90)));
+   for(const x of xt){const p=coordinates(x,s.y0);if(x!==xt[0]&&x!==xt.at(-1)){c.beginPath();c.moveTo(Math.round(p.x)+.5,top);c.lineTo(Math.round(p.x)+.5,top+height);c.stroke();}c.textAlign='center';c.fillText(axisNumber(x,s.x0,s.x1,2),p.x,top+height+15);}
+   for(const y of yt){const p=coordinates(s.x0,y);if(y!==yt[0]&&y!==yt.at(-1)){c.beginPath();c.moveTo(left,Math.round(p.y)+.5);c.lineTo(left+width,Math.round(p.y)+.5);c.stroke();}c.textAlign='right';c.fillText(axisNumber(y,s.y0,s.y1,3),left-7,p.y+4);}
+   c.setLineDash([]);c.strokeStyle=frameColor();c.strokeRect(left+.5,top+.5,width-1,height-1);
+   c.fillStyle=tickColor();c.font='12px Segoe UI';c.textAlign='center';c.fillText(spec.xLabel,left+width/2,top+height+31);
+   c.save();c.translate(15,top+height/2);c.rotate(-Math.PI/2);c.fillText(spec.yLabel,0,0);c.restore();
    c.save();c.beginPath();c.rect(left,top,width,height);c.clip();
    const active=data.filter(p=>p.row.decision!=='excluded'),ordered=[...active].sort((a,b)=>a.row.frameIndex-b.row.frameIndex);
    if(spec.indexAxis){
@@ -90,15 +98,15 @@
     const q=coordinates(p.x,p.y);if(q.x<left-7||q.x>left+width+7||q.y<top-7||q.y>top+height+7)continue;
     hits.push({x:q.x,y:q.y,row:p.row,vx:p.x,vy:p.y});const col=spec.colorMode==='plot'?seriesColor():spec.color(p.row);
     if(p.row.decision==='excluded')continue;
-    if(!spec.indexAxis||active.length<100||spec.selected.has(p.row.id)){c.beginPath();c.arc(q.x,q.y,spec.selected.has(p.row.id)?5:3,0,Math.PI*2);c.fillStyle=col;c.fill();}
-    if(spec.selected.has(p.row.id)){c.lineWidth=2;c.strokeStyle=text;c.stroke();}
-    if(p.row.id===p.row.reference){c.beginPath();c.arc(q.x,q.y,8,0,Math.PI*2);c.strokeStyle=col;c.lineWidth=2;c.stroke();}
-    if(spec.loadedId===p.row.id){c.beginPath();c.moveTo(q.x-8,q.y);c.lineTo(q.x+8,q.y);c.moveTo(q.x,q.y-8);c.lineTo(q.x,q.y+8);c.strokeStyle=text;c.lineWidth=2;c.stroke();}
+    if(spec.selected.has(p.row.id)){c.beginPath();c.arc(q.x,q.y,4.5,0,Math.PI*2);c.fillStyle=col;c.fill();c.lineWidth=1.6;c.strokeStyle=text;c.stroke();}
+    else if(!spec.indexAxis){c.beginPath();c.arc(q.x,q.y,2.8,0,Math.PI*2);c.fillStyle=col;c.fill();}
+    else if(active.length<100){c.beginPath();c.arc(q.x,q.y,2.4,0,Math.PI*2);c.fillStyle=day()?css('background'):'#000';c.fill();c.strokeStyle=col;c.lineWidth=1.3;c.stroke();}
+    if(p.row.id===p.row.reference){c.beginPath();c.arc(q.x,q.y,7.5,0,Math.PI*2);c.strokeStyle='#4f9dff';c.lineWidth=1.8;c.stroke();}
+    if(spec.loadedId===p.row.id){c.beginPath();c.moveTo(q.x-6,q.y-6);c.lineTo(q.x+6,q.y+6);c.moveTo(q.x+6,q.y-6);c.lineTo(q.x-6,q.y+6);c.strokeStyle='#ff9b26';c.lineWidth=2;c.stroke();}
 
    }
    const r=selectionRect();if(r){
-    c.fillStyle='color-mix(in srgb, '+css('accent')+' 15%, transparent)';c.strokeStyle=css('accent');c.lineWidth=1;c.fillRect(r.x,r.y,r.w,r.h);c.strokeRect(r.x,r.y,r.w,r.h);
-    for(const [x,y]of[[r.x,r.y],[r.x+r.w,r.y],[r.x,r.y+r.h],[r.x+r.w,r.y+r.h],[r.x+r.w/2,r.y],[r.x+r.w/2,r.y+r.h],[r.x,r.y+r.h/2],[r.x+r.w,r.y+r.h/2]]){c.fillStyle=css('background');c.fillRect(x-3,y-3,6,6);c.strokeRect(x-3,y-3,6,6);}
+    c.strokeStyle=day()?css('text'):'#d4d7dc';c.lineWidth=1;c.setLineDash([4,3]);c.strokeRect(Math.round(r.x)+.5,Math.round(r.y)+.5,Math.round(r.w),Math.round(r.h));c.setLineDash([]);
    }c.restore();
    // Draw ghost points outside the data clip so extrema retain their full dot.
    for(const p of hits){if(p.row.decision!=='excluded')continue;const q=p;if(q.x<left-.01||q.x>left+width+.01||q.y<top-.01||q.y>top+height+.01)continue;c.globalAlpha=.3;c.beginPath();c.arc(q.x,q.y,3,0,Math.PI*2);c.fillStyle=spec.colorMode==='plot'?seriesColor():spec.color(p.row);c.fill();c.globalAlpha=1;}
@@ -110,11 +118,10 @@
     if(spec.warnings&&(p.row.warnings||[]).some(w=>w.origin==='ai'&&w.type==='cloud')){c.font='13px Segoe UI Symbol';c.fillStyle=css('warning');c.textAlign='left';c.fillText('☁',q.x+6,q.y-7);}
     if(spec.warnings&&(p.row.warnings||[]).some(w=>w.origin==='ai'&&w.type==='light')){c.font='12px Segoe UI Symbol';c.fillStyle=css('warning');c.textAlign='left';c.fillText('✦',q.x+18,q.y-7);}
    }
-   if(r){c.fillStyle=text;c.textAlign='left';c.font='11px Segoe UI';c.fillText(`${spec.selected.size} кадъра · X ${number(selection.x0)}…${number(selection.x1)} · Y ${number(selection.y0)}…${number(selection.y1)}`,left,top-7);}
+   if(r){c.fillStyle=day()?css('text'):'#d4d7dc';c.textAlign='left';c.font='11px Segoe UI';c.fillText(`Бр.: ${spec.selected.size} · ${spec.xLabel}: [${number(selection.x0)} , ${number(selection.x1)}] · ${spec.yLabel}: [${number(selection.y0)} , ${number(selection.y1)}]`,clamp(r.x,left,left+width-10),Math.max(11,r.y-5));}
    // The two red handles constrain each axis to its own 100–6400% window.
-   const xbar=top+height+40,ybar=left+width+12;c.strokeStyle=border;c.lineWidth=4;c.lineCap='round';c.beginPath();c.moveTo(left,xbar);c.lineTo(left+width,xbar);c.moveTo(ybar,top);c.lineTo(ybar,top+height);c.stroke();
-   c.strokeStyle=css('accent');c.beginPath();c.moveTo(left+win[0]*width,xbar);c.lineTo(left+win[1]*width,xbar);c.moveTo(ybar,top+(1-win[3])*height);c.lineTo(ybar,top+(1-win[2])*height);c.stroke();
-   c.fillStyle=css('error');for(const [x,y]of[[left+win[0]*width,xbar],[left+win[1]*width,xbar],[ybar,top+(1-win[3])*height],[ybar,top+(1-win[2])*height]]){c.beginPath();c.arc(x,y,4.5,0,Math.PI*2);c.fill();}
+   const xbar=top+height+44,ybar=left+width+14;c.strokeStyle=day()?css('border'):'#8b8f96';c.lineWidth=5;c.lineCap='round';c.beginPath();c.moveTo(left,xbar);c.lineTo(left+width,xbar);c.moveTo(ybar,top);c.lineTo(ybar,top+height);c.stroke();c.lineCap='butt';
+   c.fillStyle='#e0262b';for(const [x,y]of[[left+win[0]*width,xbar],[left+win[1]*width,xbar],[ybar,top+(1-win[3])*height],[ybar,top+(1-win[2])*height]]){c.beginPath();c.arc(x,y,4.5,0,Math.PI*2);c.fill();}
    callbacks.zoom?.(Math.round(100/(win[1]-win[0])),Math.round(100/(win[3]-win[2])));
   }
   function nearest(p){let best=null;for(const item of hits){const d=Math.hypot(item.x-p.x,item.y-p.y);if(d<9&&(!best||d<best.d))best={...item,d};}return best;}
