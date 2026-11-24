@@ -9,6 +9,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import tempfile
 import threading
 import time
@@ -294,7 +295,10 @@ class LocalHost:
                         for ident, (name, kind, _) in self.archives.items()]
             ident = data["archive"]
             _, kind, archive = self.archive(ident)
-            self.check_source(ident, data.get("source"))
+            source = data.get("source")
+            if action == "disk" and not source:
+                raise RequestError(400, "Липсва идентификатор на споделения източник.")
+            self.check_source(ident, source)
             if action == "begin":
                 path = data["path"]
                 self.file_type(kind, path)
@@ -304,6 +308,14 @@ class LocalHost:
             if action in ("renew", "release"):
                 getattr(archive, action)(identity, data["lease"])
                 return {}
+        if action == "disk":
+            usage = shutil.disk_usage(archive.root)
+            with self.lock:
+                self.client(identity)
+                self.check_source(ident, source)
+            drive = archive.root.drive
+            return dict(name=self.name, volume=drive if re.fullmatch(r"[A-Za-z]:", drive) else "",
+                        totalBytes=usage.total, freeBytes=usage.free)
         if action == "refresh-catalog":
             self.refresh_catalogs(ident)
             with self.lock:

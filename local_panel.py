@@ -280,9 +280,10 @@ class LocalPanel:
             document = self.documents.get(key)
             if document is None:
                 raise ValueError("Няма запазен каталог за този споделен архив.")
-            view = self.catalog_views.get(key)
-            if view is None:
-                view = self.catalog_views[key] = CatalogView(document, key)
+            if action not in ("disk", "ingest", "refresh"):
+                view = self.catalog_views.get(key)
+                if view is None:
+                    view = self.catalog_views[key] = CatalogView(document, key)
             relative = parameters.get("path", "").replace("\\", "/").strip("/")
             if action == "browse":
                 return view.browse(relative, parameters.get("search", ""), parameters.get("offset", 0))
@@ -300,11 +301,14 @@ class LocalPanel:
                 items = view.file_items
                 return dict(rows=[dict(row, token=token) for token,row in items[offset:offset+100]],
                             total=len(items), revision=document["revision"])
-            if action not in ("ingest", "refresh") and (action != "open" or view.rows.get(relative, {}).get("kind") != "file"):
+            if action not in ("disk", "ingest", "refresh") and (action != "open" or view.rows.get(relative, {}).get("kind") != "file"):
                 raise ValueError("Файлът вече не е в запазения каталог.")
             if key not in self.available_catalogs or self.connection != "approved" or self.client is None:
-                raise ValueError("Свържи се с хоста, за да използваш файла.")
+                raise ValueError("Споделеният хост е недостъпен." if action == "disk"
+                                 else "Свържи се с хоста, за да използваш файла.")
             client = self.client
+        if action == "disk":
+            return client.call("disk", archive=document["archive"], source=document["source"], timeout=3)
         if action == "ingest":
             result = client.ingest(document["archive"], Path(parameters["file"]), parameters["fingerprint"],
                                    parameters.get("context", {}), document["source"])

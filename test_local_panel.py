@@ -103,6 +103,13 @@ class LocalPanelTests(unittest.TestCase):
                 self.assertEqual([row["name"] for row in page["entries"]], ["image.fit"])
                 cache = client.folder / "ViewerCache"
                 self.assertFalse(cache.exists())
+                from types import SimpleNamespace
+                with patch("shutil.disk_usage", return_value=SimpleNamespace(total=100000, free=40000)) as usage:
+                    disk = service.call("archive.disk", {"archiveId": "frames"})
+                usage.assert_called_once_with(source.resolve())
+                self.assertEqual((disk["totalBytes"], disk["freeBytes"], disk["archiveBytes"]),
+                                 (100000, 40000, (source / "image.fit").stat().st_size))
+                self.assertFalse(cache.exists())
                 opened = service.call("image.open", {"archiveId": "frames", "relativePath": "image.fit"})
                 self.assertTrue(opened["opened"])
                 data_path, = cache.rglob("*.fit")
@@ -110,7 +117,6 @@ class LocalPanelTests(unittest.TestCase):
                 self.assertNotIn("local-library", client_manager.live["shared-archives"]["documents"])
                 imported = root / "client-import.fit"
                 fits.writeto(imported, np.full((16, 16), 55, dtype=np.int16))
-                from types import SimpleNamespace
                 service._dialogs = SimpleNamespace(choose=lambda *_args, **_kwargs: [str(imported)])
                 result = service.wait_task(service.call("archive.import", {"archiveId": "frames"}))
                 self.assertEqual(result["errors"], [])
