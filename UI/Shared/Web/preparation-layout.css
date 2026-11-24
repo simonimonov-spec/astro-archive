@@ -57,7 +57,7 @@
 /* ---------- Step 2 ---------- */
 #w-action { max-width: none; padding: 0 !important; display: flex; flex-direction: column; }
 #w-action[hidden] { display: none !important; }
-#w-action > .flow-stepper {
+:is(#w-action, #w-plugin-run) > .flow-stepper {
   display: flex;
   gap: 4px;
   margin: 0;
@@ -65,7 +65,7 @@
   border-bottom: 1px solid var(--border);
   font-size: 13px;
 }
-#w-action .flow-step {
+:is(#w-action, #w-plugin-run) .flow-step {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -81,7 +81,7 @@
   font-weight: 500;
   transition: color 220ms ease, border-color 260ms ease;
 }
-#w-action .flow-step i {
+:is(#w-action, #w-plugin-run) .flow-step i {
   display: inline-grid;
   place-items: center;
   width: 20px;
@@ -91,17 +91,17 @@
   font-style: normal;
   background: color-mix(in srgb, var(--text) 7%, transparent);
 }
-#w-action .flow-step[aria-current="step"] {
+:is(#w-action, #w-plugin-run) .flow-step[aria-current="step"] {
   color: var(--accent) !important;
   border-bottom-color: var(--accent) !important;
   box-shadow: var(--tab-glow, 0 9px 12px -10px color-mix(in srgb, var(--accent) 75%, transparent)) !important;
 }
-#w-action .flow-step[aria-current="step"] i { background: color-mix(in srgb, var(--accent) 18%, transparent); }
-#w-action .flow-step-done { cursor: pointer; }
-#w-action .flow-step-done i { background: color-mix(in srgb, var(--success, #67d391) 22%, transparent); color: var(--success, #67d391); }
-#w-action .flow-step:last-child { opacity: .7; }
+:is(#w-action, #w-plugin-run) .flow-step[aria-current="step"] i { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+:is(#w-action, #w-plugin-run) .flow-step-done { cursor: pointer; }
+:is(#w-action, #w-plugin-run) .flow-step-done i { background: color-mix(in srgb, var(--success, #67d391) 22%, transparent); color: var(--success, #67d391); }
+:is(#w-action, #w-plugin-run) .flow-step:last-child:not([aria-current]) { opacity: .7; }
 @media (hover: hover) and (pointer: fine) {
-  #w-action .flow-step-done:hover { color: var(--text) !important; border-bottom-color: color-mix(in srgb, var(--accent) 35%, var(--border)) !important; }
+  :is(#w-action, #w-plugin-run) .flow-step-done:hover { color: var(--text) !important; border-bottom-color: color-mix(in srgb, var(--accent) 35%, var(--border)) !important; }
 }
 
 #w-action .flow-action-body {
@@ -185,7 +185,9 @@
 /* Fit the window: the bar stays, the body scrolls inside (rule: the window never scrolls). */
 @media (min-height: 560px) and (min-width: 761px) {
   #preparation-content > #w-action:not([hidden]) { overflow: hidden !important; }
-  #w-action > .flow-stepper, #w-action > .flow-action-bar { flex: none; }
+  :is(#w-action, #w-plugin-run) > :is(.flow-stepper, .flow-action-bar) { flex: none; }
+  #preparation-content > #w-plugin-run:not([hidden]) { overflow: hidden !important; }
+  #w-plugin-run > .flow-plugin-run-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
   #w-action > .flow-action-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
 }
 /* Narrow windows: one column. */
@@ -195,9 +197,9 @@
 }
 
 /* No motion when animations are off. */
-:root[data-animations="off"] :is(#w-data .flow-tasks-line, #w-action .flow-step, #w-program-options .function-actions > .checkbox-field) { transition: none !important; }
+:root[data-animations="off"] :is(#w-data .flow-tasks-line, :is(#w-action, #w-plugin-run) .flow-step, #w-program-options .function-actions > .checkbox-field) { transition: none !important; }
 @media (prefers-reduced-motion: reduce) {
-  :is(#w-data .flow-tasks-line, #w-action .flow-step, #w-program-options .function-actions > .checkbox-field) { transition: none !important; }
+  :is(#w-data .flow-tasks-line, :is(#w-action, #w-plugin-run) .flow-step, #w-program-options .function-actions > .checkbox-field) { transition: none !important; }
 }
 
 /* Spacing inside the program options (their rows are nested, not direct children). */
@@ -212,3 +214,25 @@
 /* The plugin card on the left already names it: no second heading, no centred box. */
 #w-plugin-options > .declarative-plugin { max-width: none !important; margin: 0 !important; padding: 0 !important; }
 #w-plugin-options .extension-heading { display: none !important; }
+
+/* Step 3 for a plugin run: its screen on the full width. */
+#w-plugin-run { max-width: none; padding: 0 !important; display: flex; flex-direction: column; }
+#w-plugin-run[hidden] { display: none !important; }
+#w-plugin-run > .flow-plugin-run-body { padding: 18px 22px; min-width: 0; }
+/* Never wider than the window: plugin groups shrink and wrap instead of overflowing. */
+#w-plugin-options, #w-plugin-options * { min-width: 0; }
+#w-plugin-options .extension-workbench { grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)) !important; }
+#w-plugin-options .extension-control > :is(button, .quiet-button, .primary-button) { max-width: 100%; white-space: normal; }
+
+/* Compact plugin settings in step 2 so they fit without scrolling. */
+#w-plugin-options[data-stage="settings"] .extension-group { padding: 12px 14px !important; }
+/* The chosen card on the left already names the settings. */
+#w-plugin-options[data-stage="settings"] .extension-group > h3 { display: none; }
+#w-plugin-options[data-stage="settings"] .extension-group .extension-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important; gap: 4px 12px !important; align-items: end; }
+#w-plugin-options[data-stage="settings"] .extension-span > p { margin: 2px 0 0; font-size: 12px; line-height: 1.4; }
+#w-plugin-options[data-stage="settings"] [data-element^="h-"] > p { margin-top: 6px; font-size: 10.5px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--accent); }
+#w-plugin-options[data-stage="settings"] .function-field { gap: 3px !important; }
+#w-plugin-options[data-stage="settings"] .function-field > span { font-size: 11px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#w-plugin-options[data-stage="settings"] :is(input:not([type="checkbox"]), select) { height: 28px !important; min-height: 0 !important; padding-block: 0 !important; font-size: 12.5px !important; }
+#w-plugin-options[data-stage="settings"] .checkbox-field { min-height: 28px; font-size: 12.5px; gap: 8px; }
+#w-plugin-options[data-stage="settings"] .extension-control > button { height: 28px !important; min-height: 0 !important; padding: 0 12px !important; font-size: 12px !important; }

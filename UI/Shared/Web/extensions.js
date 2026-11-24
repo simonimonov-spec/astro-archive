@@ -211,6 +211,7 @@
     // core look is unchanged while a plugin loads or has nothing to show.
     if(anchored){container.hidden=!c.elements?.length;const target=hostTargets.get(container);if(target)syncReplace(target);}
     else if(!c.elements?.length)grid.append(node('p','Добавката още не е предоставила данни.','settings-note'));
+    if(container.parentElement?.id==='w-plugin-options')window.AstroArchivePreparation?.pluginStage?.(stageOf(c));
   }
   function syncReplace(target){target.classList.toggle('plugin-replacing',(anchorHosts.get(target)||[]).some(host=>host.isConnected&&host.dataset.anchorMode==='replace'&&!host.hidden));}
   function clearAnchor(target){for(const host of anchorHosts.get(target)||[])host.remove();anchorHosts.delete(target);target.classList.remove('plugin-replacing');}
@@ -251,12 +252,14 @@
   }
   // Beta 1.3 UI: Preparation plugins show their settings in the right column of step 2, next to the other ways of working.
   const inlineHost=slot=>slot==='preparation'?$('w-plugin-options'):null;
+  // A document that starts with a group "settings" is set up next to the other ways of working (step 2); any other document is the run itself (step 3).
+  const stageOf=c=>{const first=(c.elements||[])[0];return !first||first.type==='group'&&first.id==='settings'?'settings':'run';};
   function selectInline(slot,id,notify){
     const host=inlineHost(slot);active[slot]=id;$(slot+'-content').hidden=false;$(slot+'-extensions').hidden=true;$(slot+'-extensions').replaceChildren();host.replaceChildren();
     for(const card of $('w-plugin-actions')?.querySelectorAll('[data-extension-key]')||[])card.setAttribute('aria-pressed',String(card.dataset.extensionKey===id));
     const current=approved(slot).find(x=>key(x.p,x.c)===id);
     if(current){const content=node('section',null,'declarative-plugin');host.append(content);mount(content,current.p,current.c);if(notify&&current.c.activate)U.call('plugin.ui.activate',{pluginId:current.p.id,contributionId:current.c.id,context:selection(slot)}).catch(error=>U.error(slot,error));}
-    window.AstroArchivePreparation?.plugin?.(current?id:null);
+    window.AstroArchivePreparation?.plugin?.(current?id:null);if(current)window.AstroArchivePreparation?.pluginStage?.(stageOf(current.c));
     if(notify)window.AstroArchiveSession?.changed('extensions');
   }
   // Leave an inline plugin without resetting the chosen data (pending field saves are sent first).
