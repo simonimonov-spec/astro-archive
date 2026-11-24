@@ -37,7 +37,9 @@ class Service:
         from Bridge.Plugins.downloads import Downloads
         from Backend.Foundation.updates import Updates
         self.downloads=Downloads(self.plugins);self.updates=Updates(self.store.folder/'Updates')
-        self._register_bridge();self.plugins.scan()
+        self._register_bridge()
+        self.plugin_update_problems = self.downloads.apply_pending() if desktop_actions else []
+        self.plugins.scan()
     def _register_bridge(self):
         self._core_handlers = {
             command: getattr(self, handler)
@@ -188,7 +190,7 @@ class Service:
         preferences=copy.deepcopy(self.settings.value['preferences'])
         return dict(preferences=preferences,themes=appearance_themes(),
             languages=[dict(id='bg',locale='bg',name='Български',messages={}),dict(id='en',locale='en',name='English',messages={})],
-            plugins=self.plugins.list(),pluginCatalog=self.downloads.list(),catalogProblem=self.downloads.problem,updates=dict(self.updates.value),problems=list(self.plugins.problems),backgroundDataUrl=self.settings.value.get('backgroundDataUrl'),pluginsFolder=str(self.plugins.folder),icons=self.settings.value.get('icons',[]))
+            plugins=self.plugins.list(),pluginCatalog=self.downloads.list(),catalogProblem=self.downloads.problem,updates=dict(self.updates.value),problems=[*self.plugin_update_problems,*self.plugins.problems],pluginUpdateProblems=self.plugin_update_problems,backgroundDataUrl=self.settings.value.get('backgroundDataUrl'),pluginsFolder=str(self.plugins.folder),icons=self.settings.value.get('icons',[]))
     def bootstrap(self):
         return dict(protocol=1,archives=[dict(a,structure=schema(self.settings,a['id'])) for a in self.settings.value['archives'] if not a.get('hidden') and (not a.get('ownerPlugin') or a['ownerPlugin'] in self.plugins.live)],ui=self.configuration(),activity=self.jobs.snapshot(),problem=None)
     def commit_archive_edit(self,p):

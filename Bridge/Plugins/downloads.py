@@ -1,21 +1,40 @@
 """Official GitHub catalogue and bounded, verified, non-executing downloads."""
 from __future__ import annotations
+from contextlib import contextmanager
 import hashlib
 import io
 import json
 from pathlib import Path, PurePosixPath
 import re
+import shutil
 import tempfile
 import threading
 import urllib.request
 import urllib.parse
+import uuid
 import zipfile
 
-from Backend.Foundation.runtime import ROOT, read_json, atomic_json
+from Backend.Foundation.runtime import ROOT, read_json, atomic_json, within
 
 REPOSITORY = 'simonimonov-spec/astro-archive'
 CATALOG_URL = f'https://raw.githubusercontent.com/{REPOSITORY}/refs/heads/main/docs/plugin-catalog.json'
 MAX_ARCHIVE = 32_000_000
+
+
+def version_key(value):
+    match = re.fullmatch(r'(?:(alpha|beta|rc|v)[ -]?)?(\d+(?:\.\d+)*)', value.strip(), re.IGNORECASE)
+    if not match:
+        return None
+    channel, number = match.groups()
+    parts = [int(part) for part in number.split('.')]
+    while len(parts) > 1 and parts[-1] == 0:
+        parts.pop()
+    return {'alpha': 0, 'beta': 1, 'rc': 2, 'v': 3, '': 3}[(channel or '').lower()], tuple(parts)
+
+
+def newer_version(current, offered):
+    installed, latest = version_key(current), version_key(offered)
+    return installed is not None and latest is not None and latest > installed
 
 
 def fetch(url, limit):
@@ -121,18 +140,94 @@ class Downloads:
     def list(self):
         installed = self.manager.records
         return [dict(item, installed=item['id'] in installed,
-                     updateAvailable=item['id'] in installed and installed[item['id']]['version'] != item['version']) for item in self.entries]
+                     updateAvailable=item['id'] in installed and newer_version(installed[item['id']]['version'], item['version'])) for item in self.entries]
+
+    def entry(self, ident):
+        item = next((entry for entry in self.entries if entry['id'] == ident), None)
+        if item is None:
+            raise ValueError('Плъгинът не е в официалния каталог. Обнови списъка.')
+        return item
+
+    def download(self, item, target):
+        data = fetch(f'https://codeload.github.com/{REPOSITORY}/zip/{item["commit"]}', MAX_ARCHIVE)
+        if hashlib.sha256(data).hexdigest() != item['sha256']:
+            raise ValueError('Изтеглянето не съвпада с проверения ZIP. Обнови каталога.')
+        unpack(data, target)
+        manifest = self.manager.manifest(target)
+        if manifest['id'] != item['id'] or manifest['version'] != item['version']:
+            raise ValueError('Версията или името на плъгина не съвпада с каталога.')
+        return manifest
 
     def install(self, ident):
         with self.lock:
-            item = next((e for e in self.entries if e['id'] == ident), None)
-            if item is None:raise ValueError('Плъгинът не е в официалния каталог. Обнови списъка.')
+            item = self.entry(ident)
             if ident in self.manager.records:raise FileExistsError('Първо изтрий инсталираната версия. Настройките се запазват.')
-            data = fetch(f'https://codeload.github.com/{REPOSITORY}/zip/{item["commit"]}', MAX_ARCHIVE)
-            if hashlib.sha256(data).hexdigest() != item['sha256']:raise ValueError('Изтеглянето не съвпада с проверения ZIP. Обнови каталога.')
             with tempfile.TemporaryDirectory(prefix='plugin-download-', dir=self.cache.parent) as folder:
                 target = Path(folder)
-                unpack(data, target)
-                manifest = self.manager.manifest(target)
-                if manifest['id'] != ident or manifest['version'] != item['version']:raise ValueError('Версията или името на плъгина не съвпада с каталога.')
+                self.download(item, target)
                 with self.manager.lock:return self.manager.install(target)
+
+    @contextmanager
+    def stage_update(self, ident, commit):
+        with self.lock:
+            item = self.entry(ident)
+            current = self.manager.records.get(ident)
+            if item['commit'] != commit or current is None or not newer_version(current['version'], item['version']):
+                raise ValueError('Версията е сменена или вече е инсталирана. Обнови списъка.')
+        with tempfile.TemporaryDirectory(prefix='.download-', dir=self.manager.folder) as folder:
+            staged = Path(folder)/'update'
+            package = staged/'package'
+            package.mkdir(parents=True)
+            manifest = self.download(item, package)
+            atomic_json(staged/'revisions.json', dict(old=current['uiRevision'], new=manifest['uiRevision']))
+            yield staged
+
+    def queue_update(self, ident, staged):
+        with self.manager.lock:
+            current = self.manager.manifest(within(self.manager.folder, ident))
+            if current['uiRevision'] != read_json(staged/'revisions.json')['old']:
+                raise ValueError('Инсталираният плъгин е променен. Провери папката и опитай отново.')
+            staged.rename(self.manager.folder/('.update-'+ident))
+
+    def apply_pending(self):
+        """Replace packages before loading any plug-in in the restarted desktop process."""
+        problems = []
+        for pending in self.manager.folder.glob('.update-*'):
+            ident = pending.name.removeprefix('.update-')
+            if not re.fullmatch(r'[a-z][a-z0-9_-]{0,63}', ident) or not pending.is_dir() or pending.is_symlink() or pending.is_junction():
+                continue
+            try:
+                self.apply_update(ident, pending)
+            except (OSError, ValueError, TypeError) as error:
+                problems.append(f'{ident}: {error}')
+        return problems
+
+    def apply_update(self, ident, pending):
+        package, previous = pending/'package', pending/'previous'
+        destination = self.manager.folder/ident
+        revisions = pending/'revisions.json'
+        if package.exists():
+            try:
+                expected = read_json(revisions, {})
+                new = self.manager.manifest(within(pending, 'package'))
+                old_path = within(pending, 'previous') if previous.exists() else within(self.manager.folder, ident)
+                old = self.manager.manifest(old_path)
+                if not isinstance(expected, dict) or new['id'] != ident or old['id'] != ident or new['uiRevision'] != expected.get('new') or old['uiRevision'] != expected.get('old'):
+                    raise ValueError('Файловете на плъгина са променени. Обновяването е прекратено.')
+                if not previous.exists():
+                    destination.rename(previous)
+                package.rename(destination)
+            except (OSError, ValueError, TypeError):
+                if previous.exists() and not destination.exists():
+                    previous.rename(destination)
+                pending.rename(self.manager.folder/('.failed-update-'+uuid.uuid4().hex))
+                raise
+        if previous.exists():
+            if not destination.exists():
+                previous.rename(destination)
+                raise ValueError('Обновяването е прекъснато. Възстановена е предишната версия.')
+            backup = self.cache.parent/'RemovedPlugins'/(ident+'-'+uuid.uuid4().hex)
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(previous), str(backup))
+        revisions.unlink(missing_ok=True)
+        pending.rmdir()

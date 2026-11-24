@@ -12,9 +12,11 @@
   let busy = false, generation = 0, languageStamp = "", currentImage = null;
   let messageKey = "", messageTone = "info";
   let selectedSettingsTab = "appearance";
+  let pluginUpdatePending = false;
   const pluginBrowser = window.AstroArchivePluginBrowser.create({
     controlsChanged: () => setBusy(busy),
     download: id => mutatePlugins('ui.plugins.download',{id}),
+    update: updatePlugin,
     toggle: async (id, enabled) => {const plugin=configuration.plugins.find(p=>p.id===id);if(enabled&&!await window.AstroArchiveFunctions.confirm('Включване на добавка',plugin.name+' изпълнява собствен Python код на този компютър. Включвай добавки от доверен източник. Заявени команди: '+((plugin.permissions||[]).map(p=>p.label).join('; ')||'Без достъп до основните команди.')+' Визуализацията се разрешава отделно.','Включи')){drawPlugins();return;}return mutatePlugins("ui.plugins.toggle", { id, enabled, confirmed:true, revision:plugin.uiRevision });},
     remove: async id => {if(await window.AstroArchiveFunctions.confirm('Премахване на добавка','Добавката ще се изключи и ще се прибере в резервната папка. Настройките ѝ се запазват.','Премахни'))return mutatePlugins("ui.plugins.remove", { id, confirmed:true });},
       permission: async (plugin, allowed) => {if(allowed&&!await window.AstroArchiveFunctions.confirm('Допълнение към интерфейса',plugin.name+' иска да добави: '+plugin.contributions.map(c=>c.title).join(', ')+'. Ще използва готовите компоненти и текущата тема на приложението.','Разреши'))return;return mutatePlugins("ui.plugins.permission", { id:plugin.id, revision:plugin.uiRevision, allowed });},
@@ -185,6 +187,62 @@
     } catch (error) { report(error); }
     finally { setBusy(false); }
   }
+  async function updatePlugin(plugin) {
+    if (busy || pluginUpdatePending || !bindings?.desktop || appearanceOnly()) return;
+    const ui = window.AstroArchiveFunctions;
+    pluginUpdatePending = true;
+    let accepted = false, updating = false;
+    try {
+      if (!await ui.confirm(t('plugins.update'), t('plugins.updateConfirm', plugin), t('plugins.updateRestart'))) return;
+      if (busy) return;
+      updating = true;
+      setBusy(true);
+      const status = ui.node('p', t('plugins.updateDownloading'));
+      status.setAttribute('role', 'status');
+      const dialog = ui.modal(t('plugins.update'), body => body.append(status));
+      try {
+        const result = await bindings.call('ui.plugins.update', { id: plugin.id, commit: plugin.commit, confirmed: true });
+        if (result?.accepted !== true) throw new Error(t('diagnostics.restartFailed'));
+        accepted = true;
+        status.textContent = t('diagnostics.restarting');
+        setTimeout(() => window.close(), 1200);
+      } catch (error) {
+        dialog.close();
+        ui.modal(t('plugins.updateFailed'), body => body.append(ui.node('p', error.message, 'error-banner')));
+      }
+    } finally {
+      if (!accepted) {
+        pluginUpdatePending = false;
+        if (updating) setBusy(false);
+      }
+    }
+  }
+
+  async function checkPluginUpdates() {
+    const problems = configuration.pluginUpdateProblems || [];
+    let updates = [];
+    try {
+      const result = await bindings.call('ui.plugins.catalog');
+      configuration.pluginCatalog = result.pluginCatalog;
+      configuration.catalogProblem = result.catalogProblem;
+      drawPlugins();
+      $('ui-plugin-catalog-status').textContent = result.catalogProblem || t('plugins.catalogChecked');
+      if (!result.catalogProblem) updates = result.pluginCatalog.filter(plugin => plugin.updateAvailable);
+    } catch (_) { /* A failed startup request can be retried from Settings. */ }
+    if (!updates.length && !problems.length) return;
+    const ui = window.AstroArchiveFunctions;
+    ui.modal(t(updates.length ? 'plugins.updatesTitle' : 'plugins.updateFailed'), body => {
+      for (const problem of problems) body.append(ui.node('p', problem, 'error-banner'));
+      for (const plugin of updates) {
+        const row = ui.node('div', null, 'plugin-actions');
+        const button = ui.node('button', t('plugins.update'), 'primary-button');
+        button.type = 'button';
+        button.addEventListener('click', () => updatePlugin(plugin));
+        row.append(ui.node('span', t('plugins.updateNotice', plugin)), button);
+        body.append(row);
+      }
+    });
+  }
   function preview() {
     if (busy) return;
     const color = $("ui-background-hex").value;
@@ -339,7 +397,7 @@
     connect(value) { bindings = value; window.AstroArchiveCustomization?.connect(value); },
     customizationChanged: preview,
     addIcon(icon) { configuration.icons ||= []; if (!configuration.icons.some(i => i.fileName === icon.fileName)) configuration.icons.push(icon); },
-    initialize(data) { accept(data); if(bindings?.desktop&&!window.AstroArchiveRemote)setTimeout(()=>{checkUpdates();monitorUpdateDownload();bindings.call('ui.plugins.catalog').then(result=>{configuration.pluginCatalog=result.pluginCatalog;configuration.catalogProblem=result.catalogProblem;drawPlugins();$('ui-plugin-catalog-status').textContent=result.catalogProblem||'Каталогът в GitHub е проверен.';}).catch(()=>{});},500); },
+    initialize(data) { accept(data); if(bindings?.desktop&&!window.AstroArchiveRemote)setTimeout(()=>{checkUpdates();monitorUpdateDownload();checkPluginUpdates();},500); },
     close, open, showTab, refreshAppearance,
     get isOpen() { return $("settings-dialog").open; }
   };

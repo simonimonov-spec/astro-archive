@@ -11,11 +11,11 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
-from Backend.Foundation.runtime import Events, Settings, Store
+from Backend.Foundation.runtime import Events, Jobs, Settings, Store
 from Backend.Foundation.updates import Updates
 from Bridge.Plugins.contracts import PluginGateway
 from Bridge.Plugins.manager import PluginManager
-from Bridge.Plugins.downloads import Downloads, unpack, validate, REPOSITORY
+from Bridge.Plugins.downloads import Downloads, newer_version, unpack, validate, REPOSITORY
 
 
 def archive(files):
@@ -68,6 +68,106 @@ class DownloadTests(unittest.TestCase):
         self.entry['version']='Beta-1'
         with patch('Bridge.Plugins.downloads.fetch',return_value=self.data),self.assertRaises(ValueError):self.downloads.install('sample')
         self.assertFalse(self.manager.folder.exists())
+
+    def install_and_offer_update(self):
+        with patch('Bridge.Plugins.downloads.fetch', return_value=self.data):
+            self.downloads.install('sample')
+        data = archive({'plugin.json': json.dumps(dict(id='sample', apiVersion=1, name='Sample',
+                        description='Updated', version='V-2')), 'main.py': 'raise RuntimeError("must not auto-enable")'})
+        self.entry = dict(self.entry, version='V-2', commit='2'*40, sha256=hashlib.sha256(data).hexdigest())
+        self.downloads.entries = [self.entry]
+        return data
+
+    def test_update_is_staged_then_replaces_package_before_startup_scan(self):
+        data = self.install_and_offer_update()
+        settings = self.manager.settings_path('sample')
+        settings.write_text('{"keep":true}')
+        self.manager.state('sample').update(enabled=True, uiAllowed=True, revision=self.manager.records['sample']['uiRevision'])
+        self.assertTrue(self.downloads.list()[0]['updateAvailable'])
+        with patch('Bridge.Plugins.downloads.fetch', return_value=data), self.downloads.stage_update('sample', self.entry['commit']) as staged:
+            self.downloads.queue_update('sample', staged)
+        self.assertEqual(self.manager.manifest(self.manager.folder/'sample')['version'], 'V-1')
+        self.assertEqual(self.downloads.apply_pending(), [])
+        self.manager.scan()
+        self.assertEqual(self.manager.records['sample']['version'], 'V-2')
+        self.assertEqual(self.manager.live, {})
+        self.assertFalse(self.manager.state('sample')['uiAllowed'])
+        self.assertEqual(settings.read_text(), '{"keep":true}')
+        backup, = (self.downloads.cache.parent/'RemovedPlugins').iterdir()
+        self.assertEqual(self.manager.manifest(backup)['version'], 'V-1')
+        self.assertFalse(self.downloads.list()[0]['updateAvailable'])
+        self.assertEqual(self.downloads.apply_pending(), [])
+
+    def test_failed_swap_restores_previous_package(self):
+        data = self.install_and_offer_update()
+        with patch('Bridge.Plugins.downloads.fetch', return_value=data), self.downloads.stage_update('sample', self.entry['commit']) as staged:
+            self.downloads.queue_update('sample', staged)
+        original_rename = Path.rename
+
+        def fail_package_rename(path, target):
+            if path.name == 'package':
+                raise PermissionError('locked')
+            return original_rename(path, target)
+
+        with patch.object(Path, 'rename', fail_package_rename):
+            self.assertEqual(self.downloads.apply_pending(), ['sample: locked'])
+        self.assertEqual(self.manager.manifest(self.manager.folder/'sample')['version'], 'V-1')
+        self.assertEqual(self.downloads.apply_pending(), [])
+
+    def test_startup_resumes_update_interrupted_between_package_moves(self):
+        data = self.install_and_offer_update()
+        with patch('Bridge.Plugins.downloads.fetch', return_value=data), self.downloads.stage_update('sample', self.entry['commit']) as staged:
+            self.downloads.queue_update('sample', staged)
+        pending = self.manager.folder/'.update-sample'
+        (self.manager.folder/'sample').rename(pending/'previous')
+        self.assertEqual(self.downloads.apply_pending(), [])
+        self.assertEqual(self.manager.manifest(self.manager.folder/'sample')['version'], 'V-2')
+        self.assertFalse(pending.exists())
+
+    def test_corrupt_or_stale_update_never_reaches_restart(self):
+        from Bridge.Desktop.host import restart_for_plugin_update
+
+        self.install_and_offer_update()
+        self.manager.service.downloads = self.downloads
+        self.manager.service.jobs = Jobs(self.manager.events)
+        self.addCleanup(self.manager.service.jobs.pool.shutdown)
+        with patch('Bridge.Desktop.host.prepare_restart') as restart, patch('Bridge.Plugins.downloads.fetch', return_value=b'corrupted'):
+            for commit in ('1'*40, self.entry['commit']):
+                with self.subTest(commit=commit), self.assertRaises(ValueError):
+                    restart_for_plugin_update(self.manager.service, dict(id='sample', commit=commit))
+            restart.assert_not_called()
+        self.assertFalse(self.manager.service.jobs.restarting)
+        self.assertEqual(self.manager.manifest(self.manager.folder/'sample')['version'], 'V-1')
+        self.assertFalse(list(self.manager.folder.glob('.update-*')))
+
+    def test_busy_app_and_unavailable_restart_leave_update_unqueued(self):
+        from Bridge.Desktop.host import restart_for_plugin_update
+
+        data = self.install_and_offer_update()
+        service = self.manager.service
+        service.downloads = self.downloads
+        service.jobs = Jobs(self.manager.events)
+        self.addCleanup(service.jobs.pool.shutdown)
+        params = dict(id='sample', commit=self.entry['commit'])
+        with patch('Bridge.Plugins.downloads.fetch', return_value=data), patch('Bridge.Desktop.host.prepare_restart', side_effect=OSError('restart unavailable')) as restart:
+            service.jobs.enter_call()
+            try:
+                with self.assertRaises(ValueError):
+                    restart_for_plugin_update(service, params)
+                restart.assert_not_called()
+            finally:
+                service.jobs.leave_call()
+            with self.assertRaises(OSError):
+                restart_for_plugin_update(service, params)
+        self.assertFalse(service.jobs.restarting)
+        self.assertFalse(list(self.manager.folder.glob('.update-*')))
+
+    def test_update_comparison_does_not_offer_downgrades_or_aliases(self):
+        self.assertTrue(newer_version('V-2.9', 'V-2.10'))
+        self.assertTrue(newer_version('Beta-1', 'Beta-2'))
+        self.assertFalse(newer_version('V-2.3', 'V-2.2'))
+        self.assertFalse(newer_version('V-2', '2.0'))
+        self.assertFalse(newer_version('V-2', 'unknown'))
 
     def test_offline_refresh_preserves_catalog_and_reports_problem(self):
         with patch('Bridge.Plugins.downloads.fetch',side_effect=OSError):self.downloads.refresh()

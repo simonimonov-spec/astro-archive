@@ -37,6 +37,33 @@ def prepare_restart(root=ROOT):
         raise RuntimeError('Помощният процес не е готов. Програмата остава отворена.')
     process.stdout.close();return process
 
+
+def schedule_restart(service, update=None):
+    service.jobs.begin_restart()
+    helper = None
+    try:
+        helper = prepare_restart()
+        if update is not None:
+            service.downloads.queue_update(*update)
+    except BaseException:
+        try:
+            if helper is not None:
+                helper.terminate()
+        finally:
+            service.jobs.abort_restart()
+        raise
+
+
+def restart_for_plugin_update(service, parameters):
+    ident, commit = parameters.get('id'), parameters.get('commit')
+    if not isinstance(ident, str) or not isinstance(commit, str):
+        raise ValueError('Невалидна заявка за обновяване на плъгин.')
+    # Keep normal requests available during the download. Reserve the restart
+    # only when the verified package is ready and the app has no active work.
+    with service.downloads.stage_update(ident, commit) as staged:
+        schedule_restart(service, (ident, staged))
+
+
 class Handler(BaseHTTPRequestHandler):
     # FITS tile exchange uses many bounded RPCs; keep one local connection
     # instead of exhausting Windows ephemeral sockets with per-tile handshakes.
@@ -90,13 +117,13 @@ class Handler(BaseHTTPRequestHandler):
             ident=request.get('id');method=request.get('method');parameters=request.get('params',{})
             if not isinstance(method,str) or not isinstance(parameters,dict):raise ValueError('Невалидна команда.')
             try:
-                if method=='python.app.restart':
+                if method in ('python.app.restart', 'ui.plugins.update'):
                     if request.get('version')!=1 or not isinstance(ident,str) or not 0<len(ident)<=80:raise ValueError('Невалиден протокол на заявката.')
                     if parameters.get('confirmed') is not True:raise ValueError('Потвърди рестартирането.')
-                    self.server.service.jobs.begin_restart()
-                    try:prepare_restart()
-                    except BaseException:
-                        self.server.service.jobs.abort_restart();raise
+                    if method == 'ui.plugins.update':
+                        restart_for_plugin_update(self.server.service, parameters)
+                    else:
+                        schedule_restart(self.server.service)
                     try:self.send(200,dict(type='response',version=1,id=ident,ok=True,result=dict(accepted=True)))
                     finally:threading.Thread(target=self.server.shutdown,daemon=True).start()
                     return

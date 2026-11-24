@@ -55,7 +55,8 @@
           item.setAttribute("aria-selected", String(plugin.id === selectedId)); item.tabIndex = plugin.id === selectedId ? 0 : -1;
           const copy = node("span", "plugin-choice-copy");
           const summary = node("span", "plugin-choice-description", plugin.description); summary.title = plugin.description;
-          const status = node("span", "plugin-state", state(plugin)); status.dataset.enabled = String(plugin.enabled);
+          const label = plugin.update ? t('plugins.updateAvailable', { version: plugin.update.version }) : state(plugin);
+          const status = node("span", "plugin-state", label); status.dataset.enabled = String(plugin.enabled);
           copy.append(node("span", "plugin-choice-name", plugin.name), summary, status);
           item.append(logo(plugin), copy); fragment.append(item);
         }
@@ -83,7 +84,12 @@
           const download=actionButton('Изтегли от GitHub',()=>actions.download(plugin.id),'primary-button');
           panel.append(download);actions.controlsChanged();return;
         }
-        if(plugin.updateAvailable)panel.append(node('p','settings-note','Налична е версия '+plugin.latestVersion+'. За обновяване изтрий текущия плъгин и изтегли новия. Настройките се запазват.'));
+        if (plugin.update) {
+          const update = node('div', 'plugin-actions');
+          update.append(node('span', 'plugin-meta', t('plugins.updateAvailable', { version: plugin.update.version })),
+            actionButton(t('plugins.update'), () => actions.update(plugin.update), 'primary-button'));
+          panel.append(update);
+        }
         const toggleLabel = node("label", "checkbox-field plugin-toggle"), toggle = node("input");
         toggle.type = "checkbox"; toggle.checked = !!plugin.enabled; lock(toggle, plugin);
         toggle.addEventListener("change", () => actions.toggle(plugin.id, toggle.checked));
@@ -128,7 +134,7 @@
       return {
         render(configuration) {
           const installed=configuration.plugins || [],catalog=configuration.pluginCatalog || [];
-          plugins = installed.map(p=>({...p,installed:true,updateAvailable:catalog.find(c=>c.id===p.id)?.updateAvailable,latestVersion:catalog.find(c=>c.id===p.id)?.version}));
+          plugins = installed.map(p => ({ ...p, installed: true, update: catalog.find(c => c.id === p.id && c.updateAvailable) }));
           plugins.push(...catalog.filter(c=>!installed.some(p=>p.id===c.id)).map(c=>({...c,installed:false,available:true})));
           if (!plugins.some(plugin => plugin.id === selectedId)) selectedId = plugins[0]?.id || null;
           drawList(); drawDetails();

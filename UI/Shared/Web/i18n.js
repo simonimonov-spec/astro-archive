@@ -61,7 +61,12 @@
     "plugins.empty": "Няма намерени плъгини. Постави модул в Plugins и провери папката отново.",
     "plugins.select": "Избери плъгин от списъка, за да видиш описанието и настройките му.",
     "plugins.activation": "Включи плъгина", "plugins.unavailable": "Недостъпен", "plugins.running": "Работи",
-    "plugins.runningNote": "Плъгинът обработва задача. Настройките и изключването ще са достъпни след приключването ѝ."
+    "plugins.runningNote": "Плъгинът обработва задача. Настройките и изключването ще са достъпни след приключването ѝ.",
+    "plugins.update": "Обнови", "plugins.updateRestart": "Обнови и рестартирай", "plugins.updatesTitle": "Нови версии на плъгини",
+    "plugins.updateAvailable": "Налична е версия {version}", "plugins.updateNotice": "{name} · нова версия {version}",
+    "plugins.updateConfirm": "Приложението ще изтегли {name} {version} и ще се рестартира. Настройките се запазват. След рестарта прегледай и включи новата версия, за да я използваш.",
+    "plugins.updateDownloading": "Изтегляне и проверка на плъгина…", "plugins.updateFailed": "Обновяването на плъгина не завърши",
+    "plugins.catalogChecked": "Каталогът в GitHub е проверен."
   });
   Object.assign(en, {
     "settings.title": "Settings", "settings.sections": "Settings sections", "settings.customization": "Customization", "settings.languageTab": "Language", "settings.done": "Close",
@@ -70,7 +75,12 @@
     "plugins.empty": "No plugins found. Place a module in Plugins and scan the folder again.",
     "plugins.select": "Select a plugin to see its description and settings.",
     "plugins.activation": "Enable plugin", "plugins.unavailable": "Unavailable", "plugins.running": "Running",
-    "plugins.runningNote": "The plugin is processing a task. Settings and deactivation will be available when it finishes."
+    "plugins.runningNote": "The plugin is processing a task. Settings and deactivation will be available when it finishes.",
+    "plugins.update": "Update", "plugins.updateRestart": "Update and restart", "plugins.updatesTitle": "Plugin updates available",
+    "plugins.updateAvailable": "Version {version} available", "plugins.updateNotice": "{name} · new version {version}",
+    "plugins.updateConfirm": "The app will download {name} {version} and restart. Your settings are kept. Review and enable the new version after restart to use it.",
+    "plugins.updateDownloading": "Downloading and verifying the plugin…", "plugins.updateFailed": "Plugin update could not finish",
+    "plugins.catalogChecked": "The GitHub catalogue has been checked."
   });
   Object.assign(bg, {
     "settings.storage": "Папки и програми…", "archive.import": "Внеси файлове ▾", "archive.onlyFrames": "Само кадри",
