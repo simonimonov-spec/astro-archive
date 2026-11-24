@@ -33,7 +33,7 @@
       const timeout = setTimeout(() => {
         pending.delete(id);
         reject(new Error(t("error.timeout")));
-      }, ['plugin.call','archive.summary','archive.summary.refresh','archive.audit','image.open','function.image','viewer.render','viewer.neighbor'].includes(method) ? 86_400_000 : /^(analysis\.(run|stack\.run|noise|photometry|coverage)|preparation\.(start|finish|auto|add|cancel)|analysis\.(trash\.|toqueue|redo))/.test(method) ? 86_400_000 : 60_000);
+      }, ['plugin.call','archive.summary','archive.summary.refresh','archive.audit','image.open','function.image','viewer.render','viewer.neighbor','viewer.compare'].includes(method) ? 86_400_000 : /^(analysis\.(run|stack\.run|noise|photometry|coverage)|preparation\.(start|finish|auto|add|cancel)|analysis\.(trash\.|toqueue|redo))/.test(method) ? 86_400_000 : 60_000);
       pending.set(id, { resolve, reject, timeout });
       try { webview.postMessage({ version: 1, id, method, params }); }
       catch (error) { clearTimeout(timeout); pending.delete(id); reject(error); }
@@ -119,6 +119,7 @@
     window.AstroArchiveFunctions.languageChanged();
     window.AstroArchiveMonitoring.translate();
     window.AstroArchiveViewer.languageChanged();
+    window.AstroArchiveViewerWorkbench.languageChanged();
     window.AstroArchiveExtensions.theme();
     archiveNavigation?.translate(); drawBreadcrumbs();
     if (!state.entered && state.folder) { loadFolder(); return; }
@@ -203,7 +204,7 @@
     if (entry.kind === "folder") { navigateFolder(archiveId, entry.relativePath); return; }
     if (!["fits", "image"].includes(entry.kind)) return;
     try {
-      await call("image.open", { archiveId, relativePath: entry.relativePath });
+      await call("image.open", { archiveId: entry.archiveId || archiveId, relativePath: entry.relativePath });
       log(t("file.opened", { name: entry.name }));
     } catch (error) { problem(error); }
   }
@@ -247,6 +248,7 @@
         if(entry.details?.kind==='stack'&&entry.id){const source=element('button','row-action','Изходни нощи');source.type='button';source.onclick=event=>{event.stopPropagation();window.AstroArchiveArchiveSchema.sourceNights(entry.id).catch(problem);};actionCell.append(source);}
       }
       row.append(actionCell);
+      window.AstroArchiveViewerWorkbench?.attachArchiveDrag(row, entry, folder.archiveId);
       row.addEventListener('contextmenu',event=>{if(window.AstroArchivePython?.entry){event.preventDefault();window.AstroArchivePython.entry(entry.archiveId||folder.archiveId,entry);}});
       window.AstroArchiveRemote?.decorateEntry(actionCell,folder,entry);
       row.addEventListener("dblclick", () => activateEntry(folder.archiveId, entry));
@@ -413,6 +415,8 @@
   $("archive-import").disabled = !webview;
   window.AstroArchiveFunctions.connect({ call, log, desktop: !!webview, navigate: showRoute });
   window.AstroArchiveViewer.connect({call});
+  window.AstroArchiveViewerWorkbench.connect({call, files:()=>state.folder?.entries
+    .map(entry=>window.AstroArchiveViewerWorkbench.file(entry,state.folder.archiveId)).filter(Boolean) || []});
   window.AstroArchiveExtensions.connect({call});
   archiveNavigation = window.AstroArchiveArchiveNavigation.create({call, name: archiveName, navigate: navigateFolder, home: showArchiveHome, problem});
   window.AstroArchiveMonitoring.connect({call, desktop: !!webview});

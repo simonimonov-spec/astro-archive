@@ -76,7 +76,13 @@
   P.provenance=async id=>{const graph=await P.call('archive.provenance',{id});U.modal('Произход на резултата',body=>{const visit=(row,depth=0)=>{const section=node('div');section.style.marginLeft=Math.min(depth,5)*18+'px';section.append(node('strong',row.name||row.id),node('p',row.relativePath||'Липсващ или вече показан източник','function-note'));if(row.archiveId){section.append(button('Към папката',()=>{document.querySelectorAll('.function-dialog').forEach(d=>d.close());window.AstroArchiveArchiveView.navigate(row.archiveId,row.relativePath.split('/').slice(0,-1).join('/'));P.navigate('archive');}),button('Преглед',()=>P.image(row.id)));}body.append(section);for(const child of row.sources||[])visit(child,depth+1);};visit(graph);});};
   P.entry=async(archiveId,entry)=>{try{U.modal(entry.name,(body,dialog)=>{
     if(entry.kind==='archive')body.append(button('Внеси файлове в този архив…',()=>P.task('archive.import',{archiveId})),button('Внеси папка в този архив…',()=>P.task('archive.import',{archiveId,folder:true})));
-    if(['fits','image'].includes(entry.kind)){body.append(button('Преглед',async()=>{dialog.close();if(entry.id)await P.image(entry.id);else await P.call('image.open',{archiveId,relativePath:entry.relativePath});}));}
+    if(['fits','image'].includes(entry.kind)){
+      body.append(button('Преглед',async()=>{dialog.close();if(entry.id)await P.image(entry.id);else await P.call('image.open',{archiveId,relativePath:entry.relativePath});}));
+      const workbench=window.AstroArchiveViewerWorkbench, image=workbench?.file(entry,archiveId);
+      if(image && !window.AstroArchiveRemote)body.append(button(U.tr('Отвори в нов преглед','Open in a new viewer'),()=>{
+        dialog.close();workbench.openImage(image);
+      }));
+    }
     body.append(button('Редактирай информацията…',async()=>{await window.AstroArchiveArchiveSchema.edit(archiveId,entry);dialog.close();}));
     if(entry.id&&(entry.details?.sourceFiles?.length||entry.details?.kind==='stack'))body.append(button('От кои кадри / стакове е направен',async()=>{dialog.close();await P.provenance(entry.id);}));
     if(entry.details?.kind==='stack'&&entry.id)body.append(button('Намери нощите с изходните кадри',async()=>{const nights=await P.call('archive.source.nights',{id:entry.id});U.modal('Изходни наблюдателни нощи',content=>{if(!nights.length)content.append(node('p','Няма намерена връзка с изходни кадри. Попълни обект, телескоп и наблюдателна нощ или внеси резултат през подготовката.'));for(const night of nights)content.append(button(night.name,()=>{document.querySelectorAll('.function-dialog').forEach(d=>d.close());window.AstroArchiveArchiveView.navigate(night.archiveId,night.relativePath);}));});}));

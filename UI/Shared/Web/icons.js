@@ -13,6 +13,13 @@
   flipY:'<path d="m7 3 10 6H7Zm0 18 10-6H7Z"/><path d="M3 12h18" stroke-dasharray="2 3" opacity=".55"/>',
   panel:'<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M14 4v16m3-11h1m-1 4h1m-1 4h1"/><path d="m6 14 2-3 3 4" opacity=".55"/>',
   close:'<path d="m7 7 10 10M17 7 7 17"/>',
+  add:'<path d="M12 5v14M5 12h14"/>',
+  minimize:'<path d="M5 16h14"/>',
+  maximize:'<rect x="5" y="5" width="14" height="14" rx="1"/>',
+  detach:'<path d="M13 4h7v7m0-7-9 9M10 5H5a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-5"/>',
+  dock:'<path d="M17 4h3v8h-8m8 0-8-8M10 5H5a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-4"/>',
+  up:'<path d="M12 19V5m-5 5 5-5 5 5"/>',
+  down:'<path d="M12 5v14m-5-5 5 5 5-5"/>',
   reset:'<path d="M5 8a8 8 0 1 1-1 8M5 8H1m4 0V4"/><path d="M9 12h6m-3-3v6" opacity=".55"/>',
   header:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Zm0 0v6h6M8 12h8m-8 4h5"/>',
   download:'<path d="M12 3v12m-4-4 4 4 4-4M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>'

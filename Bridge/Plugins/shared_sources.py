@@ -195,10 +195,10 @@ class SharedSources:
         cache = self.service.plugins.settings_path(PLUGIN).parent / "ViewerCache"
         return within(cache, result["cacheFile"])
 
-    def open(self, archive, relative):
+    def open(self, archive, relative, comparison=False):
         path = self.materialize(archive, relative)
         return self.service.viewer.open(path, self.file_id(archive, self.get(archive)["id"], relative),
-                                        can_navigate=False, display_name=Path(relative).name)
+                                        can_navigate=False, display_name=Path(relative).name, comparison=comparison)
 
     def import_file(self, archive, path, fingerprint, context, source):
         if source != self.get(archive):

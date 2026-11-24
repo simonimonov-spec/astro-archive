@@ -57,6 +57,7 @@ class Service:
             'ui.session.sources':lambda p:self.session.sources(p),
             'ui.appearance.get':lambda p:self.configuration(),
             'ui.appearance.save':lambda p:save_appearance(self,p),
+            'viewer.compare':self.compare_viewer,
             'archive.filtered':lambda p:self.catalog.filtered(p.get('filters',{}),p.get('offset',0),p.get('search','')),
             'archive.shared.choices':lambda p:self.shared_sources.choices(p['archiveId']),
             'archive.shared.bind':lambda p:self.shared_sources.bind(p['archiveId'],p['sourceId']),
@@ -480,15 +481,33 @@ class Service:
         if method=='python.analysis.result':return self.quality.load(p['id'],bool(p.get('compact')))
         raise ValueError('Неподдържана команда: '+method)
 
+    def open_viewer(self, p, comparison=False):
+        if p.get('id','').startswith('shared-'):
+            row=self.catalog.record(p['id'])
+            return self.shared_sources.open(row['archive'],row['relative'],comparison=comparison)
+        if not p.get('id') and self.shared_sources.get(p.get('archiveId')):
+            return self.shared_sources.open(p['archiveId'],p['relativePath'],comparison=comparison)
+        path=self.catalog.path(p['id']) if p.get('id') else self.catalog.resolve(p['archiveId'],p['relativePath'])
+        return self.viewer.open(path,p.get('id'),comparison=comparison)
+
+    def compare_viewer(self, p):
+        action = p.get('action')
+        if action == 'open':
+            original_id = p.get('sourceFrameId')
+            if original_id:
+                source = self.viewer.get(original_id)
+                return self.viewer.open(source['path'], source['sourceId'], source['canNavigate'], source['name'], comparison=True)
+            return self.open_viewer(p, comparison=True)
+        if action == 'close':
+            return self.viewer.close(p['id'],comparison=True)
+        if action not in ('render','pixel','header','neighbor'):
+            raise ValueError('Непозната команда за сравнение.')
+        if not self.viewer.get(p['id']).get('comparison'):
+            raise ValueError('Изображението не е от работното пространство за сравнение.')
+        return self._viewer_command('viewer.'+action,p)
+
     def _viewer_command(self, method, p):
-        if method in ('function.image','image.open'):
-            if p.get('id','').startswith('shared-'):
-                row=self.catalog.record(p['id'])
-                return self.shared_sources.open(row['archive'],row['relative'])
-            if not p.get('id') and self.shared_sources.get(p.get('archiveId')):
-                return self.shared_sources.open(p['archiveId'],p['relativePath'])
-            path=self.catalog.path(p['id']) if p.get('id') else self.catalog.resolve(p['archiveId'],p['relativePath'])
-            return self.viewer.open(path,p.get('id'))
+        if method in ('function.image','image.open'):return self.open_viewer(p)
         if method=='viewer.render':return self.viewer.render(p['id'],p.get('options',{}),p.get('edge',1600),p.get('debayer'),p.get('pattern'))
         if method=='viewer.pixel':return self.viewer.pixel(p['id'],p['x'],p['y'])
         if method=='viewer.header':return self.viewer.header(p['id'])
