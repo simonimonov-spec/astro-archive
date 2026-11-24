@@ -131,6 +131,10 @@
         "destination": "Bridge/Desktop/host.py"
       },
       {
+        "source": "Bridge/Desktop/startup-locales.json",
+        "destination": "Bridge/Desktop/startup-locales.json"
+      },
+      {
         "source": "Bridge/Desktop/restart_wait.py",
         "destination": "Bridge/Desktop/restart_wait.py"
       },

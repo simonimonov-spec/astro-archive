@@ -1,6 +1,7 @@
 "use strict";
 (() => {
   const $ = id => document.getElementById(id);
+  const i18n=window.AstroArchiveI18n, t=i18n.t;
   const tr = (bg, en) => !window.AstroArchiveI18n.isBulgarian ? en : bg;
   let api, usage = null, disk = null, selection = null, summary = null, recovery = null;
   let summaryKey, summaryVersion = 0, resourceBusy = false, diskBusy = false, pendingBusy = false;
@@ -60,12 +61,12 @@
     const barOther = disk && appShare == null ? percent(disk.totalBytes - disk.freeBytes, disk.totalBytes) : otherShare;
     meter('header-disk-meter', barApp, barOther); meter('diagnostic-disk-meter', barApp, barOther);
     const volume = disk?.volume.replace(/[\\/]/g, '');
-    const label = disk ? (volume ? `${disk.name} (${volume})` : disk.name) : tr('Архивен диск', 'Archive drive');
-    const diskStatus = diskError || (selection?.sharedId && diskTime) ? tr('Дискът не е достъпен', 'Drive unavailable')
-      : selection?.enabled && selection.sharedId ? tr('Проверка на диска…', 'Checking drive…')
-      : tr('Избери архив', 'Select an archive');
+    const label = disk ? (volume ? `${disk.name} (${volume})` : disk.name) : t('archive.disk.drive');
+    const diskStatus = diskError || (selection?.sharedId && diskTime) ? t('archive.disk.unavailable')
+      : selection?.enabled && selection.sharedId ? t('archive.disk.checking')
+      : t('folder.choose');
     set('header-disk-title', label); set('resource-disk-name', label);
-    set('header-disk-free', disk ? `${bytes(disk.freeBytes)} ${tr('свободни от', 'free of')} ${bytes(disk.totalBytes)}` : diskStatus);
+    set('header-disk-free', disk ? t('archive.disk.freeOf',{free:bytes(disk.freeBytes),total:bytes(disk.totalBytes)}) : diskStatus);
     set('header-disk-detail', disk ? `${tr('Архив', 'Archive')} ${disk.reading || disk.skipped ? '≈ ' : ''}${bytes(disk.archiveBytes)} · ${tr('Други', 'Others')} ${bytes(other)}` : selection?.sharedId ? diskError : '');
     set('resource-disk-app', tr('Архив: ', 'Archive: ') + bytes(disk?.archiveBytes) + ' · ' + pct(appShare));
     set('resource-disk-other', tr('Други: ', 'Others: ') + bytes(other) + ' · ' + pct(otherShare));
@@ -73,7 +74,7 @@
     const description = tr('Зелено: избраният архив. Виолетово: други файлове. Сиво: свободно място. Размерът на архива е ориентировъчен сбор на файловете.', 'Green: selected archive. Violet: other files. Gray: free space. Archive size is an approximate sum of file sizes.')
       + (disk && appShare == null ? tr('\nРазмерът на архива се изчислява; засега цялото заето място е виолетово.', '\nArchive size is being calculated; all occupied space is temporarily violet.') : '') + (disk?.problem ? '\n' + disk.problem : '');
     $('resource-monitor').title = diskError || description; $('resource-disk-row').title = diskError || description;
-    $('header-disk-meter').setAttribute('aria-label', `${label}: ${bytes(disk?.freeBytes)} ${tr('свободни', 'free')}`);
+    $('header-disk-meter').setAttribute('aria-label', `${label} · ${t('archive.disk.free',{free:bytes(disk?.freeBytes)})}`);
     $('diagnostic-disk-meter').setAttribute('aria-label', description);
     $('resource-monitor').dataset.low = String(!!disk && disk.freeBytes < Math.max(512 * 1024 ** 2, disk.totalBytes * .01));
     $('disk-refresh').disabled = !selection?.enabled || !!disk?.reading || diskBusy;
@@ -132,29 +133,27 @@
       if (version !== summaryVersion) return; summary = value; renderSummary();
     } catch (error) {
       if (version !== summaryVersion || error.cancelled) return;
-      renderSummary(); set('summary-state', tr('Няма достъпна статистика', 'Statistics unavailable')); $('summary-state').title = error.message;
+      renderSummary(); set('summary-state', t('archive.summary.unavailable')); $('summary-state').title = error.message;
     } finally { if (version === summaryVersion) summaryReading = false; }
   }
   function duration(seconds) {
-    if (!Number.isFinite(seconds)) return '—';
-    const h = Math.floor(seconds / 3600), m = Math.floor(seconds / 60) % 60, s = seconds % 60;
-    return tr(`${n(h, 0)} ч ${n(m, 0)} м ${n(s, Number.isInteger(s) ? 0 : 2)} с`, `${n(h, 0)} h ${n(m, 0)} m ${n(s, Number.isInteger(s) ? 0 : 2)} s`);
+    return i18n.duration(seconds);
   }
   function renderSummary(loading = false) {
-    set('summary-heading', tr('ИЗБРАНА ПАПКА', 'SELECTED FOLDER')); set('summary-folder', selection?.name || tr('Избери папка', 'Select a folder')); $('summary-folder').title = selection?.name || '';
-    set('summary-frames-label', summary?.kind === 'stacks' ? tr('Кадри в стаковете', 'Frames in stacks') : summary?.kind === 'photos' ? tr('Готови снимки', 'Finished photos') : tr('Кадри', 'Frames'));
-    set('summary-exposure-label', summary?.kind==='photos'?tr('Последно създаване','Latest creation'):tr('Обща експозиция', 'Total exposure'));
+    set('summary-heading', t('archive.selectedFolder')); set('summary-folder', selection?.name || t('archive.chooseSummaryFolder')); $('summary-folder').title = selection?.name || '';
+    set('summary-frames-label', summary?.kind === 'stacks' ? t('archive.summary.stackedFrames') : summary?.kind === 'photos' ? t('archive.summary.finishedPhotos') : t('archive.framesLabel'));
+    set('summary-exposure-label', summary?.kind==='photos'?t('archive.summary.latestCreation'):t('analysis.totalExposure'));
     set('summary-frames', summary?.frames != null ? (summary.minimumFrames || summary.partial ? '≥ ' : '') + n(summary.frames, 0) : '—');
     set('summary-exposure', summary?.exposureSeconds != null ? (summary.unknownExposure > 0 || summary.partial ? '≥ ' : '') + duration(summary.exposureSeconds) : '—');
     if(summary?.kind==='photos'){set('summary-frames',n(summary.files,0));set('summary-exposure',summary.created?new Date(summary.created).toLocaleDateString(window.AstroArchiveI18n.locale):'—');}
     const updating = summary?.building;
-    const note = updating ? summary?.totalFiles > 0 ? tr(`Проверка на информацията: ${n(summary.scannedFiles||0,0)} / ${n(summary.totalFiles,0)} файла`, `Checking metadata: ${n(summary.scannedFiles||0,0)} / ${n(summary.totalFiles,0)} files`) : summary?.frames != null ? tr('Запазен сбор · обновява се…', 'Saved totals · updating…')
-      : tr('Преброяване на архива · подготвя се…', 'Counting archive files · preparing…')
-      : loading ? tr('Зареждане на справката…', 'Loading saved totals…') : summary?.problem ? tr('Проверката не завърши · виж дневника', 'Check incomplete · see diagnostics')
-      : summary?.stale ? tr('Индексът не е проверен изцяло · натисни Обнови', 'Index not fully checked · select Refresh')
-      : summary ? summary.kind!=='photos'&&summary.unknownExposure > 0 ? tr(`Без записана експозиция: ${n(summary.unknownExposure, 0)} файла`, `No recorded exposure: ${n(summary.unknownExposure, 0)} files`) : summary.partial ? tr('Непълни данни · виж дневника', 'Partial data · see diagnostics') : summary.fromIndex ? tr('Запазен сбор', 'Cached totals') : tr('Проверено', 'Checked') : '';
+    const note = updating ? summary?.totalFiles > 0 ? t('archive.summary.scanning',{scanned:n(summary.scannedFiles||0,0),total:n(summary.totalFiles,0)}) : summary?.frames != null ? t('archive.summary.updating')
+      : t('archive.summary.counting')
+      : loading ? t('archive.summary.loading') : summary?.problem ? t('archive.summary.problem')
+      : summary?.stale ? t('archive.summary.stale')
+      : summary ? summary.kind!=='photos'&&summary.unknownExposure > 0 ? t('archive.summary.unknownExposure',{count:n(summary.unknownExposure,0)}) : summary.partial ? t('archive.summary.partial') : summary.fromIndex ? t('archive.summary.cached') : t('archive.summary.checked') : '';
     set('summary-state', note); $('folder-summary').setAttribute('aria-busy', String(loading || !!updating));
-    $('summary-state').title = summary ? tr('Сбор за избраната папка и всички вложени файлове. „Обнови“ проверява броя и експозицията отново.', 'Totals include every nested file. Refresh rechecks count and exposure.') + (summary.savedUtc ? '\n' + new Date(summary.savedUtc).toLocaleString(window.AstroArchiveI18n.locale) : '') + (summary.cacheFile ? '\n' + summary.cacheFile : '') + (summary.problem ? '\n' + summary.problem : '') : '';
+    $('summary-state').title = summary ? t('archive.summary.hint') + (summary.savedUtc ? '\n' + new Date(summary.savedUtc).toLocaleString(window.AstroArchiveI18n.locale) : '') + (summary.cacheFile ? '\n' + summary.cacheFile : '') + (summary.problem ? '\n' + summary.problem : '') : '';
   }
 
   function renderAudit() {

@@ -3,7 +3,7 @@
 (() => {
   const U=window.AstroArchiveFunctions, P=window.AstroArchivePython;
   let menu, anchor, clipboard;
-  const text=(bg,en)=>U.tr(bg,en);
+  const t=window.AstroArchiveI18n.t;
   const api=()=>window.AstroArchiveArchiveView;
   const directory=entry=>['folder','archive'].includes(entry.kind);
   const image=entry=>['fits','image'].includes(entry.kind);
@@ -72,17 +72,17 @@
   }
 
   function renameFile(archiveId,entry) {
-    U.modal(text('Преименувай','Rename'),(body,dialog)=>{
+    U.modal(t('archive.rename'),(body,dialog)=>{
       const label=U.node('label',null,'function-field');
       const field=U.node('input');field.value=entry.name;
-      label.append(U.node('span',text('Име на файла','File name')),field);
+      label.append(U.node('span',t('archive.context.fileName')),field);
       const problem=U.node('p',null,'function-note');
       problem.setAttribute('role','alert');
-      const save=modalAction(text('Запази името','Save name'),async()=>{
+      const save=modalAction(t('archive.context.saveName'),async()=>{
         const name=field.value.trim();
         const extension=entry.name.slice(entry.name.lastIndexOf('.'));
         if(image(entry)&&!name.toLowerCase().endsWith(extension.toLowerCase())){
-          problem.textContent=text('Запази разширението '+extension+'.','Keep the '+extension+' extension.');
+          problem.textContent=t('archive.context.keepExtension',{extension});
           return;
         }
         save.disabled=true;
@@ -101,7 +101,7 @@
     const value=await window.AstroArchiveTags.chooseTag({
       stack:entry.details?.kind==='stack'||(archive?.type||archiveId)==='stacks',
       current:current==='mixed'?null:current,
-      title:text('Етикет · ','Tag · ')+entry.name,
+      title:t('archive.context.tagTitle',{name:entry.name}),
       allowClear:true
     });
     if(value===undefined)return;
@@ -111,47 +111,47 @@
   async function prepare(archiveId,entry) {
     const result=await P.call('python.archive.query',{filters:{archive:archiveId,relative:entry.relativePath||''}});
     const ids=result.rows.map(row=>row.id);
-    if(!ids.length)throw new Error(text('В избраното място няма кадри или снимки.','The selection contains no images.'));
+    if(!ids.length)throw new Error(t('archive.context.noImages'));
     await window.AstroArchivePreparation.receive(ids,archiveId);
     if(!window.AstroArchivePreparation.selection().ids.length){
-      throw new Error(text('Няма изображения, които могат да се изберат за подготовка.','No images in this selection can be prepared.'));
+      throw new Error(t('archive.context.cannotPrepare'));
     }
     P.navigate('preparation');
   }
 
   async function information(archiveId,entry,shared) {
     const data=directory(entry)||image(entry)?await P.call('archive.metadata.describe',scope(archiveId,entry)):null;
-    U.modal(text('Информация · ','Information · ')+entry.name,(body,dialog)=>{
+    U.modal(t('archive.context.infoTitle',{name:entry.name}),(body,dialog)=>{
       body.append(U.node('p',entry.relativePath||entry.name,'archive-context-path'));
       if(data){
-        const summary=text('Изображения: ','Images: ')+data.count+' · '+U.number(data.totals.bytes/1048576,2)+' MB';
+        const summary=t('archive.context.imageCount',{count:U.number(data.count,0)})+' · '+U.number(data.totals.bytes/1048576,2)+' MB';
         body.append(U.node('p',summary,'function-note'));
         const host=U.node('div');body.append(host);
         const rows=data.fields.filter(field=>data.values[field.key]!=null&&data.values[field.key]!=='');
         if(rows.length)U.table(host,[
-          {title:text('Поле','Field'),value:field=>window.AstroArchiveArchiveSchema.fieldTitle(field.key,field.title)},
-          {title:text('Стойност','Value'),value:field=>String(data.values[field.key])}
+          {title:t('archive.field'),value:field=>window.AstroArchiveArchiveSchema.fieldTitle(field.key,field.title)},
+          {title:t('archive.context.value'),value:field=>String(data.values[field.key])}
         ],rows);
-        if(!shared&&data.count)body.append(modalAction(text('Редактирай информацията…','Edit information…'),async()=>{
+        if(!shared&&data.count)body.append(modalAction(t('archive.context.editInfo'),async()=>{
           await window.AstroArchiveArchiveSchema.edit(archiveId,entry);dialog.close();
         }));
       }
       if(entry.kind==='archive'&&!shared){
-        for(const [folder,label] of [[false,text('Внеси файлове…','Import files…')],[true,text('Внеси папка…','Import folder…')]]){
+        for(const [folder,label] of [[false,t('archive.context.importFiles')],[true,t('archive.context.importFolder')]]){
           body.append(modalAction(label,()=>{dialog.close();return window.AstroArchiveTags.importWithTags({archiveId,folder});}));
         }
       }
       if(image(entry)&&!entry.isLink){
-        body.append(modalAction(text('Преглед','Preview'),()=>{
+        body.append(modalAction(t('archive.context.preview'),()=>{
           dialog.close();return entry.id?P.image(entry.id):P.call('image.open',scope(archiveId,entry));
         }));
       }
       if(entry.id&&(entry.details?.sourceFiles?.length||entry.details?.kind==='stack')){
-        body.append(modalAction(text('Изходни кадри и стакове','Source frames and stacks'),()=>{
+        body.append(modalAction(t('archive.context.sourceFrames'),()=>{
           dialog.close();return P.provenance(entry.id);
         }));
       }
-      if(entry.id&&entry.details?.kind==='stack')body.append(modalAction(text('Намери изходните нощи','Find source nights'),()=>{
+      if(entry.id&&entry.details?.kind==='stack')body.append(modalAction(t('archive.context.findNights'),()=>{
         dialog.close();return window.AstroArchiveArchiveSchema.sourceNights(entry.id);
       }));
     });
@@ -164,17 +164,17 @@
     const data=await P.call('archive.entries.movePreview',{archiveId:source.archiveId,relativePath:source.relativePath,
       targetArchiveId:archiveId,targetRelativePath:target});
     window.AstroArchiveArchiveSchema.showPreview(data,{
-      title:text('Преглед преди поставяне','Preview move'),
-      action:text('Премести файловете','Move files'),
+      title:t('archive.context.previewMove'),
+      action:t('archive.context.moveFiles'),
       onSaved:()=>{if(clipboard===source)clipboard=null;}
     });
   }
 
   async function remove(archiveId,entry) {
-    const title=text('Премести в кошчето','Move to Trash');
+    const title=t('archive.context.moveTrash');
     const prompt=directory(entry)
-      ? text('Изображенията в „'+entry.name+'“ и подпапките ѝ ще отидат в кошчето.','Move the images inside “'+entry.name+'” and its subfolders to Trash?')
-      : text('„'+entry.name+'“ ще отиде в кошчето.','Move “'+entry.name+'” to Trash?');
+      ? t('archive.context.trashFolder',{name:entry.name})
+      : t('archive.context.trashFile',{name:entry.name});
     if(!await U.confirm(title,prompt,title))return;
     await P.task('archive.entries.delete',{...scope(archiveId,entry),confirmed:true});
     if(clipboard?.archiveId===archiveId&&clipboard.relativePath===entry.relativePath)clipboard=null;
@@ -201,19 +201,19 @@
     const movable=writable&&entry.kind!=='archive';
     const actions=U.node('div',null,'archive-context-file-actions');
     actions.setAttribute('role','group');
-    actions.setAttribute('aria-label',text('Действия с файлове','File actions'));
+    actions.setAttribute('aria-label',t('archive.context.fileActions'));
     actions.append(
-      command(text('Изрежи','Cut'),()=>{clipboard=scope(archiveId,entry);},'cut',movable),
-      command(text('Постави','Paste'),()=>paste(archiveId,entry),'paste',writable&&Boolean(clipboard)),
-      command(text('Изтрий','Delete'),()=>remove(archiveId,entry),'trash',movable)
+      command(t('archive.context.cut'),()=>{clipboard=scope(archiveId,entry);},'cut',movable),
+      command(t('archive.context.paste'),()=>paste(archiveId,entry),'paste',writable&&Boolean(clipboard)),
+      command(t('archive.context.delete'),()=>remove(archiveId,entry),'trash',movable)
     );
     menu.setAttribute('aria-label',entry.name);
     menu.replaceChildren(
-      command(folder?text('Промени именуването…','Change naming…'):text('Преименувай…','Rename…'),
+      command(folder?t('archive.context.naming'):t('archive.context.rename'),
         ()=>folder?window.AstroArchiveArchiveSchema.renameBatch(archiveId,entry):renameFile(archiveId,entry),'rename',writable),
-      command(text('Промени етикета…','Change data tag…'),()=>tag(archiveId,entry,archive),'tag',writable),
-      command(text('Подготовка','Preparation'),()=>prepare(archiveId,entry),'prepare',enabled),
-      command(text('Информация','Information'),()=>information(archiveId,entry,shared),'info',valid),
+      command(t('archive.context.tag'),()=>tag(archiveId,entry,archive),'tag',writable),
+      command(t('nav.preparation'),()=>prepare(archiveId,entry),'prepare',enabled),
+      command(t('archive.context.info'),()=>information(archiveId,entry,shared),'info',valid),
       actions
     );
     menu.style.left=menu.style.top='0px';

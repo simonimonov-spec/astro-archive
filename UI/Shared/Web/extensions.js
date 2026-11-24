@@ -328,7 +328,7 @@
       const plugin=plugins.find(p=>p.id==='ai-training'),section=node('section',null,'viewer-plugin-tool');
       section.append(localized('h3','plugins.manualRating'));
       const reason=!plugin?'plugins.ratingMissing':!plugin.enabled?'plugins.ratingDisabled':!plugin.uiAllowed?'plugins.ratingPermission':'plugins.ratingUnavailable';
-      section.append(plugin?.problem?node('p',plugin.problem,'extension-tone-warning'):localized('p',reason,'extension-tone-warning'));
+      section.append(plugin?.problem?pluginLabel('p',()=>pluginText(plugin,plugin.problem),'extension-tone-warning'):localized('p',reason,'extension-tone-warning'));
       if(!window.AstroArchiveRemote){const button=localized('button','plugins.settingsLink','quiet-button');button.onclick=()=>window.AstroArchivePreferences.open('plugins');section.append(button);}
       viewerHost.append(section);
     }

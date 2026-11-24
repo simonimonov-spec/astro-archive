@@ -1,8 +1,8 @@
 "use strict";
 (() => {
   const i18n = window.AstroArchiveI18n;
-  const locale=()=>i18n.locale, en=()=>!window.AstroArchiveI18n.isBulgarian;
-  const duration=value=>{const s=Math.round(value);return `${Math.floor(s/3600)} ч ${Math.floor(s%3600/60)} мин ${s%60} сек`;};
+  const locale=()=>i18n.locale;
+  const duration=value=>i18n.duration(Math.round(value));
   const n=value=>new Intl.NumberFormat(locale(),{maximumFractionDigits:3}).format(value);
   const label=kind=>i18n.t(kind === 'observation' ? 'table.observingNight' : 'table.modificationDay');
   function rowProfile(entry,folder){return window.AstroArchiveCustomization.effective('archive',{...context(folder),kind:entry.details?.kind||entry.kind,name:entry.name,archive:entry.archiveId||folder?.archiveId||'',telescope:entry.relativePath.split(/[\\/]/).filter(Boolean)[0]||entry.info?.telescope||''});}
@@ -13,7 +13,7 @@
     const first=format(d?.firstObservation),last=format(d?.lastObservation);return first===last?first:first+' – '+last;
   }
   function columnTitle(column, entries, folder) {
-    if (['exposure', 'totalExposure'].includes(column.key) && entries.length && entries.every(e => ['frame','dark','flat','bias'].includes(e.details?.kind))) return en() ? 'Exposure [s]' : 'Експозиция [s]';
+    if (['exposure', 'totalExposure'].includes(column.key) && entries.length && entries.every(e => ['frame','dark','flat','bias'].includes(e.details?.kind))) return i18n.t('archive.field.exposureSeconds');
     const standardTitle = {name: 'table.name', kind: 'table.type', size: 'table.size'}[column.key];
     if (standardTitle) return i18n.t(standardTitle);
     if (column.key !== 'date' && column.key !== 'modified') return column.title;
@@ -27,7 +27,7 @@
     if(key==='frames')return aggregate&&d.frames!=null?(d.minimumFrames?'≥ ':'')+n(d.frames):aggregate&&d.building?'…':'—';
     if(key==='exposure'||key==='totalExposure'){
       const total=aggregate&&(!both||key==='totalExposure'),single=['frame','dark','flat','bias'].includes(d?.kind)&&mode!=='total'&&(!both||key==='exposure');
-      const value=total?d.totalExposure:single?d.exposure:null;return value==null?total&&d.building?'…':'—':(total&&d.minimumExposure?'≥ ':'')+(total?duration(value):n(value)+' s');
+      const value=total?d.totalExposure:single?d.exposure:null;return value==null?total&&d.building?'…':'—':(total&&d.minimumExposure?'≥ ':'')+(total?duration(value):i18n.unit(value,'second',3));
     }
     return entry.info?.[key]??'—';
   }

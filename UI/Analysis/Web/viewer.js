@@ -2,41 +2,8 @@
 
 // The canvas owns the viewport. The Python service owns linear pixels and display rendering.
 (() => {
-  const words = {
-    title:['Преглед на изображение','Image viewer'], close:['Назад към работата · Esc','Back to workspace · Esc'],
-    compare:['Раздвои','Split'],compareTitle:['Сравнение на кадри','Frame comparison'],
-    compareLeft:['Ляв кадър','Left frame'],compareRight:['Десен кадър','Right frame'],
-    sync:['Синхронизирай','Sync'],syncHint:['Синхронизирай увеличението и позицията','Sync zoom and position'],
-    previous:['Предишен кадър · ←','Previous image · ←'],next:['Следващ кадър · →','Next image · →'],
-    fit:['Напасни · F','Fit · F'],one:['Мащаб 1:1 · 1','Scale 1:1 · 1'],rotate:['Завърти 90°','Rotate 90°'],
-    flipX:['Огледално по хоризонтала','Flip horizontally'],flipY:['Огледално по вертикала','Flip vertically'],
-    panel:['Покажи / скрий настройките','Show / hide controls'],orientation:['Ориентация','Navigator'],
-    histogram:['Хистограма','Histogram'],display:['Екранна визуализация','Display'],channel:['Канал','Channel'],
-    mode:['Разтягане','Stretch'],auto:['Автоматично','Auto stretch'],linear:['Линейно','Linear'],manual:['Ръчно · MTF','Manual · MTF'],
-    mono:['Яркост','Luminance'],red:['Червен','Red'],green:['Зелен','Green'],blue:['Син','Blue'],
-    separate:['Независими RGB канали','Independent RGB channels'],black:['Черна граница, %','Black point, %'],
-    white:['Бяла граница, %','White point, %'],midtone:['Средни тонове','Midtones'],gamma:['Гама','Gamma'],
-    negative:['Негатив','Negative'],smooth:['Плавни пиксели','Smooth pixels'],grid:['Пикселна мрежа','Pixel grid'],
-    cross:['Централен кръст','Center crosshair'],reset:['Нулирай изгледа','Reset display'],details:['Файл и FITS хедър','File and FITS header'],
-    header:['Покажи FITS хедъра','Show FITS header'],quality:['Разделителна способност','Preview resolution'],
-    fast:['Бърз · 1600 px','Fast · 1600 px'],detail:['Подробен · 3200 px','Detailed · 3200 px'],original:['Оригинал · до 16 MP','Original · up to 16 MP'],
-    loading:['Зареждане на изображението…','Loading image…'],rendering:['Обновяване на изгледа…','Updating display…'],
-    hint:['Колелце: приближаване · влачене: местене · F: напасни · 1: 1:1 · ← →: кадри','Wheel: zoom · drag: pan · F: fit · 1: 1:1 · ← →: images'],
-    sampled:['Линейни стойности от прегледа; координати от 0, Y отдолу.','Linear preview values; coordinates from 0, Y from bottom.'],
-    preview:['Преглед','Preview'],source:['Оригинал','Source'],median:['Медиана','Median'],mean:['Средно','Mean'],
-    note:['Само екранен изглед. Оригиналът не се променя.','Display only. The source is unchanged.'],
-    noNext:['Няма следващ кадър в тази посока.','No more images in this direction.'],
-    retry:['Опитай отново','Try again'],
-    invalid:['Черната граница трябва да е под бялата.','Black point must be below white point.'],
-    bayerNote:['Debayer само за цветен RAW; матрицата е от хедъра, ако е налична.','Debayer only for color RAW; pattern comes from the header when available.'],
-    histogramNote:['Линейна хистограма с логаритмична височина; статистика от проба на прегледа.','Linear histogram with logarithmic height; statistics sample the preview.'],
-    zoom:['Мащаб в проценти от оригинала','Zoom as percent of source'],palette:['Палитра за монохромен канал','Monochrome palette'],
-    plus:['Приближи','Zoom in'],minus:['Отдалечи','Zoom out'],
-    download:['Изтегли','Download'],
-    gray:['Сиво','Gray'],heat:['Топлинна','Heat'],blueGold:['Синьо / златно','Blue / gold'],
-  };
-  const en = () => !(window.AstroArchiveI18n?.locale || 'bg').toLowerCase().startsWith('bg');
-  const t = key => {const full='viewer.'+key,translated=window.AstroArchiveI18n?.t(full);return translated&&translated!==full?translated:words[key]?.[en()?1:0]||key;};
+  const i18n = window.AstroArchiveI18n;
+  const t = (key, values) => i18n.t('viewer.'+key, values);
   let paneNumber = 0;
   function createViewer(host = null, paneLabel = '', {viewChanged, ready} = {}) {
   const isolated = Boolean(host), prefix = isolated ? `vc-${++paneNumber}-` : 'v-';
@@ -45,25 +12,25 @@
   let debounce,pixelTimer,pixelBusy=false,restoreFocus,resize,loading=false,keptTransform=null,pendingDisplay=null;
   const $ = key => dialog.querySelector('#'+prefix+key);
   const request = (method, params) => isolated ? call('viewer.compare', {...params, action:method.slice(7)}) : call(method, params);
-  const fmt = x => Number.isFinite(x)?x.toLocaleString(en()?'en':'bg',{maximumSignificantDigits:7}):'—';
+  const fmt = x => Number.isFinite(x)?x.toLocaleString(i18n.locale,{maximumSignificantDigits:7}):'—';
   const icons={close:'close',previous:'previous',next:'next',fit:'fit',one:'actual',minus:'zoomOut',plus:'zoomIn',rotate:'rotate',flipX:'flipX',flipY:'flipY',panel:'panel',reset:'reset',header:'header',retry:'reset'};
   function button(key){return `<button type="button" class="quiet-button viewer-icon-button${key==='retry'?' viewer-retry':''}" id="v-${key}" data-label="${key}">${window.AstroArchiveIcons.markup(icons[key])}</button>`;}
   function panelState(){const visible=!dialog.classList.contains('viewer-wide');$('panel').setAttribute('aria-pressed',String(visible));$('panel').setAttribute('aria-expanded',String(visible));$('panel').setAttribute('aria-controls',prefix+'sidebar');}
-  function control(key,value,min,max,step){return `<label class="viewer-control"><span data-text="${key}"></span><div><input id="v-${key}" type="range" min="${min}" max="${max}" step="${step}" value="${value}"><input id="v-${key}-number" type="number" aria-label="${t(key)}" min="${min}" max="${max}" step="${step}" value="${value}"></div></label>`;}
+  function control(key,value,min,max,step){return `<label class="viewer-control"><span data-text="${key}"></span><div><input id="v-${key}" type="range" min="${min}" max="${max}" step="${step}" value="${value}"><input id="v-${key}-number" type="number" data-text-aria="${key}" min="${min}" max="${max}" step="${step}" value="${value}"></div></label>`;}
   function create(){
     dialog=document.createElement('dialog');dialog.className='image-viewer';dialog.setAttribute('aria-labelledby','v-title');
     dialog.innerHTML=`<header class="viewer-heading"><div><p class="eyebrow" id="v-title" data-text="title"></p><h2 id="v-name"></h2><p id="v-meta"></p></div>${isolated?'':`<div class="viewer-heading-actions"><button type="button" id="v-compare" class="quiet-button" data-label="compare" data-text="compare" disabled></button>${button('close')}</div>`}</header>
       <div class="viewer-toolbar" role="toolbar"><div class="viewer-tool-group">${button('previous','←')}${button('next','→')}</div><div class="viewer-tool-group">${button('fit')}${button('one','1:1')}${button('minus','−')}<label class="viewer-zoom"><input id="v-zoom" type="number" min="1" max="6400" step="10" value="100"> %</label>${button('plus','+')}</div><div class="viewer-tool-group">${button('rotate','↻')}${button('flipX','↔')}${button('flipY','↕')}</div>${button('panel','☷')}</div>
       <div class="viewer-workspace"><div id="v-stage" class="viewer-stage" tabindex="0"><canvas id="v-canvas"></canvas><div id="v-loading" class="viewer-loading"><span class="viewer-spinner"></span><span id="v-load-label"></span></div><p id="v-error" class="viewer-error" role="alert" hidden></p>${button('retry')}<div id="v-badge" class="viewer-badge"></div></div>
-      <aside id="v-sidebar" class="viewer-sidebar"><div id="v-plugin-tools" hidden></div><section><h3 data-text="orientation"></h3><canvas id="v-overview" class="viewer-overview" role="img" aria-label="${t('orientation')}"></canvas><p class="viewer-muted" id="v-resolution"></p></section>
-      <section><h3 data-text="histogram"></h3><canvas id="v-histogram" class="viewer-histogram" role="img" aria-label="${t('histogram')}"></canvas><div class="viewer-hist-range"><span id="v-low">—</span><span id="v-high">—</span></div><p class="viewer-muted" id="v-stats"></p></section>
+      <aside id="v-sidebar" class="viewer-sidebar"><div id="v-plugin-tools" hidden></div><section><h3 data-text="orientation"></h3><canvas id="v-overview" class="viewer-overview" role="img" data-text-aria="orientation"></canvas><p class="viewer-muted" id="v-resolution"></p></section>
+      <section><h3 data-text="histogram"></h3><canvas id="v-histogram" class="viewer-histogram" role="img" data-text-aria="histogram"></canvas><div class="viewer-hist-range"><span id="v-low">—</span><span id="v-high">—</span></div><p class="viewer-muted" id="v-stats"></p></section>
       <section><h3 data-text="display"></h3><label class="viewer-select"><span data-text="mode"></span><select id="v-mode"><option value="0" data-text="auto"></option><option value="1" data-text="linear"></option><option value="2" data-text="manual"></option><option value="3">Asinh</option><option value="4">Log</option><option value="5">√</option><option value="6">x²</option></select></label>
       <label class="viewer-select"><span data-text="channel"></span><select id="v-channel"><option value="0">RGB</option><option value="1" data-text="mono"></option><option value="2" data-text="red"></option><option value="3" data-text="green"></option><option value="4" data-text="blue"></option></select></label>
       <label class="viewer-check"><input id="v-separate" type="checkbox"><span data-text="separate"></span></label>
       ${control('black',0,0,99.999,.001)}${control('white',100,.001,100,.001)}${control('midtone',.5,.001,.999,.001)}${control('gamma',1,.1,10,.01)}
       <label class="viewer-select"><span data-text="palette"></span><select id="v-palette"><option value="0" data-text="gray"></option><option value="1" data-text="heat"></option><option value="2" data-text="blueGold"></option></select></label>
       <label class="viewer-check"><input id="v-negative" type="checkbox"><span data-text="negative"></span></label>${button('reset')}</section>
-      <section><label class="viewer-select"><span data-text="quality"></span><select id="v-quality"><option value="1600" data-text="fast"></option><option value="3200" data-text="detail"></option><option value="0" data-text="original"></option></select></label><div class="viewer-bayer"><label class="viewer-check"><input id="v-debayer" type="checkbox">Debayer</label><select id="v-pattern" aria-label="Bayer"><option value="auto">Автоматично · FITS хедър</option><option>RGGB</option><option>BGGR</option><option>GRBG</option><option>GBRG</option></select></div><p class="viewer-muted" data-text="bayerNote"></p></section>
+      <section><label class="viewer-select"><span data-text="quality"></span><select id="v-quality"><option value="1600" data-text="fast"></option><option value="3200" data-text="detail"></option><option value="0" data-text="original"></option></select></label><div class="viewer-bayer"><label class="viewer-check"><input id="v-debayer" type="checkbox"><span data-text="debayer"></span></label><select id="v-pattern" aria-label="Bayer"><option value="auto" data-text="bayerAuto"></option><option>RGGB</option><option>BGGR</option><option>GRBG</option><option>GBRG</option></select></div><p class="viewer-muted" data-text="bayerNote"></p></section>
       <section class="viewer-local-options"><label class="viewer-check"><input id="v-smooth" type="checkbox" checked><span data-text="smooth"></span></label><label class="viewer-check"><input id="v-grid" type="checkbox"><span data-text="grid"></span></label><label class="viewer-check"><input id="v-cross" type="checkbox"><span data-text="cross"></span></label></section>
       <details class="viewer-file"><summary data-text="details"></summary><p id="v-path"></p>${button('header')}<pre id="v-cards" hidden></pre></details><p class="viewer-muted viewer-note" data-text="note"></p></aside></div>
       <footer class="viewer-footer"><span id="v-pixel"></span><span data-text="hint"></span></footer>`;
@@ -123,11 +90,16 @@
     for(const node of dialog.querySelectorAll('[data-label]')){
       node.title=t(node.dataset.label);node.setAttribute('aria-label',t(node.dataset.label));
     }
+    for(const node of dialog.querySelectorAll('[data-text-aria]'))node.setAttribute('aria-label',t(node.dataset.textAria));
     $('zoom').setAttribute('aria-label',t('zoom'));
     histogram.title=t('histogramNote');
+    if(frame){renderFrameLabels(frame);drawHistogram();}
+    else $('pixel').textContent=t('sampled');
+    if(loading)$('load-label').textContent=t(loadingMessage);
   }
   function resetControls(){for(const [key,value]of Object.entries({mode:frame?.fits?'0':'1',channel:'0',palette:'0',black:0,white:100,midtone:.5,gamma:1})){$(key).value=value;if($(key+'-number'))$(key+'-number').value=value;}$('separate').checked=!!frame?.separateRgb;$('negative').checked=false;}
-  function busy(value,kind='rendering'){loading=value;$('loading').hidden=!value;$('load-label').textContent=t(kind);if(frame)enableControls();}
+  let loadingMessage='loading';
+  function busy(value,kind='rendering'){loading=value;loadingMessage=kind;$('loading').hidden=!value;$('load-label').textContent=t(kind);if(frame)enableControls();}
   function enableControls(){
     const auto=Number($('mode').value)===0;for(const key of ['black','white']){$(key).disabled=$(key+'-number').disabled=auto;}
     $('midtone').disabled=$('midtone-number').disabled=Number($('mode').value)!==2;
@@ -159,7 +131,7 @@
   async function accept(data,first=false){
     if(!dialog?.open||id!==data.id)return;const version=serial,render=renderSerial;
     const image=new Image();image.src=new URL(data.url,document.baseURI);
-    try{await image.decode();}catch(e){if(dialog.open&&id===data.id&&version===serial&&render===renderSerial){busy(false);error(en()?'Cannot load preview.':'Прегледът не може да се зареди.');$('retry').hidden=false;$('retry').onclick=()=>{if(id!==data.id)return;$('retry').hidden=true;$('error').hidden=true;busy(true);accept(data,first);};if(!isolated)call('viewer.presented',{id:data.id,shown:false,error:String(e?.message||e).slice(0,1000)+' · '+data.url}).catch(()=>{});}return;}
+    try{await image.decode();}catch(e){if(dialog.open&&id===data.id&&version===serial&&render===renderSerial){busy(false);error(t('previewFailed'));$('retry').hidden=false;$('retry').onclick=()=>{if(id!==data.id)return;$('retry').hidden=true;$('error').hidden=true;busy(true);accept(data,first);};if(!isolated)call('viewer.presented',{id:data.id,shown:false,error:String(e?.message||e).slice(0,1000)+' · '+data.url}).catch(()=>{});}return;}
     if(!dialog.open||id!==data.id||version!==serial||render!==renderSerial)return;
     const old=frame;picture=image;frame=data;
     if(!isolated)window.AstroArchiveExtensions?.viewerReady(dialog,data);
@@ -167,9 +139,8 @@
     for(const input of dialog.querySelectorAll('.viewer-sidebar input,.viewer-sidebar select,.viewer-sidebar button'))input.disabled=false;
     for(const k of ['fit','one','plus','minus','rotate','flipX','flipY'])$(k).disabled=false;
     $('name').textContent=data.name;stage.setAttribute('aria-label',data.name);
-    $('meta').textContent=[data.objectName,data.date,data.width+' × '+data.height,data.fits?'FITS · '+Math.abs(data.bitpix)+' bit'+(data.bitpix<0?' float':''):'RGB · 8 bit'].filter(Boolean).join('  ·  ');
-    $('path').textContent=data.path;$('resolution').textContent=t('preview')+': '+data.previewWidth+' × '+data.previewHeight;
-    $('badge').textContent=data.fits?(data.debayer?'Debayer · '+data.bayerPattern:data.color?'RGB':'Mono'):'RGB';
+    renderFrameLabels(data);
+    $('path').textContent=data.path;
     if(keptTransform)restoreTransform(keptTransform);else if(old&&old.previewWidth!==data.previewWidth)zoom*=old.previewWidth/data.previewWidth;
     $('retry').hidden=true;$('retry').onclick=null;busy(false);enableControls();if(fitting)fit();else schedule();drawHistogram();
     ready?.();
@@ -178,6 +149,13 @@
       window.AstroArchiveRemote?.viewerReady(dialog,data);
     }
     for(const action of dialog.querySelectorAll('.viewer-toolbar a[download]'))window.AstroArchiveIcons.mount(action,'download',t('download'));
+  }
+  function renderFrameLabels(data){
+    const depth=t('bitDepth',{count:fmt(data.fits?Math.abs(data.bitpix):8)});
+    const type=data.fits?'FITS · '+depth+(data.bitpix<0?' · '+t('float'):''):'RGB · '+depth;
+    $('meta').textContent=[data.objectName,data.date,fmt(data.width)+' × '+fmt(data.height),type].filter(Boolean).join('  ·  ');
+    $('resolution').textContent=t('previewSize',{width:fmt(data.previewWidth),height:fmt(data.previewHeight)});
+    $('badge').textContent=data.fits?(data.debayer?t('debayer')+' · '+data.bayerPattern:data.color?'RGB':t('monochrome')):'RGB';
   }
   function close(silent=false){
     if(!dialog?.open)return;

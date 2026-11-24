@@ -199,7 +199,10 @@
     const get = entries => entries && Object.hasOwn(entries, source) ? entries[source] : undefined;
     const translations = plugin?.translations || {};
     const inLocale = id => get(translations[Object.keys(translations).find(key => key.toLowerCase() === id)]);
+    // The plugin bridge can return this message as a plain error string to older plugins.
+    const capability = /^Няма включен плъгин за функцията „([a-z][a-z0-9_.-]{0,119})“\. Инсталирай и включи подходящия плъгин от Настройки → Плъгини; виж docs\/PLUGINS\.md\.$/.exec(source);
     return inLocale(locale) ?? (base !== locale ? inLocale(base) : undefined) ??
+      (capability ? t("plugins.capabilityMissing", {capability: capability[1]}) : undefined) ??
       (base === "bg" ? source : inLocale("en") ?? get(pluginEnglish[plugin?.id]) ?? source);
   }
   function permissionText(permission) {
@@ -207,8 +210,20 @@
     const value = t(key);
     return value === key ? permission.label : value;
   }
+  const unitFormats = new Map();
+  function unit(value, name, maximumFractionDigits = 0) {
+    const key = [selected.locale, name, maximumFractionDigits].join(":");
+    if (!unitFormats.has(key)) unitFormats.set(key, new Intl.NumberFormat(selected.locale, {
+      style: "unit", unit: name, unitDisplay: "narrow", maximumFractionDigits
+    }));
+    return unitFormats.get(key).format(value);
+  }
+  function duration(seconds) {
+    if (!Number.isFinite(seconds)) return "—";
+    return [unit(Math.floor(seconds / 3600), "hour"), unit(Math.floor(seconds / 60) % 60, "minute"), unit(seconds % 60, "second", 2)].join(" ");
+  }
   window.AstroArchiveI18n = {
-    t, apply, archiveName, pluginText, permissionText, languages, defaultLanguage, get locale() { return selected.locale; },
+    t, apply, archiveName, pluginText, permissionText, unit, duration, languages, defaultLanguage, get locale() { return selected.locale; },
     get isBulgarian() { return selected.locale.toLowerCase().startsWith("bg"); },
     select(language) {
       // Invalid or unfamiliar locale identifiers still get a readable fallback.

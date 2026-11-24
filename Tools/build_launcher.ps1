@@ -47,7 +47,9 @@ $arguments = @('/nologo', '/target:winexe', '/platform:x64', '/optimize+', '/deb
     '/r:System.IO.Compression.dll', '/r:System.IO.Compression.FileSystem.dll',
     "/win32icon:$(Join-Path $Root 'UI/Shared/Web/Assets/AstroArchive.ico')",
     "/resource:$(Join-Path $Root 'UI/Shared/Web/Assets/AstroArchive.ico'),logo.ico",
-    "/resource:$manifestPath,manifest.json", (Join-Path $Root 'Tools/Launcher/Launcher.cs'))
+    "/resource:$manifestPath,manifest.json",
+    "/resource:$(Join-Path $Root 'Bridge/Desktop/startup-locales.json'),startup-locales.json",
+    (Join-Path $Root 'Tools/Launcher/Launcher.cs'))
 & $compiler @arguments
 if ($LASTEXITCODE -ne 0) { throw 'Launcher compilation failed' }
 Write-Output $exe
