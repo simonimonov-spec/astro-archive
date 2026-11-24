@@ -236,3 +236,35 @@
 #w-plugin-options[data-stage="settings"] :is(input:not([type="checkbox"]), select) { height: 28px !important; min-height: 0 !important; padding-block: 0 !important; font-size: 12.5px !important; }
 #w-plugin-options[data-stage="settings"] .checkbox-field { min-height: 28px; font-size: 12.5px; gap: 8px; }
 #w-plugin-options[data-stage="settings"] .extension-control > button { height: 28px !important; min-height: 0 !important; padding: 0 12px !important; font-size: 12px !important; }
+
+/* Grouped plugin settings (model C): when the "settings" group holds sections, each section is a
+   frame with its title on the line, and the sections flow in up to three columns. An untitled
+   sub-group whose first field is a switch shows that switch as its title; its other fields fade
+   while the switch is off. Plugins that send a flat list keep the compact grid above. */
+#w-plugin-options[data-stage="settings"] > .declarative-plugin > .extension-grid > .extension-group:has(> .extension-grid > .extension-group) { border: 0 !important; padding: 0 !important; background: none !important; }
+#w-plugin-options[data-stage="settings"] > .declarative-plugin > .extension-grid > .extension-group > .extension-grid:has(> .extension-group) { display: block !important; columns: 3 300px; column-gap: 16px; padding-top: 10px; }
+#w-plugin-options[data-stage="settings"] > .declarative-plugin > .extension-grid > .extension-group > .extension-grid:has(> .extension-group) > :not(.extension-group) { column-span: all; margin: 0 0 16px; }
+#w-plugin-options[data-stage="settings"] > .declarative-plugin > .extension-grid > .extension-group > .extension-grid:has(> .extension-group) > .extension-control:has(> button) { text-align: right; margin: 8px 0 0; }
+#w-plugin-options[data-stage="settings"] > .declarative-plugin > .extension-grid > .extension-group > .extension-grid > .extension-group {
+  display: flow-root; break-inside: avoid; position: relative; margin: 0 0 22px;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent) !important; border-radius: 10px !important;
+  padding: 0 12px 10px !important; background: none !important;
+}
+#w-plugin-options[data-stage="settings"] > .declarative-plugin > .extension-grid > .extension-group > .extension-grid > .extension-group > h3 {
+  display: table !important; position: static; margin: -10px 0 6px -7px; padding: 0 7px; line-height: 20px;
+  font-size: 12.5px; font-weight: 650; color: var(--text); background: var(--surface);
+}
+#w-plugin-options[data-stage="settings"] .extension-group .extension-group .extension-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 6px 12px !important; align-items: end; }
+#w-plugin-options[data-stage="settings"] .extension-group .extension-group .extension-group {
+  grid-column: 1 / -1; position: relative; margin-top: 12px; padding: 24px 10px 8px !important;
+  border: 1px solid color-mix(in srgb, var(--text) 9%, transparent) !important; border-radius: 9px !important; background: none !important;
+}
+#w-plugin-options[data-stage="settings"] .extension-group .extension-group:has(> h3:empty) > h3 { display: none !important; }
+#w-plugin-options[data-stage="settings"] .extension-group .extension-group:has(> h3:empty) > .extension-grid > .extension-control:first-child:has(.checkbox-field) {
+  position: absolute; top: -13px; left: 8px; padding: 0 6px; background: var(--surface); z-index: 1;
+}
+#w-plugin-options[data-stage="settings"] .extension-group .extension-group:has(> h3:empty) > .extension-grid > .extension-control:first-child .checkbox-field { min-height: 0 !important; font-weight: 650; }
+#w-plugin-options[data-stage="settings"] .extension-group .extension-group:has(> h3:empty):has(> .extension-grid > .extension-control:first-child input[type="checkbox"]:not(:checked)) > .extension-grid > .extension-control:not(:first-child) { opacity: .38; pointer-events: none; transition: opacity 240ms ease; }
+#w-plugin-options[data-stage="settings"] .extension-group .extension-group .extension-control:has(> .checkbox-field) { margin: 0 !important; padding: 0 !important; }
+#w-plugin-options[data-stage="settings"] .extension-group .extension-group .checkbox-field { padding-block: 2px !important; margin: 0 !important; }
+:root[data-animations="off"] #w-plugin-options .extension-control { transition: none !important; }
