@@ -1,3 +1,4 @@
+/* Beta 1.3 UI (в разработка, не е издание) · виж docs/BETA-1.3-UI.md */
 "use strict";
 // Keyboard shortcuts: Ctrl+1/2/3 switch workspaces, Ctrl+, opens Settings.
 (() => {

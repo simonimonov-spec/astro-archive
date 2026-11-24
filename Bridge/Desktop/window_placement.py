@@ -1,3 +1,4 @@
+# Beta 1.3 UI (в разработка, не е издание) · виж docs/BETA-1.3-UI.md
 """Centered 16:9 first start and remembered window placement for the app window.
 
 The browser window belongs to Edge, so the host watches it by its unique title,

@@ -1,3 +1,4 @@
+/* Beta 1.3 UI (в разработка, не е издание) · виж docs/BETA-1.3-UI.md */
 "use strict";
 // Click a column heading to sort the visible archive rows; click again to reverse.
 // Sorting is applied to the rows of the current page and kept while browsing folders.

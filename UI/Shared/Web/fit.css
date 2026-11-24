@@ -1,3 +1,4 @@
+/* Beta 1.3 UI (в разработка, не е издание) · виж docs/BETA-1.3-UI.md */
 /* Rule: the window itself never scrolls (Analysis and Preparation).
    Each workspace is exactly as tall as the window; lists, tables and panels
    scroll inside. Safeguard: below 560 px height or in the narrow stacked
@@ -81,3 +82,8 @@
    the toggle and its help bar are hidden; saved panel layouts still apply and
    can be restored to the original in Settings. */
 :root .islands-toggle, :root .islands-help { display: none !important; }
+
+/* The Analysis tab already names the page: its big title is shown only when
+   the header is collapsed (same rule as Archive). */
+#page-analysis > .page-heading { display: none !important; }
+:root[data-header-collapsed="true"] #page-analysis > .page-heading { display: flex !important; }

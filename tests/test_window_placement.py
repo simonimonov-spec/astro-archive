@@ -1,3 +1,4 @@
+# Beta 1.3 UI (в разработка, не е издание) · виж docs/BETA-1.3-UI.md
 """Window start geometry and remembered placement, without touching real windows."""
 import tempfile
 import unittest
