@@ -24,7 +24,7 @@
   });
 
   function offlineConfiguration() {
-    return { preferences: defaults(), themes: [{ id: "builtin.night", name: "theme.night", colors: {} }], languages: [{ id: "bg", locale: "bg", name: "Български", messages: {} }, { id: "en", locale: "en", name: "English", messages: {} }], plugins: [], problems: [], backgroundDataUrl: null };
+    return { preferences: defaults(), themes: [{ id: "builtin.night", name: "theme.night", colors: {} }], plugins: [], problems: [], backgroundDataUrl: null };
   }
 
   function apply(preferences, background) {
@@ -77,11 +77,17 @@
   function accept(data, preserveDraft = false) {
     const previous = preserveDraft ? { ...draft } : null;
     const previousImage = imagePreview;
-    configuration = data || offlineConfiguration();
+    const source = data || offlineConfiguration();
+    const languages = new Map(i18n.languages.map(language => [language.id, language]));
+    for (const language of source.languages || []) {
+      const builtin = languages.get(language.id);
+      languages.set(language.id, builtin ? { ...builtin, messages: language.messages } : language);
+    }
+    configuration = { ...source, languages: [...languages.values()] };
     generation++;
     draft = previous || { ...configuration.preferences };
     if (!configuration.themes.some(theme => theme.id === draft.themeId)) draft.themeId = configuration.preferences.themeId;
-    if (!configuration.languages.some(language => language.id === draft.languageId)) draft.languageId = configuration.preferences.languageId;
+    if (!languages.has(draft.languageId)) draft.languageId = languages.has(source.preferences.languageId) ? source.preferences.languageId : defaults().languageId;
     imagePreview = preserveDraft ? previousImage : configuration.backgroundDataUrl;
     apply(draft, imagePreview);
     bindings?.pluginsChanged(configuration.plugins);
@@ -101,13 +107,37 @@
     }
     $("ui-image-state").textContent = t(draft.backgroundImage ? "settings.imageReady" : "settings.noImage");
   }
+  function fillLanguages() {
+    const choices = document.createDocumentFragment();
+    for (const language of configuration.languages) {
+      const label = document.createElement("label");
+      const input = document.createElement("input");
+      input.type = "radio";
+      input.name = "ui-language";
+      input.value = language.id;
+      input.checked = language.id === draft.languageId;
+      const caption = document.createElement("span");
+      if (language.flag !== undefined) {
+        const flag = document.createElement("span");
+        flag.className = "language-flag";
+        flag.style.backgroundPositionX = `${language.flag * 100 / (i18n.languages.length - 1)}%`;
+        flag.setAttribute("aria-hidden", "true");
+        caption.append(flag);
+      }
+      const name = document.createElement("span");
+      name.lang = language.locale;
+      name.textContent = language.name;
+      caption.append(name);
+      label.append(input, caption);
+      choices.append(label);
+    }
+    $("ui-language-options").replaceChildren(choices);
+  }
   function fillControls() {
     $("ui-theme").replaceChildren();
     for (const theme of configuration.themes) option($("ui-theme"), theme.id, theme.id.startsWith("builtin.") ? t(theme.name) : theme.name);
-    $("ui-language").replaceChildren();
-    for (const language of configuration.languages) option($("ui-language"), language.id, language.name);
+    fillLanguages();
     $("ui-theme").value = draft.themeId;
-    $("ui-language").value = draft.languageId;
     $("ui-background-mode").value = draft.backgroundMode;
     $("ui-background-color").value = $("ui-background-hex").value = draft.backgroundColor;
     $("ui-background-hex").removeAttribute("aria-invalid");
@@ -250,7 +280,7 @@
     $("ui-background-hex").removeAttribute("aria-invalid");
     const changedTheme = draft.themeId !== $("ui-theme").value;
     if (changedTheme) $("ui-background-mode").value = 'theme';
-    draft = { ...draft, themeId: $("ui-theme").value, languageId: $("ui-language").value,
+    draft = { ...draft, themeId: $("ui-theme").value,
       backgroundMode: $("ui-background-mode").value, backgroundColor: color.toLowerCase(), animations: $("ui-animations").checked,
       customization: window.AstroArchiveCustomization?.snapshot(), islands: window.AstroArchiveIslands?.snapshot() || draft.islands };
     updateBackgroundControls(); apply(draft, imagePreview); notice("settings.previewing");
@@ -324,7 +354,13 @@
   $("ui-save").addEventListener("click", save);
   $("ui-reset").addEventListener("click", () => { const values=defaults(); draft = appearanceOnly() ? {...draft,...Object.fromEntries(appearanceFields.map(k=>[k,values[k]]))} : {...values, islands:window.AstroArchiveIslands?.snapshot() || draft.islands}; imagePreview = null; apply(draft, null); fillControls(); notice("settings.previewing"); });
   $("ui-layout-reset").addEventListener("click", () => { window.AstroArchiveIslands.restore(window.AstroArchiveIslands.resetScope()); preview(); });
-  for (const id of ["ui-theme", "ui-language", "ui-background-mode", "ui-animations"]) $(id).addEventListener("change", preview);
+  for (const id of ["ui-theme", "ui-background-mode", "ui-animations"]) $(id).addEventListener("change", preview);
+  $("ui-language").addEventListener("change", event => {
+    if (busy || !event.target.checked) return;
+    draft = { ...draft, languageId: event.target.value };
+    apply(draft, imagePreview);
+    notice("settings.previewing");
+  });
   $("ui-background-color").addEventListener("input", () => { $("ui-background-hex").value = $("ui-background-color").value; preview(); });
   $("ui-background-hex").addEventListener("input", () => { if (/^#[0-9a-f]{6}$/i.test($("ui-background-hex").value)) $("ui-background-color").value = $("ui-background-hex").value; preview(); });
   $("ui-plugin-install").addEventListener("click", () => mutatePlugins("ui.plugins.install"));

@@ -1,9 +1,10 @@
 "use strict";
 (() => {
-  const locale=()=>window.AstroArchiveI18n.locale, en=()=>locale().startsWith('en');
+  const i18n = window.AstroArchiveI18n;
+  const locale=()=>i18n.locale, en=()=>locale().startsWith('en');
   const duration=value=>{const s=Math.round(value);return `${Math.floor(s/3600)} ч ${Math.floor(s%3600/60)} мин ${s%60} сек`;};
   const n=value=>new Intl.NumberFormat(locale(),{maximumFractionDigits:3}).format(value);
-  const label=kind=>kind==='observation'?(en()?'Observation night':'Нощ на наблюдение'):(en()?'Modification day':'Ден на промяна');
+  const label=kind=>i18n.t(kind === 'observation' ? 'table.observingNight' : 'table.modificationDay');
   function rowProfile(entry,folder){return window.AstroArchiveCustomization.effective('archive',{...context(folder),kind:entry.details?.kind||entry.kind,name:entry.name,archive:entry.archiveId||folder?.archiveId||'',telescope:entry.relativePath.split(/[\\/]/).filter(Boolean)[0]||entry.info?.telescope||''});}
   function dateKind(entry,folder){const mode=rowProfile(entry,folder).dateMode;return mode&&mode!=='auto'?mode:entry.details?.dateKind||(entry.kind==='fits'?'observation':'modified');}
   function dateText(entry,folder){const d=entry.details;if(dateKind(entry,folder)!=='observation')return entry.modified?new Intl.DateTimeFormat(locale(),{dateStyle:'short'}).format(new Date(entry.modified)):'—';
@@ -11,7 +12,14 @@
     const format=text=>text?new Intl.DateTimeFormat(locale(),{dateStyle:'short',timeZone:'UTC'}).format(new Date(text.slice(0,10)+'T00:00:00Z')):'—';
     const first=format(d?.firstObservation),last=format(d?.lastObservation);return first===last?first:first+' – '+last;
   }
-  function columnTitle(column,entries,folder){if(['exposure','totalExposure'].includes(column.key)&&entries.length&&entries.every(e=>['frame','dark','flat','bias'].includes(e.details?.kind)))return en()?'Exposure [s]':'Експозиция [s]';if(column.key!=='date'&&column.key!=='modified')return column.title;const kinds=new Set(entries.map(e=>dateKind(e,folder)));return kinds.size===1?label([...kinds][0]):en()?'Date':'Дата';}
+  function columnTitle(column, entries, folder) {
+    if (['exposure', 'totalExposure'].includes(column.key) && entries.length && entries.every(e => ['frame','dark','flat','bias'].includes(e.details?.kind))) return en() ? 'Exposure [s]' : 'Експозиция [s]';
+    const standardTitle = {name: 'table.name', kind: 'table.type', size: 'table.size'}[column.key];
+    if (standardTitle) return i18n.t(standardTitle);
+    if (column.key !== 'date' && column.key !== 'modified') return column.title;
+    const kinds = new Set(entries.map(entry => dateKind(entry, folder)));
+    return kinds.size === 1 ? label([...kinds][0]) : i18n.t('table.date');
+  }
   function cell(entry,key,columns,folder){const d=entry.details,mode=rowProfile(entry,folder).exposureMode||'auto',aggregate=d&&['stack','folder','archive','day'].includes(d.kind)&&mode!=='single',both=columns.some(c=>c.key==='exposure')&&columns.some(c=>c.key==='totalExposure');
     if(key==='files'||key==='stacks')return d?.[key]==null?'—':n(d[key]);
     if(key==='observed'||key==='created'){const value=key==='created'?d?.created:entry.info?.observed;return value?new Intl.DateTimeFormat(locale(),{dateStyle:'short',timeStyle:'short'}).format(new Date(value)):'—';}

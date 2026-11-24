@@ -160,10 +160,10 @@
     const parts = state.path.split(/[\\/]/).filter(Boolean);
     const filterSummary=$('archive-filter-summary');filterSummary.hidden=!archiveFilter;filterSummary.replaceChildren();
     document.querySelector('#page-archive .content-panel').classList.toggle('archive-filter-results',!!archiveFilter);
-    $('search').placeholder=archiveFilter?(i18n.locale.startsWith('en')?'Search filtered results…':'Търси сред резултатите…'):t('folder.search');
+    $('search').placeholder=archiveFilter?t('archive.filteredSearch'):t('folder.search');
     if(archiveFilter){
-      fragment.append(element('strong','filter-results-title',i18n.locale.startsWith('en')?'Filtered results':'Резултати от филтриране'),element('span','filter-results-badge',i18n.locale.startsWith('en')?'FILTER ON':'АКТИВЕН ФИЛТЪР'));
-      const clear=element('button','filter-clear',i18n.locale.startsWith('en')?'Turn off':'Изключи');clear.type='button';clear.onclick=()=>$('archive-filter-toggle').click();fragment.append(clear);$('breadcrumbs').replaceChildren(fragment);
+      fragment.append(element('strong','filter-results-title',t('archive.filteredResults')),element('span','filter-results-badge',t('archive.filterOn')));
+      const clear=element('button','filter-clear',t('archive.filterOff'));clear.type='button';clear.onclick=()=>$('archive-filter-toggle').click();fragment.append(clear);$('breadcrumbs').replaceChildren(fragment);
       const labels={archive:'Архив',telescope:'Телескоп',object:'Обект',night:'Нощ',since:'Добавени',tag:'Етикет'},roles={archive:'archive',telescope:'telescope',object:'object',night:'day',since:'day',tag:'fits'};
       for(const[key,value]of Object.entries(archiveFilter)){if(!value)continue;const chip=element('span','archive-filter-chip'),copy=element('span','');chip.append(window.AstroArchiveArchiveIcons.create(roles[key]||'folder'));copy.append(element('small','',labels[key]||key),element('strong','',key==='archive'?archiveName(archive):key==='since'?`Последните ${Math.max(1,Math.round((Date.now()/1000-value)/86400))} дни`:key==='telescope'?window.AstroArchiveCustomization.telescope(value):key==='tag'?({astro:'Астрофотография',photometry:'Фотометрия',variable:'Променливи звезди',exoplanet:'Екзопланети',other:'Друго',none:'Без етикет'}[value]||String(value)):String(value)));chip.append(copy);filterSummary.append(chip);}
       return;
@@ -234,7 +234,7 @@
       if(folder.filtered){row.classList.add('archive-filter-result');name.append(element('small','filter-result-origin',entry.relativePath.split(/[\\/]/).slice(0,-1).join(' › ')||archiveName(state.archives.find(a=>a.id===folder.archiveId))));}
       for (const column of columns) {
         if (column.key === 'name') { row.append(name); continue; }
-        const value = column.key === 'kind' ? entry.kind === "archive" ? t("nav.archive") : !entry.isLink && entry.details?.kind==='stack' ? (i18n.locale.startsWith('en')?'Stack':'Стак') : !entry.isLink && entry.details?.kind==='frame' ? (i18n.locale.startsWith('en')?'Frame':'Кадър') : entry.kind==="image" ? entry.name.split(".").at(-1).toUpperCase() : t("type." + (entry.isLink ? "link" : entry.kind))
+        const value = column.key === 'kind' ? entry.kind === "archive" ? t("nav.archive") : !entry.isLink && entry.details?.kind==='stack' ? t('type.stack') : !entry.isLink && entry.details?.kind==='frame' ? t('type.frame') : entry.kind==="image" ? entry.name.split(".").at(-1).toUpperCase() : t("type." + (entry.isLink ? "link" : entry.kind))
           : column.key === 'size' ? formatSize(entry.bytes) : window.AstroArchiveArchiveRows.cell(entry,column.key,columns,folder);
         const cell=element('td','muted',value);
         if(column.key==='date'||column.key==='modified')cell.title=window.AstroArchiveArchiveRows.label(window.AstroArchiveArchiveRows.dateKind(entry,folder));
@@ -270,9 +270,9 @@
     $("page-label").textContent = folder.total ? t("folder.page", { first: number.format(folder.offset + 1), last: number.format(folder.offset + folder.entries.length), total: number.format(folder.total) }) : "";
     $("previous").disabled = folder.offset === 0;
     $("next").disabled = folder.offset + folder.pageSize >= folder.total;
-    $("folder-path").textContent = folder.filtered?'Резултати от всички папки на „'+archiveName(state.archives.find(a=>a.id===folder.archiveId))+'“':folder.fullPath;
+    $("folder-path").textContent = folder.filtered ? t('archive.resultPath', {name: archiveName(state.archives.find(a => a.id === folder.archiveId))}) : folder.fullPath;
     $("folder-path").title = folder.fullPath;
-    if (!state.entered) $("folder-counts").textContent = new Intl.NumberFormat(i18n.locale).format(state.archives.length) + ' ' + (i18n.locale.startsWith('en') ? 'archives' : 'архива');
+    if (!state.entered) $("folder-counts").textContent = t('archive.count', {count: number.format(state.archives.length)});
   }
 
   function refreshRows(){const version=state.version;if(webview&&state.folder&&!state.folder.shared)window.AstroArchiveArchiveRows.watch(state.folder,call,()=>version===state.version,()=>drawFiles(state.folder));}

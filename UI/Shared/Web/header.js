@@ -5,7 +5,7 @@
   const header = document.querySelector('.topbar'), wheel = $('activity-button');
   if (!header || !wheel) return;
   const storageKey = 'astroarchive.header.collapsed';
-  const tr = (bg, en) => window.AstroArchiveI18n.locale.startsWith('en') ? en : bg;
+  const t = window.AstroArchiveI18n.t;
   const node = (tag, className) => { const e = document.createElement(tag); if (className) e.className = className; return e; };
   const svg = paths => {
     const e = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); e.setAttribute('viewBox', '0 0 24 24'); e.setAttribute('aria-hidden', 'true');
@@ -44,11 +44,11 @@
     if (!settings.contains(settingsText)) {
       settings.replaceChildren(svg(['M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1 1-3Z', 'M15.5 12a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z']), settingsText);
     }
-    text(settingsText, tr('Настройки', 'Settings'));
-    const label = tr('Прибери горното меню', 'Collapse the top menu'); toggle.title = label; toggle.setAttribute('aria-label', label);
+    text(settingsText, t('settings.title'));
+    const label = t('header.collapse'); toggle.title = label; toggle.setAttribute('aria-label', label);
     const caption = $('activity-caption').textContent;
     if (collapsed) {
-      const restore = tr('Покажи горното меню', 'Show the top menu');
+      const restore = t('header.expand');
       wheel.title = restore + ' · ' + caption;
       wheel.setAttribute('aria-label', restore + '. ' + caption);
       wheel.setAttribute('aria-controls', shell.id); wheel.setAttribute('aria-expanded', 'false'); wheel.removeAttribute('aria-haspopup');
@@ -57,10 +57,10 @@
       wheel.setAttribute('aria-label', window.AstroArchiveI18n.t('activity.status', {status: caption}));
       wheel.title = caption + ' · ' + window.AstroArchiveI18n.t('activity.openDiary');
     }
-    settings.setAttribute('aria-label', tr('Настройки', 'Settings')); settings.title = tr('Настройки', 'Settings') + ' (Ctrl+,)';
-    text(resourceLabel, tr('Диск и връзка', 'Disk and connection'));
-    text(free, $('header-disk-free')?.textContent || tr('Състояние на системата', 'System status'));
-    summary.title = tr('Диск, връзка и добавки', 'Disk, connection and plugins'); summary.setAttribute('aria-label', summary.title);
+    settings.setAttribute('aria-label', t('settings.title')); settings.title = t('settings.title') + ' (Ctrl+,)';
+    text(resourceLabel, t('header.resources'));
+    text(free, $('header-disk-free')?.textContent || t('header.system'));
+    summary.title = t('header.resourcesTitle'); summary.setAttribute('aria-label', summary.title);
   }
   function position() {
     positioning = 0;

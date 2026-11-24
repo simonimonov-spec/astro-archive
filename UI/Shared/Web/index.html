@@ -37,6 +37,7 @@
   <link rel="stylesheet" href="preparation-layout.css">
   <link rel="stylesheet" href="fit.css">
   <script src="python/transport.js"></script>
+  <script src="locales.js" defer></script>
   <script src="i18n.js" defer></script>
   <script src="icons.js" defer></script>
   <script src="plugin-browser.js" defer></script>
@@ -115,7 +116,7 @@
             <div id="archive-filter-summary" class="archive-filter-summary" aria-label="Избрани филтри" hidden></div>
             <div id="error-banner" class="error-banner" role="alert" hidden></div>
             <div class="table-scroll">
-              <table><thead><tr><th scope="col">Име</th><th scope="col">Тип</th><th scope="col">Размер</th><th scope="col">Променен</th><th scope="col"><span class="sr-only">Действия</span></th></tr></thead><tbody id="files"></tbody></table>
+              <table><thead><tr><th scope="col" data-i18n="table.name">Име</th><th scope="col" data-i18n="table.type">Тип</th><th scope="col" data-i18n="table.size">Размер</th><th scope="col" data-i18n="table.modified">Променен</th><th scope="col"><span class="sr-only" data-i18n="table.actions">Действия</span></th></tr></thead><tbody id="files"></tbody></table>
               <div id="empty" class="empty-state"><div class="empty-orbit" aria-hidden="true">◎</div><h2>Място за твоите наблюдения</h2><p id="empty-message">Зареждане на запазените места за архивите…</p><button type="button" data-storage-settings class="quiet-button" data-i18n="settings.storage">Папки и програми…</button> <button type="button" id="empty-shared-source" class="quiet-button" hidden>Избери споделен архив…</button></div>
             </div>
             <footer class="table-footer"><div class="archive-location"><nav id="breadcrumbs" aria-label="Текуща папка"></nav><div class="folder-description"><span id="folder-path">Избери архив</span><span id="loading" class="loading-label" hidden>Зареждане…</span></div></div><span id="folder-counts">Само съдържанието на избраната папка</span><div class="pagination"><span id="page-label"></span><button type="button" id="previous" class="icon-button" aria-label="Предишна страница" disabled>←</button><button type="button" id="next" class="icon-button" aria-label="Следваща страница" disabled>→</button></div></footer>
@@ -165,9 +166,11 @@
       </section>
       <section id="settings-panel-customization" class="settings-section" role="tabpanel" aria-labelledby="settings-tab-customization" hidden><div id="customization-editor"></div><section class="custom-block"><h3>Визуални настройки на плъгините</h3><p class="settings-note">Показват се само включени плъгини с разрешение за интерфейса. Настройките им се запазват отделно от общия изглед.</p><div id="custom-plugin-panels"></div></section></section>
       <section id="settings-panel-language" class="settings-section" role="tabpanel" aria-labelledby="settings-tab-language" hidden>
-        <h3 data-i18n="settings.languageTab">Език</h3>
-        <label class="settings-field"><span data-i18n="settings.language">Език на новия интерфейс</span><select id="ui-language"></select></label>
-        <p class="settings-note" data-i18n="settings.languageNote">Старите C# екрани и оригиналните записи в дневника запазват своя език.</p>
+        <fieldset id="ui-language" class="language-field">
+          <legend data-i18n="settings.language">Език на интерфейса</legend>
+          <div id="ui-language-options" class="language-options"></div>
+        </fieldset>
+        <p class="settings-note" data-i18n="settings.languageNote">Непреведените екрани и съобщения може да се показват на български или английски.</p>
         <p class="settings-note" data-i18n="settings.preview">Промените се виждат веднага. Запазват се с „Запази“.</p>
       </section>
       <section id="settings-panel-plugins" class="settings-section" role="tabpanel" aria-labelledby="settings-tab-plugins" hidden>
@@ -204,7 +207,7 @@
         <details class="legacy-debug"><summary data-i18n="diagnostics.legacy">Стар интерфейс · само за диагностика</summary><p class="settings-note" data-i18n="diagnostics.legacyNote">Помощен изглед за откриване на проблеми. Основните функции работят независимо от него.</p><div class="plugin-actions"><button type="button" class="quiet-button" data-debug-section="archive" data-i18n="nav.archive">Архив</button><button type="button" class="quiet-button" data-debug-section="analysis" data-i18n="nav.analysis">Анализ</button><button type="button" class="quiet-button" data-debug-section="preparation" data-i18n="nav.preparation">Подготовка</button></div></details>
       </section>
     </div>
-    <footer class="settings-footer"><button type="button" class="text-button" id="ui-reset" data-i18n="settings.reset">По подразбиране</button><button type="button" class="text-button" id="ui-layout-reset">Върни оригиналните места и размери</button><button type="button" class="quiet-button" id="ui-cancel" data-i18n="settings.cancel">Отказ</button><button type="button" class="primary-button" id="ui-save" data-i18n="settings.save">Запази</button></footer>
+    <footer class="settings-footer"><button type="button" class="text-button" id="ui-reset" data-i18n="settings.reset">По подразбиране</button><button type="button" class="text-button" id="ui-layout-reset" data-i18n="settings.layoutReset">Върни оригиналните места и размери</button><button type="button" class="quiet-button" id="ui-cancel" data-i18n="settings.cancel">Отказ</button><button type="button" class="primary-button" id="ui-save" data-i18n="settings.save">Запази</button></footer>
   </dialog>
   <aside id="activity-popover" class="activity-popover" role="dialog" aria-modal="false" aria-labelledby="activity-popover-title" hidden>
     <header class="activity-popover-header"><div><p id="activity-popover-kind" class="eyebrow"></p><h2 id="activity-popover-title">Състояние и дневници</h2></div><button type="button" class="icon-button" id="activity-close" aria-label="Затвори балона">×</button></header>

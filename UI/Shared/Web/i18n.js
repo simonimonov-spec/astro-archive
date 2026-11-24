@@ -118,17 +118,54 @@
     "activity.queue": "Active tasks", "activity.loadingImage": "Loading image…",
     "activity.tier.important": "Important", "activity.tier.normal": "Frequent", "activity.tier.ambient": "Background"
   });
+  Object.assign(bg, {
+    "settings.language": "Език на интерфейса",
+    "settings.languageNote": "Непреведените екрани и съобщения може да се показват на български или английски.",
+    "settings.layoutReset": "Върни оригиналните места и размери",
+    "header.collapse": "Прибери горното меню", "header.expand": "Покажи горното меню",
+    "header.resources": "Диск и връзка", "header.system": "Състояние на системата",
+    "header.resourcesTitle": "Диск, връзка и добавки",
+    "archive.telescopeList": "Телескопи", "archive.objectList": "Обекти", "archive.nightList": "Наблюдателни нощи",
+    "archive.folderList": "Папки", "archive.foldersAtLevel": "Папки на това ниво", "archive.archives": "Архиви",
+    "archive.back": "← Назад", "archive.all": "Всички архиви", "archive.backTo": "Назад към {name}",
+    "archive.shared": "Споделен архив", "archive.chooseFolder": "Избери папка за този архив от настройките.",
+    "archive.noFolders": "Няма папки на това ниво. Файловете са вдясно.", "archive.more": "Покажи още…",
+    "archive.filteredSearch": "Търси сред резултатите…", "archive.filteredResults": "Резултати от филтриране",
+    "archive.filterOn": "АКТИВЕН ФИЛТЪР", "archive.filterOff": "Изключи", "archive.resultPath": "Резултати от всички папки на „{name}“",
+    "archive.count": "Архиви: {count}", "type.frame": "Кадър", "type.stack": "Стак",
+    "table.sort": "Подреди по тази колона. Натисни пак за обратен ред.",
+    "table.date": "Дата", "table.observingNight": "Нощ на наблюдение", "table.modificationDay": "Ден на промяна"
+  });
+  Object.assign(en, {
+    "settings.language": "Interface language",
+    "settings.languageNote": "Untranslated screens and messages may appear in Bulgarian or English.",
+    "settings.layoutReset": "Restore original panel positions and sizes",
+    "header.collapse": "Collapse the top menu", "header.expand": "Show the top menu",
+    "header.resources": "Disk and connection", "header.system": "System status",
+    "header.resourcesTitle": "Disk, connection and plugins",
+    "archive.telescopeList": "Telescopes", "archive.objectList": "Objects", "archive.nightList": "Observing nights",
+    "archive.folderList": "Folders", "archive.foldersAtLevel": "Folders at this level", "archive.archives": "Archives",
+    "archive.back": "← Back", "archive.all": "All archives", "archive.backTo": "Back to {name}",
+    "archive.shared": "Shared archive", "archive.chooseFolder": "Choose an archive folder in Settings.",
+    "archive.noFolders": "No folders at this level. Files are on the right.", "archive.more": "Show more…",
+    "archive.filteredSearch": "Search filtered results…", "archive.filteredResults": "Filtered results",
+    "archive.filterOn": "FILTER ON", "archive.filterOff": "Turn off", "archive.resultPath": "Results from all folders in “{name}”",
+    "archive.count": "Archives: {count}", "type.frame": "Frame", "type.stack": "Stack",
+    "table.sort": "Sort by this column. Click again to reverse the order.",
+    "table.date": "Date", "table.observingNight": "Observation night", "table.modificationDay": "Modification day"
+  });
+  const { languages, messages } = window.AstroArchiveLocales;
   const staticText = {
     ".skip-link":"skip", ".brand strong":"app.brand", "[data-route='archive']":"nav.archive", "[data-route='analysis']":"nav.analysis", "[data-route='preparation']":"nav.preparation", "#settings-open":"nav.settings",
     "#page-archive .eyebrow":"archive.eyebrow", "#archive-heading":"archive.title", "#page-archive .subtitle":"archive.subtitle", "#refresh span":"archive.refresh", ".sidebar-note .eyebrow":"archive.fast", ".sidebar-note p":"archive.lazy", "#loading":"folder.loading", "#empty h2":"folder.emptyTitle", "#empty [data-workspace]":"legacy.open",
-    "#page-archive thead th:nth-child(1)":"table.name", "#page-archive thead th:nth-child(2)":"table.type", "#page-archive thead th:nth-child(3)":"table.size", "#page-archive thead th:nth-child(4)":"table.modified", "#page-archive thead th:nth-child(5) span":"table.actions",
     "#page-analysis .page-heading .eyebrow":"analysis.eyebrow", "#analysis-heading":"analysis.title", "#page-analysis .subtitle":"analysis.subtitle", "#page-analysis .tag":"analysis.tag", "#page-analysis .migration-card:not(.detail-card) h2":"analysis.measurements", "#page-analysis .migration-card:not(.detail-card) p":"analysis.body", "[data-workspace='analysis']":"analysis.open", "#page-analysis .detail-card .eyebrow":"analysis.migration", "#page-analysis .detail-card h2":"analysis.separation", "#page-analysis .detail-card p:not(.eyebrow)":"analysis.existing", "#page-analysis li:nth-child(1)":"analysis.backend", "#page-analysis li:nth-child(2)":"analysis.frontend", "#page-analysis li:nth-child(3)":"analysis.settings",
     "#page-preparation .page-heading .eyebrow":"preparation.eyebrow", "#preparation-heading":"preparation.title", "#page-preparation .subtitle":"preparation.subtitle", "#page-preparation .tag":"preparation.tag", "#page-preparation .migration-card:not(.detail-card) h2":"preparation.queue", "#page-preparation .migration-card:not(.detail-card) p":"preparation.body", "[data-workspace='preparation']":"preparation.open", "#page-preparation .detail-card .eyebrow":"preparation.foundation", "#page-preparation .detail-card h2":"preparation.separation", "#page-preparation .detail-card p:not(.eyebrow)":"preparation.existing", ".workflow-steps span:nth-child(1)":"preparation.step1", ".workflow-steps span:nth-child(2)":"preparation.step2", ".workflow-steps span:nth-child(3)":"preparation.step3", ".journal h2":"journal.title", "#clear-journal":"journal.clear"
   };
   let selected = { id: "bg", locale: "bg", messages: {} };
   function t(key, parameters = {}) {
     const fallback = selected.locale.toLowerCase().startsWith("bg") ? bg : en;
-    const text = (Object.hasOwn(selected.messages, key) ? selected.messages[key] : undefined) ?? fallback[key] ?? en[key] ?? bg[key] ?? key;
+    const text = (Object.hasOwn(selected.messages, key) ? selected.messages[key] : undefined)
+      ?? messages[selected.id]?.[key] ?? fallback[key] ?? en[key] ?? bg[key] ?? key;
     return String(text).replace(/\{([A-Za-z0-9_]+)\}/g, (match, name) => Object.hasOwn(parameters, name) ? String(parameters[name]) : match);
   }
   function apply() {
@@ -137,12 +174,13 @@
     for (const [selector, key] of Object.entries(staticText)) for (const node of document.querySelectorAll(selector)) node.textContent = t(key);
     for (const node of document.querySelectorAll("[data-i18n]")) node.textContent = t(node.dataset.i18n);
     for (const node of document.querySelectorAll("[data-i18n-aria-label]")) node.setAttribute("aria-label", t(node.dataset.i18nAriaLabel));
+    document.getElementById("refresh").title = t("archive.refresh");
     const labels = [[".navigation", "nav.label"], [".archive-sidebar", "archive.select"], [".content-panel", "folder.content"], ["#breadcrumbs", "folder.current"], ["#search", "folder.search"], ["#previous", "page.previous"], ["#next", "page.next"], [".journal", "journal.label"], ["#journal-entries", "journal.entries"]];
     for (const [selector, key] of labels) document.querySelector(selector)?.setAttribute("aria-label", t(key));
     document.getElementById("search").placeholder = t("folder.search");
   }
   window.AstroArchiveI18n = {
-    t, apply, get locale() { return selected.locale; },
+    t, apply, languages, get locale() { return selected.locale; },
     select(language) {
       // Invalid or unfamiliar locale identifiers still get a readable fallback.
       let locale = language?.locale || "bg";

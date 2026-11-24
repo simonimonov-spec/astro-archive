@@ -18,7 +18,7 @@
   const anchorParts=(path,id)=>parts(path).slice(0,Math.max(0,(layouts[id]?.levels?.length||3)-1));
   const parts = path => (path || '').split(/[\\/]/).filter(Boolean);
   const pathKey = path => parts(path).join('\\').toLocaleLowerCase('en-US');
-  const tr = (bg, en) => window.AstroArchiveI18n.locale.startsWith('en') ? en : bg;
+  const t = window.AstroArchiveI18n.t;
   const number = value => new Intl.NumberFormat(window.AstroArchiveI18n.locale).format(value);
   const make = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; };
   function icon(role) {
@@ -57,20 +57,20 @@
       }
       function describe() {
         const path = parts(context.path), anchor = anchorParts(context.path,context.archiveId), archive = context.archives.find(a => a.id === context.archiveId);
-        return {anchor: anchor.join('\\'), depth: anchor.length, title: !context.entered ? window.AstroArchiveI18n.t('archive.roots')
+        return {anchor: anchor.join('\\'), depth: anchor.length, title: !context.entered ? t('archive.roots')
           : (anchor.length===1?window.AstroArchiveCustomization.telescope(anchor[0]):anchor.at(-1)) || actions.name(archive), icon: anchor.length ? role(context.archiveId, anchor.join('\\')) : role(context.archiveId, '', 'archive'),
-          hint: !context.entered ? tr('Избери архив', 'Choose an archive') : ({telescope:tr('Телескопи','Telescopes'),object:tr('Обекти','Objects'),night:tr('Наблюдателни нощи','Observation nights')}[layouts[context.archiveId]?.levels?.[anchor.length]?.field]||tr('Папки','Folders'))};
+          hint: !context.entered ? t('folder.choose') : ({telescope:t('archive.telescopeList'),object:t('archive.objectList'),night:t('archive.nightList')}[layouts[context.archiveId]?.levels?.[anchor.length]?.field]||t('archive.folderList'))};
       }
       function renderHeading() {
         const description = describe(); title.textContent = description.title; title.title = description.title;
         count.textContent = context.entered ? (context.unavailable ? '—' : number(total)) : String(total).padStart(2, '0');
-        count.title = context.entered ? tr('Папки на това ниво', 'Folders at this level') : tr('Архиви', 'Archives');
+        count.title = context.entered ? t('archive.foldersAtLevel') : t('archive.archives');
         level.textContent = description.hint;
         const holder = document.getElementById('archive-nav-icon'); holder.hidden = !context.entered; holder.replaceChildren(icon(description.icon));
         back.hidden = home.hidden = !context.entered;
-        back.textContent = tr('← Назад', '← Back'); home.textContent = tr('Всички архиви', 'All archives');
-        const parent = parts(context.path).slice(0, -1).at(-1) || (context.path ? actions.name(context.archives.find(a => a.id === context.archiveId)) : window.AstroArchiveI18n.t('archive.roots'));
-        back.title = tr('Назад към ', 'Back to ') + parent;
+        back.textContent = t('archive.back'); home.textContent = t('archive.all');
+        const parent = parts(context.path).slice(0, -1).at(-1) || (context.path ? actions.name(context.archives.find(a => a.id === context.archiveId)) : t('archive.roots'));
+        back.title = t('archive.backTo', {name: parent});
         list.setAttribute('aria-label', description.title + ' · ' + description.hint);
       }
       function renderEntries() {
@@ -80,18 +80,18 @@
           button.dataset.navKey = entry.kind==='archive' ? 'archive:' + entry.archiveId : pathKey(entry.relativePath);
           const entryIcon = entry.kind==='archive' ? role(entry.archiveId, '', 'archive') : entry.icon||role(context.archiveId, entry.relativePath);
           const caption = make('span', 'archive-nav-caption'); caption.append(make('strong', '', entry.displayName||(!entry.archiveId&&parts(entry.relativePath).length===1?window.AstroArchiveCustomization.telescope(entry.name):entry.name)));
-          if (entry.kind==='archive') caption.append(make('small', '', entry.shared ? tr('Споделен архив', 'Shared archive') : window.AstroArchiveI18n.t(entry.configured ? 'archive.savedPath' : 'archive.chooseSettings')));
+          if (entry.kind==='archive') caption.append(make('small', '', entry.shared ? t('archive.shared') : t(entry.configured ? 'archive.savedPath' : 'archive.chooseSettings')));
           button.append(icon(entryIcon), caption, make('span', 'archive-nav-chevron', '›')); button.title = entry.name;
-          if (entry.isLink) { button.disabled = true; button.title = window.AstroArchiveI18n.t('file.linkBlocked'); }
+          if (entry.isLink) { button.disabled = true; button.title = t('file.linkBlocked'); }
           const archiveId = context.archiveId;
           button.onclick = () => actions.navigate(entry.archiveId || archiveId, entry.relativePath || ''); fragment.append(button);
           actions.attachMenu?.(button,entry.archiveId||archiveId,entry);
         }
         if (!entries.length) fragment.append(make('p', 'archive-nav-empty', context.unavailable
-          ? tr('Избери папка за този архив от настройките.', 'Choose an archive folder in Settings.')
-          : tr('Няма папки на това ниво. Файловете са вдясно.', 'No folders at this level. Files are on the right.')));
+          ? t('archive.chooseFolder')
+          : t('archive.noFolders')));
         if (context.entered && entries.length < total) {
-          const more = make('button', 'text-button archive-nav-more', tr('Покажи още…', 'Show more…')); more.type = 'button'; more.disabled = moreBusy; more.onclick = loadMore; fragment.append(more);
+          const more = make('button', 'text-button archive-nav-more', t('archive.more')); more.type = 'button'; more.disabled = moreBusy; more.onclick = loadMore; fragment.append(more);
         }
         list.replaceChildren(fragment); selected();
       }

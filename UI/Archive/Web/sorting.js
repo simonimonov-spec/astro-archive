@@ -42,8 +42,7 @@
     const active = state.key === column.key;
     arrow.className = 'sort-arrow'; arrow.setAttribute('aria-hidden', 'true'); arrow.textContent = active && state.direction < 0 ? '▼' : '▲';
     if (active) th.setAttribute('aria-sort', state.direction > 0 ? 'ascending' : 'descending');
-    const en = window.AstroArchiveI18n?.locale?.startsWith('en');
-    button.title = en ? 'Sort by this column; click again to reverse' : 'Подреди по тази колона; натисни пак за обратен ред';
+    button.title = window.AstroArchiveI18n.t('table.sort');
     button.append(document.createTextNode(title), arrow);
     button.onclick = () => { if (state.key === column.key) state.direction *= -1; else { state.key = column.key; state.direction = 1; } redraw(); };
     th.append(button);

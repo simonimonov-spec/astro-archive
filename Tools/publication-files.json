@@ -363,6 +363,14 @@
         "destination": "UI/Shared/Web/islands.js"
       },
       {
+        "source": "UI/Shared/Web/language-flags.png",
+        "destination": "UI/Shared/Web/language-flags.png"
+      },
+      {
+        "source": "UI/Shared/Web/locales.js",
+        "destination": "UI/Shared/Web/locales.js"
+      },
+      {
         "source": "UI/Shared/Web/monitoring.css",
         "destination": "UI/Shared/Web/monitoring.css"
       },
