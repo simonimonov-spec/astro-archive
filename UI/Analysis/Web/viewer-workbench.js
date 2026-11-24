@@ -162,11 +162,22 @@
     shelf.hidden=!openGroups.length;
     document.documentElement.classList.toggle('viewer-shelf-open',Boolean(openGroups.length));
     for (const group of openGroups) {
-      const item=node('button','quiet-button viewer-shelf-item',group.name||t('title'));
-      item.type='button';item.title=group.name||t('title');
+      const name=group.name||t('title');
+      const entry=node('div','viewer-shelf-entry');
+      const item=node('button','quiet-button viewer-shelf-item');
+      item.append(node('span',null,name));
+      item.type='button';item.title=name;
       item.setAttribute('aria-pressed',String(group===active));
       item.onclick=()=>group===active?hide(group):show(group);
-      shelf.append(item);
+      const close=button('close',()=>{
+        closeGroup(group);
+        shelf.querySelector('.viewer-shelf-item')?.focus();
+      },'close');
+      close.classList.add('viewer-shelf-close');
+      close.title=t('close')+' · '+name;
+      close.setAttribute('aria-label',close.title);
+      entry.append(item,close);
+      shelf.append(entry);
     }
   }
   function report(group,message) {
@@ -184,6 +195,7 @@
     images.setAttribute('aria-label',t('imageSelection'));
     images.hidden=true;
     const controls=node('div','viewer-comparison-actions');
+    const windowControls=node('div','viewer-window-buttons');
     const tools=node('div','viewer-shared-tools');
     tools.hidden=true;
     const body=node('div','viewer-comparison-body');
@@ -203,12 +215,13 @@
     group.detach=button('detach',()=>openWindow(group),'detach');
     group.dock=button('dock',()=>returnToApp(group,true),'dock');
     group.dock.hidden=true;
-    controls.append(add,group.hideImage,group.closeImage,group.detach,group.dock,
+    windowControls.append(group.detach,group.dock,
       button('minimize',()=>hide(group),'minimize'),
       button('maximize',()=>{
         if(group.popup)native(group,'maximize').catch(error=>report(group,error.message));
         else root.classList.toggle('viewer-comparison-expanded');
       },'maximize'),button('close',()=>closeGroup(group),'close'));
+    controls.append(add,group.hideImage,group.closeImage,windowControls);
     heading.append(title,images,controls);
     status.hidden=true;status.setAttribute('role','status');
     body.append(grid,picker);root.append(heading,tools,status,hiddenImages,body,hiddenPanes);

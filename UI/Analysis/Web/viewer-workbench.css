@@ -19,9 +19,21 @@
   scrollbar-width: none;
 }
 .viewer-shelf > .app-icon-button { flex: 0 0 26px; width: 26px; }
-.viewer-shelf > .app-icon-button .app-icon { width: 16px; height: 16px; }
+.viewer-shelf .quiet-button .app-icon { width: 16px; height: 16px; }
 .viewer-shelf-open .app-shell { padding-bottom: var(--viewer-shelf-height); }
-.viewer-shelf .viewer-shelf-item { flex-basis: 116px; }
+.viewer-shelf-entry { display: flex; flex: 0 0 116px; min-width: 0; }
+.viewer-shelf-entry .viewer-shelf-item { flex: 1 1 auto; min-width: 0; }
+.viewer-shelf-entry .viewer-shelf-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.viewer-shelf-close {
+  --quiet-button-padding: 0;
+  flex: 0 0 24px;
+  width: 24px;
+  margin-left: -1px;
+}
 .viewer-shelf-item {
   flex: 0 1 190px;
   min-width: 74px;
@@ -97,6 +109,31 @@
   min-width: 34px;
   height: 34px;
   padding: 0;
+}
+.viewer-shelf .quiet-button,
+.viewer-comparison .quiet-button,
+.viewer-workbench-controls :is(.viewer-icon-button, .viewer-comparison-actions .quiet-button) {
+  --control-radius: 2px;
+  border-radius: var(--control-radius);
+}
+.viewer-window-buttons {
+  --quiet-button-height: 28px;
+  --quiet-button-padding: 0;
+  display: flex;
+  margin-left: 4px;
+}
+.viewer-window-buttons .quiet-button {
+  width: 38px;
+  min-width: 38px;
+  height: 28px;
+}
+.viewer-window-buttons .quiet-button:not([hidden]) ~ .quiet-button { margin-left: -1px; }
+.viewer-window-buttons .quiet-button .app-icon { width: 16px; height: 16px; }
+.viewer-shelf .viewer-shelf-entry .viewer-shelf-close.quiet-button:not(:disabled):hover,
+.viewer-comparison .viewer-window-buttons .quiet-button[data-viewer-label="close"]:not(:disabled):hover {
+  background: var(--error-surface);
+  border-color: var(--error);
+  color: var(--error);
 }
 .viewer-shared-tools {
   grid-row: 2;
