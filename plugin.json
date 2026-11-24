@@ -28,14 +28,6 @@
       "clients": ["desktop"]
     },
     {
-      "id": "network",
-      "slot": "settings",
-      "title": "Shared Archives · Windows SMB",
-      "clients": [
-        "desktop"
-      ]
-    },
-    {
       "id": "state",
       "slot": "header",
       "title": "Споделени LAN архиви",

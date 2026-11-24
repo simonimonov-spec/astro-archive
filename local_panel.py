@@ -656,7 +656,7 @@ class LocalPanel:
             if self.host:
                 options.append(dict(value="server", label="Контрол на сървъра"))
             fields = [field("select", "local-mode", label="Режим на Shared Archives", value=self.mode,
-                            options=options, span=2, disabled=bool(self.lease or self.busy), command="local-mode")]
+                            options=options, presentation="segments", span=2, disabled=bool(self.lease or self.busy), command="local-mode")]
             fields.extend({"host": self.host_fields, "server": self.server_fields,
                            "receive": self.receive_fields}[self.mode]())
         if fields != self.last_document:

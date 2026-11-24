@@ -290,7 +290,8 @@ class LocalPanelTests(unittest.TestCase):
                 close = entry.setup(context)
                 try:
                     self.assertIn("local-sharing", context.documents)
-                    self.assertIn("network", context.documents)
+                    self.assertNotIn("network", context.documents)
+                    self.assertEqual(context.documents["local-sharing"][0]["presentation"], "segments")
                     self.assertIn("local-host-switch", context.commands)
                 finally:
                     close()
