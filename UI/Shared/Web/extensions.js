@@ -249,7 +249,20 @@
       for(const holder of holders){for(const property of [...holder.style])if(property.startsWith('--'))holder.style.removeProperty(property);for(const[n,v]of values)holder.style.setProperty(n,v);}
     }
   }
+  // Beta 1.3 UI: Preparation plugins show their settings in the right column of step 2, next to the other ways of working.
+  const inlineHost=slot=>slot==='preparation'?$('w-plugin-options'):null;
+  function selectInline(slot,id,notify){
+    const host=inlineHost(slot);active[slot]=id;$(slot+'-content').hidden=false;$(slot+'-extensions').hidden=true;$(slot+'-extensions').replaceChildren();host.replaceChildren();
+    for(const card of $('w-plugin-actions')?.querySelectorAll('[data-extension-key]')||[])card.setAttribute('aria-pressed',String(card.dataset.extensionKey===id));
+    const current=approved(slot).find(x=>key(x.p,x.c)===id);
+    if(current){const content=node('section',null,'declarative-plugin');host.append(content);mount(content,current.p,current.c);if(notify&&current.c.activate)U.call('plugin.ui.activate',{pluginId:current.p.id,contributionId:current.c.id,context:selection(slot)}).catch(error=>U.error(slot,error));}
+    window.AstroArchivePreparation?.plugin?.(current?id:null);
+    if(notify)window.AstroArchiveSession?.changed('extensions');
+  }
+  // Leave an inline plugin without resetting the chosen data (pending field saves are sent first).
+  async function deselect(slot){const current=approved(slot).find(x=>key(x.p,x.c)===active[slot]);if(current){for(const[id,pending]of [...saveTimers])if(id.startsWith(key(current.p,current.c)+':')){clearTimeout(pending.timer);pending.flush();}await actionQueues.get(current.p.id);}select(slot,null);}
   function select(slot,id,notify=true){
+    if(inlineHost(slot))return selectInline(slot,id,notify);
     active[slot]=id;$(slot+'-content').hidden=!!id;const host=$(slot+'-extensions');host.hidden=!id;host.replaceChildren();
     for(const button of $(slot+'-extension-tabs').querySelectorAll('button'))button.setAttribute('aria-pressed',String((button.dataset.extensionKey||null)===id));
     const current=approved(slot).find(x=>key(x.p,x.c)===id);if(current){if(slot==='preparation'){const back=node('button','← Подбор на данни','flow-back');back.onclick=()=>leavePreparation(current.p,current.c).catch(error=>U.error(slot,error));host.append(back);}const content=node('section',null,'declarative-plugin');host.append(content);mount(content,current.p,current.c);if(notify&&current.c.activate)U.call('plugin.ui.activate',{pluginId:current.p.id,contributionId:current.c.id,context:selection(slot)}).catch(error=>U.error(slot,error));}
@@ -265,9 +278,9 @@
       const base=node('button',slot==='analysis'?'Основен анализ':'Основна подготовка');base.onclick=()=>select(slot,null);menu.append(base);
       for(const {p,c}of entries){const button=node('button',c.title);button.dataset.extensionKey=key(p,c);button.onclick=()=>select(slot,key(p,c));menu.append(button);}
       const actionHost=$(slot==='analysis'?'q-plugin-actions':'w-plugin-actions');
-      if(actionHost){actionHost.replaceChildren();actionHost.hidden=!entries.length;for(const{p,c}of entries){const button=node('button',null,'flow-card');button.append(node('span','ПЛЪГИН','extension-plugin-badge'));if(p.logoDataUrl){const img=node('img');img.src=p.logoDataUrl;img.alt='';img.className='extension-card-logo';button.append(img);}button.append(node('strong',c.title),node('small',p.name+' · '+(c.description||'Добавка')));button.onclick=()=>select(slot,key(p,c));actionHost.append(button);}}
+      if(actionHost){actionHost.replaceChildren();actionHost.hidden=!entries.length;for(const{p,c}of entries){const button=node('button',null,'flow-card');button.dataset.extensionKey=key(p,c);button.setAttribute('aria-pressed',String(active[slot]===key(p,c)));button.append(node('span','ПЛЪГИН','extension-plugin-badge'));if(p.logoDataUrl){const img=node('img');img.src=p.logoDataUrl;img.alt='';img.className='extension-card-logo';button.append(img);}button.append(node('strong',c.title),node('small',p.name+' · '+(c.description||'Добавка')));button.onclick=()=>select(slot,key(p,c));actionHost.append(button);}}
       const selected=entries.some(x=>key(x.p,x.c)===active[slot])?active[slot]:null;
-      if(selected)select(slot,selected,false);else{$(slot+'-content').hidden=false;$(slot+'-extensions').hidden=true;active[slot]=null;base.setAttribute('aria-pressed','true');}
+      if(selected)select(slot,selected,false);else if(inlineHost(slot)&&active[slot])select(slot,null,false);else{$(slot+'-content').hidden=false;$(slot+'-extensions').hidden=true;active[slot]=null;base.setAttribute('aria-pressed','true');}
     }
     renderActivities();
     const archive=$('archive-extensions');archive.replaceChildren();
@@ -323,7 +336,7 @@
       for(const[id,value]of Object.entries(updates)){const element=item.c.elements?.find(e=>e.id===id&&['metric','text'].includes(e.type));if(!element||!value||Object.keys(value).some(k=>!['value','tone','unit'].includes(k))||typeof value.value!=='string'||value.value.length>4000||value.tone&&!['normal','success','warning','error','primary'].includes(value.tone)||value.unit!=null&&(typeof value.unit!=='string'||value.unit.length>100))throw Error('Непозволени локални UI данни.');mapped.set(id,{...value});}
       clientValues.set(key(item.p,item.c),mapped);renderHeader();return true;
     },
-    select,isActive:slot=>!!active[slot],
+    select,deselect,isActive:slot=>!!active[slot],
     // Core code may register a dynamic anchor; plugins add/replace only while approved.
     anchor(element,name,context={}){if(!(element instanceof Element)||typeof name!=='string'||!/^[a-z]+\.[a-z-]+$/.test(name))return;element.dataset.pluginAnchor=name;anchorContexts.set(element,{...context});if(loaded){renderAnchor(element,true);applyThemes();}},
     hasCapability:id=>plugins.some(p=>p.enabled&&p.available&&(p.capabilities||[]).some(c=>c.id===id)),

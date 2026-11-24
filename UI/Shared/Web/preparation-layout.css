@@ -204,3 +204,11 @@
 #w-program-options:not([hidden]) { display: flex; flex-direction: column; gap: 14px; }
 #w-return-options:not([hidden]) { display: flex; flex-direction: column; gap: 6px; }
 #w-program-options :is(.flow-option-fields, .function-actions), #w-program-path, #w-destination-note { margin-block: 0 !important; }
+
+/* A chosen plugin shows its settings here, in the options column. */
+#w-plugin-options[hidden], #w-plan[hidden], #w-action .flow-action-bar .function-actions[hidden] { display: none !important; }
+#w-plugin-options > .declarative-plugin { min-width: 0; }
+#w-plugin-options .extension-workbench > .extension-group { max-height: none; }
+/* The plugin card on the left already names it: no second heading, no centred box. */
+#w-plugin-options > .declarative-plugin { max-width: none !important; margin: 0 !important; padding: 0 !important; }
+#w-plugin-options .extension-heading { display: none !important; }
