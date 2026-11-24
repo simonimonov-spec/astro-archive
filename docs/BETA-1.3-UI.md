@@ -121,6 +121,7 @@
 | 2026-11-24 | Сравнението е на общо поле с тънка разделителна линия и обща лента с инструменти за избраната снимка. `UI/Analysis/Web/viewer.js`, `UI/Analysis/Web/viewer-workbench.{js,css}`. | `Beta 1.3 UI: unify the image comparison viewer` |
 | 2026-11-24 | Етикет за данните (Астрофотография / Фотометрия): внасяне с „Какво внасяш?“ по вечери и кадри, етикет в Архив, филтър, знаци, въпрос преди фотометрия | (този commit) |
 | 2026-11-24 | Долната лента на прегледите се показва при отворен файл и се скрива, когато няма файлове за възстановяване. `UI/Analysis/Web/viewer-workbench.js`. | `Beta 1.3 UI: hide viewer shelf when empty` |
+| 2026-11-24 | Долната лента на прегледите е висока 31 px с бутони 26 px. `UI/Analysis/Web/viewer-workbench.css`, `UI/Shared/Web/buttons.css`. | `Beta 1.3 UI: compact the viewer shelf` |
 
 ## Следващи стъпки (план)
 
