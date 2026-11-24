@@ -52,13 +52,15 @@ def validate(document):
             raise ValueError('Невалиден публичен плъгин.')
         seen.add(ident)
         validate_package(item)
-        # Earlier builds ignore this field and keep using the base package.
-        if 'archiveSourcePackage' in item:
-            package = item['archiveSourcePackage']
+        # Older clients use the newest package field they recognise.
+        for field in ('archiveSourcePackage', 'lanPackage'):
+            if field not in item:
+                continue
+            package = item[field]
             if not isinstance(package, dict) or set(package) != {'description', 'version', 'commit', 'sha256'}:
-                raise ValueError('Невалиден пакет за споделен източник.')
+                raise ValueError('Невалиден пакет за споделен архив.')
             item = dict(item, **package)
-            del item['archiveSourcePackage']
+            del item[field]
             validate_package(item)
         entries.append(item)
     return entries

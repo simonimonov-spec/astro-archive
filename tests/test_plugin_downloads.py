@@ -91,6 +91,16 @@ class DownloadTests(unittest.TestCase):
         self.assertIn(package['commit'], fetch.call_args.args[0])
         self.assertEqual(self.manager.records['sample']['version'], 'V-2.1')
 
+    def test_lan_package_preserves_older_catalog_entries(self):
+        sources = dict(version='V-2.2', description='Sources', commit='2'*40, sha256='a'*64)
+        lan = dict(version='V-2.3', description='LAN', commit='3'*40, sha256='b'*64)
+        item = dict(self.entry, archiveSourcePackage=sources, lanPackage=lan)
+        self.assertEqual(validate(dict(format=1, plugins=[item])), [dict(self.entry, **lan)])
+        self.assertEqual(item['archiveSourcePackage'], sources)
+        self.assertEqual(item['version'], self.entry['version'])
+        with self.assertRaises(ValueError):
+            validate(dict(format=1, plugins=[dict(item, lanPackage=dict(lan, sha256='invalid'))]))
+
     def test_rejects_unverified_archive_source_package(self):
         good = dict(version='V-2.1', description='Sources', commit='2'*40, sha256='b'*64)
         for package in (None, dict(good, commit='main'), dict(good, repository='someone/other'),

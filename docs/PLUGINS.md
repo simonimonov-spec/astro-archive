@@ -36,10 +36,10 @@
 | AI оценител | Beta-1 | [frame-inspector-ai](https://github.com/simonimonov-spec/astro-archive/tree/plugin-frame-inspector-ai) |
 | Автоматично стакване чрез Siril | V-1 | [siril-auto](https://github.com/simonimonov-spec/astro-archive/tree/plugin-siril-auto) |
 | Remote Operation | V-1 | [remote-operation](https://github.com/simonimonov-spec/astro-archive/tree/plugin-remote-operation) |
-| Shared Archives · LAN | V-2.2 / V-2 | [shared-archives](https://github.com/simonimonov-spec/astro-archive/tree/plugin-shared-archives) |
+| Shared Archives · LAN | V-2.3 / V-2.2 / V-2 | [shared-archives](https://github.com/simonimonov-spec/astro-archive/tree/plugin-shared-archives) |
 | IASC Campaigns | V-1 | [iasc-campaigns](https://github.com/simonimonov-spec/astro-archive/tree/plugin-iasc-campaigns) |
 
-V-2.2 на Shared Archives се предлага в Astro Archive с поддръжка на споделени източници. За дисковата справка и измереното време за отговор в „Диск и връзка“ използвай Beta 1.2.3 и Shared Archives V-2.2 и в двете копия. По-старите копия без поддръжка на споделен източник получават V-2 от същия каталог.
+V-2.3 се предлага в Astro Archive с поддръжка на табове за плъгини и включена зависимост `cryptography`. Изданието добавя LAN/VPN свързване с еднократен код и ключ за откачане на получателя. V-2.2 на Shared Archives се предлага в Astro Archive с поддръжка на споделени източници. За дисковата справка и измереното време за отговор в „Диск и връзка“ използвай Beta 1.2.3 и Shared Archives V-2.2 и в двете копия. По-старите копия без поддръжка на споделен източник получават V-2 от същия каталог.
 
 AI Trainer и частният плъгин за етикетиране `ai-training` не се публикуват.
 AI оценителят работи без Trainer. Без активен обучен модел използва евристики;
