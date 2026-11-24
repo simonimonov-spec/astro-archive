@@ -120,6 +120,7 @@
 | 2026-11-24 | Сравнение на снимки с влачене върху „Добави“, подредба по четирите посоки и независими, преместваеми панели за настройки. Отделяне, прибиране и връщане на прегледи като прозорци на Astro Archive в Windows. `UI/Analysis/Web/viewer.js`, `UI/Analysis/Web/viewer-workbench.{js,css}`, `Bridge/Desktop/viewer_windows.py`. | `Beta 1.3 UI: add image comparison workspaces` |
 | 2026-11-24 | Сравнението е на общо поле с тънка разделителна линия и обща лента с инструменти за избраната снимка. `UI/Analysis/Web/viewer.js`, `UI/Analysis/Web/viewer-workbench.{js,css}`. | `Beta 1.3 UI: unify the image comparison viewer` |
 | 2026-11-24 | Етикет за данните (Астрофотография / Фотометрия): внасяне с „Какво внасяш?“ по вечери и кадри, етикет в Архив, филтър, знаци, въпрос преди фотометрия | (този commit) |
+| 2026-11-24 | Долната лента на прегледите се показва при отворен файл и се скрива, когато няма файлове за възстановяване. `UI/Analysis/Web/viewer-workbench.js`. | `Beta 1.3 UI: hide viewer shelf when empty` |
 
 ## Следващи стъпки (план)
 

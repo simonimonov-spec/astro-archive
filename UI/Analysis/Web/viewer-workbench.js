@@ -141,11 +141,15 @@
       native(group,'focus').then(()=>group.popup?.focus()).catch(error=>report(group,error.message));
       return;
     }
-    if(active && active!==group)active.root.hidden=true;
+    if(active && active!==group){
+      if(active.panes.size)active.root.hidden=true;
+      else closeGroup(active);
+    }
     active=group;group.root.hidden=false;
     drawShelf();
   }
   function hide(group) {
+    if(!group.panes.size){closeGroup(group);return;}
     if(group.popup){native(group,'minimize').catch(error=>report(group,error.message));return;}
     group.root.hidden=true;
     if(active===group)active=null;
@@ -153,10 +157,11 @@
   }
   function drawShelf() {
     if(!shelf)return;
+    const openGroups=[...groups].filter(group=>group.panes.size);
     shelf.replaceChildren(button('newGroup',()=>createGroup(), 'add'));
-    shelf.hidden=!groups.size;
-    document.documentElement.classList.toggle('viewer-shelf-open',groups.size>0);
-    for (const group of groups) {
+    shelf.hidden=!openGroups.length;
+    document.documentElement.classList.toggle('viewer-shelf-open',Boolean(openGroups.length));
+    for (const group of openGroups) {
       const item=node('button','quiet-button viewer-shelf-item',group.name||t('title'));
       item.type='button';item.title=group.name||t('title');
       item.setAttribute('aria-pressed',String(group===active));
@@ -422,7 +427,10 @@
       group.themeObserver=new MutationObserver(()=>copyTheme(doc));
       group.themeObserver.observe(document.documentElement,{attributes:true,attributeFilter:['style','data-theme','data-animations','data-image-tint','lang']});
       popup.addEventListener('pagehide',()=>{
-        if(!unloading && group.popup===popup)returnToApp(group,false);
+        if(!unloading && group.popup===popup){
+          returnToApp(group,false);
+          if(!group.panes.size)closeGroup(group);
+        }
       });
       if(active===group)active=null;
       doc.body.append(group.root);group.root.hidden=false;
