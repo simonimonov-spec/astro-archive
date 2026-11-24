@@ -95,6 +95,7 @@
 | 2026-11-24 | Бележка за Beta 1.3 UI и правила за AI помощниците; скрито заглавие „Анализ“ | `def23e2` |
 | 2026-11-24 | Shared Archives: меню за получател, настройки на хоста и контрол на сървъра. `UI/Shared/Web/toggles.css` запазва отметките за избор на архиви, а `UI/Shared/Web/extensions.js` възстановява предишната стойност при отказана промяна на отметка. | `Beta 1.3 UI: Shared Archives controls` |
 | 2026-11-24 | Shared Archives: табове с плъзгащо се подчертаване за режимите и премахнат стар SMB панел. `UI/Shared/Web/extensions.js`, `UI/Shared/Web/extensions.css`, `Bridge/Plugins/contracts.py`. | `Beta 1.3 UI: Shared Archives sliding tabs` |
+| 2026-11-24 | Shared Archives: ключ за откачане и повторно свързване в „Получател“. `Plugins/shared-archives/local_panel.py`. | `Beta 1.3 UI: allow disconnecting from a Shared Archives host` |
 
 ## Следващи стъпки (план)
 
