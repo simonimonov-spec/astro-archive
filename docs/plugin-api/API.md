@@ -121,7 +121,7 @@ Handler връща JSON-съвместим резултат; `message` пока�
 | `input` | `value`, `placeholder`, `maxLength`, `command` |
 | `number` | `value`, `min`, `max`, `step`, `command` |
 | `checkbox` | `value`, `command` |
-| `select` | `value`, `options: [{value, label}]`, `command` |
+| `select` | `value`, `options: [{value, label}]`, `command`, `presentation` с `dropdown` или `segments` (по подразбиране `dropdown`) |
 | `button` | `command`, `tone` |
 | `group` | `children` със същите видове контроли |
 | `table` | `columns: [{key, label, format}]`, `rows`, `command` при избор на ред |

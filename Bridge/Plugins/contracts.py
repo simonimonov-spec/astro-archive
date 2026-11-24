@@ -100,7 +100,7 @@ def ui_document(elements):
             allowed={
                 'text':{'value','tone'},'metric':{'value','unit','tone'},
                 'input':{'value','placeholder','maxLength','command'},'textarea':{'value','placeholder','maxLength','command'},'number':{'value','min','max','step','command'},
-                'checkbox':{'value','command'},'select':{'value','options','command'},
+                'checkbox':{'value','command'},'select':{'value','options','command','presentation'},
                 'button':{'command','tone'},'group':{'children'},'console':{'value'},'image':{'value','assetId'},
                 'table':{'columns','rows','command'},'chart':{'chartType','series','xLabel','yLabel'},
                 'list':{'items','command','actionLabel'},
@@ -136,6 +136,8 @@ def ui_document(elements):
                 if 'value' in e and not e.get('min',float('-inf'))<=e['value']<=e.get('max',float('inf')):raise ValueError('Началната стойност е извън интервала.')
             if e['type']=='group':validate(e.get('children',[]),depth+1)
             if e['type']=='select':
+                if e.get('presentation', 'dropdown') not in ('dropdown', 'segments'):
+                    raise ValueError('Невалиден изглед на поле за избор.')
                 options=e.get('options',[])
                 if not isinstance(options,list) or len(options)>1000 or any(not isinstance(o,dict) or set(o)-{'value','label'} or not isinstance(o.get('value'),str) or not isinstance(o.get('label'),str) for o in options):raise ValueError('Невалидни опции за избор.')
                 if len({o['value'] for o in options})!=len(options) or ('value' in e and e['value'] not in [o['value'] for o in options]):raise ValueError('Повторена опция или невалиден начален избор.')
