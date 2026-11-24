@@ -4,7 +4,8 @@
 (() => {
   const words = {
     title:['Преглед на изображение','Image viewer'], close:['Назад към работата · Esc','Back to workspace · Esc'],
-    closeImage:['Затвори снимката','Close image'],
+    compare:['Сравни','Compare'],compareTitle:['Сравнение на кадри','Frame comparison'],
+    compareLeft:['Ляв кадър','Left frame'],compareRight:['Десен кадър','Right frame'],
     previous:['Предишен кадър · ←','Previous image · ←'],next:['Следващ кадър · →','Next image · →'],
     fit:['Напасни · F','Fit · F'],one:['Мащаб 1:1 · 1','Scale 1:1 · 1'],rotate:['Завърти 90°','Rotate 90°'],
     flipX:['Огледално по хоризонтала','Flip horizontally'],flipY:['Огледално по вертикала','Flip vertically'],
@@ -36,15 +37,12 @@
   const en = () => !(window.AstroArchiveI18n?.locale || 'bg').toLowerCase().startsWith('bg');
   const t = key => {const full='viewer.'+key,translated=window.AstroArchiveI18n?.t(full);return translated&&translated!==full?translated:words[key]?.[en()?1:0]||key;};
   let paneNumber = 0;
-  function createViewer(host = null, callbacks = {}) {
+  function createViewer(host = null, paneLabel = '') {
   const isolated = Boolean(host), prefix = isolated ? `vc-${++paneNumber}-` : 'v-';
-  let call,dialog,canvas,ctx,overview,histogram,stage,toolbar,footer,pixel,frame=null,picture=null,id='',serial=0,renderSerial=0;
+  let call,dialog,canvas,ctx,overview,histogram,stage,frame=null,picture=null,id='',serial=0,renderSerial=0,comparisonSource;
   let zoom=1,pan={x:0,y:0},rotation=0,flipX=false,flipY=false,fitting=true,drag=null,animation=0;
-  let debounce,pixelTimer,pixelBusy=false,restoreFocus,resize,animationWindow,loading=false,keptTransform=null,pendingDisplay=null;
-  const $ = key => {
-    const selector='#'+prefix+key;
-    return dialog.querySelector(selector) || toolbar?.querySelector(selector) || (key==='pixel'?pixel:null);
-  };
+  let debounce,pixelTimer,pixelBusy=false,restoreFocus,resize,loading=false,keptTransform=null,pendingDisplay=null;
+  const $ = key => dialog.querySelector('#'+prefix+key);
   const request = (method, params) => isolated ? call('viewer.compare', {...params, action:method.slice(7)}) : call(method, params);
   const fmt = x => Number.isFinite(x)?x.toLocaleString(en()?'en':'bg',{maximumSignificantDigits:7}):'—';
   const icons={close:'close',previous:'previous',next:'next',fit:'fit',one:'actual',minus:'zoomOut',plus:'zoomIn',rotate:'rotate',flipX:'flipX',flipY:'flipY',panel:'panel',reset:'reset',header:'header',retry:'reset'};
@@ -53,7 +51,7 @@
   function control(key,value,min,max,step){return `<label class="viewer-control"><span data-text="${key}"></span><div><input id="v-${key}" type="range" min="${min}" max="${max}" step="${step}" value="${value}"><input id="v-${key}-number" type="number" aria-label="${t(key)}" min="${min}" max="${max}" step="${step}" value="${value}"></div></label>`;}
   function create(){
     dialog=document.createElement('dialog');dialog.className='image-viewer';dialog.setAttribute('aria-labelledby','v-title');
-    dialog.innerHTML=`<header class="viewer-heading"><div><p class="eyebrow" id="v-title" data-text="title"></p><h2 id="v-name"></h2><p id="v-meta"></p></div>${button('close','×')}</header>
+    dialog.innerHTML=`<header class="viewer-heading"><div><p class="eyebrow" id="v-title" data-text="title"></p><h2 id="v-name"></h2><p id="v-meta"></p></div>${isolated?'':`<div class="viewer-heading-actions"><button type="button" id="v-compare" class="quiet-button" data-label="compare" data-text="compare" disabled></button>${button('close')}</div>`}</header>
       <div class="viewer-toolbar" role="toolbar"><div class="viewer-tool-group">${button('previous','←')}${button('next','→')}</div><div class="viewer-tool-group">${button('fit')}${button('one','1:1')}${button('minus','−')}<label class="viewer-zoom"><input id="v-zoom" type="number" min="1" max="6400" step="10" value="100"> %</label>${button('plus','+')}</div><div class="viewer-tool-group">${button('rotate','↻')}${button('flipX','↔')}${button('flipY','↕')}</div>${button('panel','☷')}</div>
       <div class="viewer-workspace"><div id="v-stage" class="viewer-stage" tabindex="0"><canvas id="v-canvas"></canvas><div id="v-loading" class="viewer-loading"><span class="viewer-spinner"></span><span id="v-load-label"></span></div><p id="v-error" class="viewer-error" role="alert" hidden></p>${button('retry')}<div id="v-badge" class="viewer-badge"></div></div>
       <aside id="v-sidebar" class="viewer-sidebar"><div id="v-plugin-tools" hidden></div><section><h3 data-text="orientation"></h3><canvas id="v-overview" class="viewer-overview" role="img" aria-label="${t('orientation')}"></canvas><p class="viewer-muted" id="v-resolution"></p></section>
@@ -68,27 +66,25 @@
       <section class="viewer-local-options"><label class="viewer-check"><input id="v-smooth" type="checkbox" checked><span data-text="smooth"></span></label><label class="viewer-check"><input id="v-grid" type="checkbox"><span data-text="grid"></span></label><label class="viewer-check"><input id="v-cross" type="checkbox"><span data-text="cross"></span></label></section>
       <details class="viewer-file"><summary data-text="details"></summary><p id="v-path"></p>${button('header')}<pre id="v-cards" hidden></pre></details><p class="viewer-muted viewer-note" data-text="note"></p></aside></div>
       <footer class="viewer-footer"><span id="v-pixel"></span><span data-text="hint"></span></footer>`;
-    for (const node of dialog.querySelectorAll('[id^="v-"]')) {
-      node.dataset.viewerId = node.id.slice(2);
-      node.id = prefix + node.dataset.viewerId;
-    }
-    toolbar=dialog.querySelector('.viewer-toolbar');
-    footer=dialog.querySelector('.viewer-footer');
-    pixel=$('pixel');
+    if(isolated)for(const node of dialog.querySelectorAll('[id^="v-"]'))node.id=prefix+node.id.slice(2);
     dialog.setAttribute('aria-labelledby', prefix+'title');
     if (isolated) {
       dialog.classList.add('viewer-wide');
-      $('title').textContent = t('title');
+      $('title').dataset.text=paneLabel;
+      dialog.querySelector('.viewer-heading').append(dialog.querySelector('.viewer-tool-group'));
       host.append(dialog);
     } else {
       document.body.append(dialog);
       if(window.matchMedia('(max-width:720px)').matches)dialog.classList.add('viewer-wide');
     }
-    if (!window.AstroArchiveRemote) window.AstroArchiveViewerWorkbench?.configureViewer(dialog, prefix, isolated ? callbacks : null);
     canvas=$('canvas');ctx=canvas.getContext('2d');overview=$('overview');histogram=$('histogram');stage=$('stage');
     $('retry').hidden=true;panelState();translate();
-    $('close').onclick=isolated ? callbacks.close : close;
-    dialog.addEventListener('cancel',e=>{e.preventDefault();if(isolated)callbacks.close();else close();});
+    if(!isolated){
+      $('compare').hidden=Boolean(window.AstroArchiveRemote);
+      $('compare').onclick=()=>{if(frame?.canNavigate&&!loading)showComparison(frame,snapshot(),call);};
+      $('close').onclick=close;
+      dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
+    }
     $('fit').onclick=()=>{fit();commitViewport();};$('one').onclick=()=>setZoom(frame.width/frame.previewWidth);
     $('plus').onclick=()=>setZoom(zoom*1.3);$('minus').onclick=()=>setZoom(zoom/1.3);
     $('zoom').onchange=()=>{if(frame)setZoom(Math.max(1,Math.min(6400,Number($('zoom').value)||100))/100*frame.width/frame.previewWidth);};
@@ -110,12 +106,7 @@
     stage.addEventListener('contextmenu',e=>e.preventDefault());stage.addEventListener('dblclick',()=>{fit();commitViewport();});
     overview.addEventListener('pointerdown',e=>{if(!picture)return;e.preventDefault();overview.setPointerCapture(e.pointerId);locate(e);});overview.addEventListener('pointermove',e=>{if(overview.hasPointerCapture(e.pointerId))locate(e);});
     dialog.addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey||/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;const actions={f:()=>{fit();commitViewport();},'1':()=>$('one').click(),'+':()=>$('plus').click(),'-':()=>$('minus').click(),ArrowLeft:()=>neighbor(-1),ArrowRight:()=>neighbor(1)};if(actions[e.key]){e.preventDefault();actions[e.key]();}});
-    watchViewport();
-  }
-  function watchViewport(){
-    resize?.disconnect();
-    if(animation){animationWindow.cancelAnimationFrame(animation);animation=0;}
-    resize=new dialog.ownerDocument.defaultView.ResizeObserver(()=>{
+    resize=new ResizeObserver(()=>{
       if(!stage.clientWidth||!stage.clientHeight)return;
       if(fitting)fit();else if(keptTransform)restoreTransform(keptTransform);else schedule();
       drawHistogram();
@@ -124,12 +115,9 @@
   }
   function translate(){
     if(!dialog)return;
-    const roots=dialog.contains(toolbar)?[dialog]:[dialog,toolbar];
-    for(const root of roots){
-      for(const node of root.querySelectorAll('[data-text]'))node.textContent=t(node.dataset.text);
-      for(const node of root.querySelectorAll('[data-label]')){
-        node.title=t(node.dataset.label);node.setAttribute('aria-label',t(node.dataset.label));
-      }
+    for(const node of dialog.querySelectorAll('[data-text]'))node.textContent=t(node.dataset.text);
+    for(const node of dialog.querySelectorAll('[data-label]')){
+      node.title=t(node.dataset.label);node.setAttribute('aria-label',t(node.dataset.label));
     }
     $('zoom').setAttribute('aria-label',t('zoom'));
     histogram.title=t('histogramNote');
@@ -143,6 +131,7 @@
     $('palette').disabled=frame.color&&Number($('channel').value)===0;
     $('debayer').disabled=!frame.canDebayer;$('pattern').disabled=!frame.canDebayer||!$('debayer').checked;
     $('header').disabled=!frame.fits;for(const key of ['previous','next'])$(key).disabled=!frame.canNavigate||loading;
+    if(!isolated)$('compare').disabled=!frame.canNavigate||loading;
   }
   function error(message){$('error').textContent=message;$('error').hidden=false;}
   function opening(message){
@@ -160,7 +149,8 @@
     for(const c of [canvas,overview,histogram])c.getContext('2d').clearRect(0,0,c.width,c.height);
     for(const input of dialog.querySelectorAll('.viewer-sidebar input,.viewer-sidebar select,.viewer-sidebar button'))input.disabled=true;
     for(const k of ['previous','next','fit','one','plus','minus','rotate','flipX','flipY'])$(k).disabled=true;
-    busy(true,'loading');stage.focus();
+    if(!isolated)$('compare').disabled=true;
+    busy(true,'loading');if(!isolated)stage.focus();
   }
   async function accept(data,first=false){
     if(!dialog?.open||id!==data.id)return;const version=serial,render=renderSerial;
@@ -178,8 +168,7 @@
     $('badge').textContent=data.fits?(data.debayer?'Debayer · '+data.bayerPattern:data.color?'RGB':'Mono'):'RGB';
     if(keptTransform)restoreTransform(keptTransform);else if(old&&old.previewWidth!==data.previewWidth)zoom*=old.previewWidth/data.previewWidth;
     $('retry').hidden=true;$('retry').onclick=null;busy(false);enableControls();if(fitting)fit();else schedule();drawHistogram();
-    if(isolated)callbacks.ready?.(data);
-    else{
+    if(!isolated){
       call('viewer.presented',{id:data.id,shown:true,width:image.naturalWidth,height:image.naturalHeight}).catch(()=>{});
       window.AstroArchiveRemote?.viewerReady(dialog,data);
     }
@@ -191,7 +180,7 @@
     if(viewState)keptTransform=viewState.transform;
     if(!isolated){window.AstroArchiveExtensions?.viewerClosed();document.documentElement.classList.remove('viewer-open');}
     id='';serial++;renderSerial++;clearTimeout(debounce);clearTimeout(pixelTimer);dialog.close();
-    frame=picture=null;if(animation)animationWindow.cancelAnimationFrame(animation);animation=0;
+    frame=picture=null;cancelAnimationFrame(animation);animation=0;
     for(const c of [canvas,overview,histogram]){c.width=1;c.height=1;}
     restoreFocus?.focus?.();
     if(silent!==true && closing)request('viewer.close',{id:closing,viewState}).catch(()=>{});
@@ -205,6 +194,11 @@
     catch(e){if(id===requestId&&version===renderSerial){busy(false);if(!e.cancelled)error(e.message);}}
   }
   async function neighbor(delta){
+    if(isolated&&dialog?.contains(document.activeElement))stage.focus({preventScroll:true});
+    if(!frame&&comparisonSource&&!loading){
+      await openComparisonFrame({...comparisonSource,delta});
+      return;
+    }
     if(!frame||loading||!frame.canNavigate)return;
     const current=id;busy(true,'loading');
     try{
@@ -226,8 +220,8 @@
   }
   function setZoom(value,anchor={x:stage.clientWidth/2,y:stage.clientHeight/2}){if(!picture)return;const at=matrix().inverse().transformPoint(anchor);zoom=Math.max(.01,Math.min(64,value*frame.previewWidth/frame.width))*frame.width/frame.previewWidth;const moved=matrix().transformPoint(at);pan.x+=anchor.x-moved.x;pan.y+=anchor.y-moved.y;fitting=false;schedule();commitViewport();}
   if(!isolated)window.addEventListener('astroarchive-inspection-decision',()=>schedule());
-  function schedule(remember=true){if(remember&&frame&&picture)keptTransform=transformState();if(!dialog?.open||animation)return;animationWindow=dialog.ownerDocument.defaultView;animation=animationWindow.requestAnimationFrame(()=>{animation=0;draw();});}
-  function surface(c){const r=c.getBoundingClientRect(),dpr=c.ownerDocument.defaultView.devicePixelRatio||1,w=Math.max(1,Math.round(r.width*dpr)),h=Math.max(1,Math.round(r.height*dpr));if(c.width!==w||c.height!==h){c.width=w;c.height=h;}const context=c.getContext('2d');context.setTransform(dpr,0,0,dpr,0,0);context.clearRect(0,0,r.width,r.height);return{context,w:r.width,h:r.height,dpr};}
+  function schedule(remember=true){if(remember&&frame&&picture)keptTransform=transformState();if(!dialog?.open||animation)return;animation=requestAnimationFrame(()=>{animation=0;draw();});}
+  function surface(c){const r=c.getBoundingClientRect(),dpr=window.devicePixelRatio||1,w=Math.max(1,Math.round(r.width*dpr)),h=Math.max(1,Math.round(r.height*dpr));if(c.width!==w||c.height!==h){c.width=w;c.height=h;}const context=c.getContext('2d');context.setTransform(dpr,0,0,dpr,0,0);context.clearRect(0,0,r.width,r.height);return{context,w:r.width,h:r.height,dpr};}
   function apply(context,m,dpr){context.setTransform(m.a*dpr,m.b*dpr,m.c*dpr,m.d*dpr,m.e*dpr,m.f*dpr);}
   function draw(){
     const{w,h,dpr}=surface(canvas);if(!picture)return;const m=matrix(w,h);apply(ctx,m,dpr);ctx.imageSmoothingEnabled=$('smooth').checked;ctx.drawImage(picture,0,0);if(dialog.querySelector('#q-excluded-overlay')?.hidden===false){ctx.strokeStyle='#e8b781';ctx.lineWidth=1.5/zoom;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(picture.width,picture.height);ctx.moveTo(picture.width,0);ctx.lineTo(0,picture.height);ctx.stroke();}
@@ -288,33 +282,63 @@
       enableControls();schedule();
     }
   });
-  return {state:snapshot, current:()=>frame, close, next(viewerId){if(id!==viewerId||!dialog?.open||loading)return;const next=$('next');if(!next.disabled)next.click();else error(t('noNext'));},connect(options){call=options.call;},languageChanged:translate,event(message){if(message.name==='viewer.closed'){close(true);return;}if(message.name==='viewer.loading')opening(message);else if(message.name==='viewer.loaded')accept(message.document,true);else if(message.name==='viewer.problem'&&id===message.id){busy(false);error(message.error);}},
-    async open(source, name, presentation){
-      opening({id:'',fileName:name});
-      const version=serial;
-      try{
-        const {viewerDocument:data}=await request('viewer.open',source);
-        if(!dialog.open || serial!==version){await request('viewer.close',{id:data.id});return false;}
-        id=data.id;
-        if(presentation){
-          keptTransform=presentation.transform;
-          for(const [key,value] of Object.entries(presentation.controls||{}))$(key).checked=value;
-        }
-        await accept(data,true);
-        return Boolean(frame);
-      }catch(e){if(dialog.open&&serial===version){busy(false);error(e.message);}return false;}
-    },
-    refresh(){if(dialog)watchViewport();},
-    mountTools(target){
-      if(!isolated||!toolbar)return;
-      if(target){
-        if(toolbar.parentElement!==target)target.append(toolbar,pixel);
-      }else if(toolbar.parentElement!==dialog){
-        footer.before(toolbar);footer.prepend(pixel);
+  async function openComparisonFrame(source,presentation){
+    comparisonSource=source;
+    opening({id:'',fileName:'—'});
+    busy(true,'loading');
+    $('error').hidden=true;
+    $('previous').disabled=$('next').disabled=true;
+    const version=serial;
+    try{
+      const {viewerDocument:data}=await request('viewer.open',source);
+      if(!dialog.open||serial!==version){
+        if(data)await request('viewer.close',{id:data.id});
+        return;
       }
-    },
-    destroy(){close();resize?.disconnect();toolbar?.remove();pixel?.remove();dialog?.remove();}
+      if(!data){
+        busy(false);error(t('noNext'));
+        $('previous').disabled=$('next').disabled=false;
+        return;
+      }
+      id=data.id;
+      if(presentation){
+        keptTransform=presentation.transform;
+        for(const [key,value] of Object.entries(presentation.controls||{}))$(key).checked=value;
+      }
+      await accept(data,true);
+    }catch(e){
+      if(dialog.open&&serial===version){busy(false);error(e.message);$('previous').disabled=$('next').disabled=false;}
+    }
+  }
+  return {state:snapshot, next(viewerId){if(id!==viewerId||!dialog?.open||loading)return;const next=$('next');if(!next.disabled)next.click();else error(t('noNext'));},connect(options){call=options.call;},languageChanged:translate,event(message){if(message.name==='viewer.closed'){close(true);return;}if(message.name==='viewer.loading')opening(message);else if(message.name==='viewer.loaded')accept(message.document,true);else if(message.name==='viewer.problem'&&id===message.id){busy(false);error(message.error);}},
+    openComparisonFrame,
+    destroy(){close();resize?.disconnect();dialog?.remove();}
   };
   }
-  window.AstroArchiveViewer = Object.assign(createViewer(), {createPane:createViewer});
+  function showComparison(frame,presentation,call){
+    const focus=document.activeElement;
+    const dialog=document.createElement('dialog');
+    dialog.className='image-viewer image-compare';
+    dialog.setAttribute('aria-labelledby','viewer-compare-title');
+    dialog.innerHTML=`<header class="viewer-heading"><h2 id="viewer-compare-title"></h2><button type="button" class="quiet-button viewer-icon-button"></button></header>
+      <div class="viewer-compare-grid"><div class="viewer-compare-pane"></div><div class="viewer-compare-pane"></div></div>`;
+    dialog.querySelector('h2').textContent=t('compareTitle');
+    const close=dialog.querySelector('button');
+    window.AstroArchiveIcons.mount(close,'close',t('close'));
+    close.onclick=()=>dialog.close();
+    const panes=[...dialog.querySelectorAll('.viewer-compare-pane')].map((host,index)=>createViewer(host,index?'compareRight':'compareLeft'));
+    dialog.addEventListener('close',()=>{
+      for(const pane of panes)pane.destroy();
+      dialog.remove();
+      focus?.focus();
+    },{once:true});
+    document.body.append(dialog);
+    dialog.showModal();
+    panes.forEach((pane,index)=>{
+      pane.connect({call});
+      pane.openComparisonFrame({sourceFrameId:frame.id,delta:index},index?null:presentation);
+    });
+    dialog.querySelector('.viewer-stage').focus({preventScroll:true});
+  }
+  window.AstroArchiveViewer = createViewer();
 })();

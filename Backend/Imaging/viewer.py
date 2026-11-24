@@ -92,11 +92,15 @@ class Viewer:
                 raise ValueError('Изображението не е от работното пространство за сравнение.')
             self.frames.pop(ident,None);self.assets.pop(ident,None)
         return dict(closed=True)
+    def adjacent_path(self,frame,delta):
+        if not frame.get('canNavigate',True):return None
+        path=frame['path'];from Backend.Fits.images import IMAGES
+        files=sorted(p for p in path.parent.iterdir() if p.suffix.lower() in IMAGES and not p.is_symlink() and p.is_file())
+        if path not in files:return None
+        index=files.index(path)+int(delta)
+        return files[index] if 0<=index<len(files) else None
     def neighbor(self,ident,delta):
         frame=self.get(ident)
-        if not frame.get('canNavigate',True):return dict(opened=False)
-        path=frame['path'];from Backend.Fits.images import IMAGES
-        files=sorted(p for p in path.parent.iterdir() if p.suffix.lower() in IMAGES and not p.is_symlink())
-        index=files.index(path)+int(delta)
-        if not 0<=index<len(files):return dict(opened=False)
-        result=self.open(files[index],comparison=frame.get('comparison',False));self.close(ident);return result
+        path=self.adjacent_path(frame,delta)
+        if path is None:return dict(opened=False)
+        result=self.open(path,comparison=frame.get('comparison',False));self.close(ident);return result

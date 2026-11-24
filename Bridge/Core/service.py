@@ -551,6 +551,12 @@ class Service:
             original_id = p.get('sourceFrameId')
             if original_id:
                 source = self.viewer.get(original_id)
+                delta = p.get('delta',0)
+                if type(delta) is not int or delta not in (-1,0,1):
+                    raise ValueError('Невалидна посока за сравнение.')
+                if delta:
+                    adjacent = self.viewer.adjacent_path(source,delta)
+                    return self.viewer.open(adjacent,comparison=True) if adjacent is not None else dict(opened=False)
                 return self.viewer.open(source['path'], source['sourceId'], source['canNavigate'], source['name'], comparison=True)
             return self.open_viewer(p, comparison=True)
         if action == 'close':

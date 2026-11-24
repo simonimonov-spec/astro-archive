@@ -27,7 +27,7 @@ class ViewerComparisonTests(unittest.TestCase):
             primary = service.call('image.open', source)['viewerDocument']
             event_sequence = service.events.sequence
             first = service.call('viewer.compare', dict(action='open', sourceFrameId=primary['id']))['viewerDocument']
-            second = service.call('viewer.compare', dict(action='open', archiveId='photos', relativePath='second.png'))['viewerDocument']
+            second = service.call('viewer.compare', dict(action='open', sourceFrameId=primary['id'], delta=1))['viewerDocument']
             updated = service.call('viewer.compare', dict(action='render', id=first['id'], options={'negative': True}))
 
             self.assertTrue(first['fits'])
@@ -39,11 +39,19 @@ class ViewerComparisonTests(unittest.TestCase):
             self.assertFalse(service.viewer_state.display()['options'].get('negative'))
             self.assertNotEqual(service.viewer.assets[first['id']], service.viewer.assets[primary['id']])
 
+            self.assertFalse(service.call('viewer.compare', dict(action='open', sourceFrameId=second['id'], delta=1))['opened'])
+            replacement = service.call('viewer.compare', dict(action='neighbor', id=second['id'], delta=-1))['viewerDocument']
+            self.assertEqual(replacement['name'], primary['name'])
+            self.assertIn(first['id'], service.viewer.assets)
+            self.assertNotIn(second['id'], service.viewer.assets)
+            self.assertEqual(service.session.channels['viewer']['value']['document']['id'], primary['id'])
+            self.assertEqual(service.events.sequence, event_sequence)
+
             with self.assertRaises(ValueError):
                 service.call('viewer.compare', dict(action='close', id=primary['id']))
             service.call('viewer.compare', dict(action='close', id=first['id']))
             self.assertNotIn(first['id'], service.viewer.assets)
-            self.assertIn(second['id'], service.viewer.assets)
+            self.assertIn(replacement['id'], service.viewer.assets)
             self.assertIn(primary['id'], service.viewer.assets)
 
 

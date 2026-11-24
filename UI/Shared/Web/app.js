@@ -119,7 +119,6 @@
     window.AstroArchiveFunctions.languageChanged();
     window.AstroArchiveMonitoring.translate();
     window.AstroArchiveViewer.languageChanged();
-    window.AstroArchiveViewerWorkbench.languageChanged();
     window.AstroArchiveExtensions.theme();
     archiveNavigation?.translate(); drawBreadcrumbs();
     if (!state.entered && state.folder) { loadFolder(); return; }
@@ -255,7 +254,6 @@
         if(entry.details?.kind==='stack'&&entry.id){const source=element('button','row-action','Изходни нощи');source.type='button';source.onclick=event=>{event.stopPropagation();window.AstroArchiveArchiveSchema.sourceNights(entry.id).catch(problem);};actionCell.append(source);}
       }
       row.append(actionCell);
-      window.AstroArchiveViewerWorkbench?.attachArchiveDrag(row, entry, folder.archiveId);
       attachArchiveMenu(row,entry.archiveId||folder.archiveId,entry);
       window.AstroArchiveRemote?.decorateEntry(actionCell,folder,entry);
       row.addEventListener("dblclick", () => activateEntry(folder.archiveId, entry));
@@ -422,8 +420,6 @@
   $("archive-import").disabled = !webview;
   window.AstroArchiveFunctions.connect({ call, log, desktop: !!webview, navigate: showRoute });
   window.AstroArchiveViewer.connect({call});
-  window.AstroArchiveViewerWorkbench.connect({call, files:()=>state.folder?.entries
-    .map(entry=>window.AstroArchiveViewerWorkbench.file(entry,state.folder.archiveId)).filter(Boolean) || []});
   window.AstroArchiveExtensions.connect({call});
   archiveNavigation = window.AstroArchiveArchiveNavigation.create({call, name: archiveName, navigate: navigateFolder, home: showArchiveHome, problem, attachMenu:attachArchiveMenu});
   if(webview)window.AstroArchiveArchiveMenu.attach(document.querySelector('#page-archive .content-panel'),event=>{

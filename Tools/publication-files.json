@@ -239,14 +239,6 @@
         "destination": "UI/Analysis/Web/viewer.js"
       },
       {
-        "source": "UI/Analysis/Web/viewer-workbench.css",
-        "destination": "UI/Analysis/Web/viewer-workbench.css"
-      },
-      {
-        "source": "UI/Analysis/Web/viewer-workbench.js",
-        "destination": "UI/Analysis/Web/viewer-workbench.js"
-      },
-      {
         "source": "UI/Analysis/Web/workbench.js",
         "destination": "UI/Analysis/Web/workbench.js"
       },
@@ -517,10 +509,6 @@
       {
         "source": "Bridge/Desktop/window_placement.py",
         "destination": "Bridge/Desktop/window_placement.py"
-      },
-      {
-        "source": "Bridge/Desktop/viewer_windows.py",
-        "destination": "Bridge/Desktop/viewer_windows.py"
       },
       {
         "source": "UI/Archive/Web/layout.css",

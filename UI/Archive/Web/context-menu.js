@@ -145,10 +145,6 @@
         body.append(modalAction(text('Преглед','Preview'),()=>{
           dialog.close();return entry.id?P.image(entry.id):P.call('image.open',scope(archiveId,entry));
         }));
-        const workbench=window.AstroArchiveViewerWorkbench, source=workbench?.file(entry,archiveId);
-        if(source&&!window.AstroArchiveRemote)body.append(modalAction(text('Отвори в нов преглед','Open in a new viewer'),()=>{
-          dialog.close();workbench.openImage(source);
-        }));
       }
       if(entry.id&&(entry.details?.sourceFiles?.length||entry.details?.kind==='stack')){
         body.append(modalAction(text('Изходни кадри и стакове','Source frames and stacks'),()=>{

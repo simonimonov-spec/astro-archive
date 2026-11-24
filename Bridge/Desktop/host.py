@@ -11,7 +11,6 @@ from Bridge.Core.service import Service
 from Bridge.Desktop.single_instance import acquire,activate,release
 from Bridge.Desktop.identity import installation_id,window_title,matches,signal_ready
 from Bridge.Desktop import window_placement
-from Bridge.Desktop.viewer_windows import ViewerWindows
 
 PLACEMENT=CACHE/'window-placement.json'
 
@@ -132,9 +131,6 @@ class Handler(BaseHTTPRequestHandler):
                     if request.get('version')!=1 or not isinstance(ident,str) or not 0<len(ident)<=80:raise ValueError('Невалиден протокол на заявката.')
                     if any(t['state']=='running' for t in self.server.service.jobs.snapshot()['tasks']):raise ValueError('Има активни задачи. Отмени ги или изчакай приключването.')
                     result=dict(closed=True);threading.Thread(target=self.server.shutdown,daemon=True).start()
-                elif method=='viewer.window':
-                    if request.get('version')!=1 or not isinstance(ident,str) or not 0<len(ident)<=80:raise ValueError('Невалиден протокол на заявката.')
-                    result=self.server.viewer_windows.command(parameters)
                 else:
                     response=self.server.service.dispatch(request)
                     if not response['ok']:self.server.service.events.emit('app.log',entries=[dict(section='archive' if method.startswith('archive.') else 'analysis' if 'analysis' in method else 'preparation',time=time.strftime('%Y-%m-%dT%H:%M:%S'),category='ВРЪЗКА',level='warning',message=response.get('error','Проблем при командата.'))])
@@ -185,7 +181,6 @@ def run():
                 release(instance);signal_ready(ROOT);return
         except (OSError,ValueError):pass
     server=ThreadingHTTPServer(('127.0.0.1',0),Handler);server.daemon_threads=True
-    server.viewer_windows=ViewerWindows(window_title(ROOT))
     server.service=Service(desktop_actions={'show':lambda:open_browser(server.url),'quit':server.shutdown});server.key=secrets.token_urlsafe(32);server.prefix='/s/'+server.key+'/'
     server.url=f'http://127.0.0.1:{server.server_port}'+server.prefix;server.last_seen=time.monotonic()
     placement_stopped=threading.Event();window_placement.track(window_title(ROOT),PLACEMENT,placement_stopped)

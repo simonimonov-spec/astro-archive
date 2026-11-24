@@ -68,10 +68,10 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: var(--quiet-button-height, 34px) !important;
+  min-height: 34px !important;
   height: auto;
-  padding: var(--quiet-button-padding, 0 14px) !important;
-  font-size: var(--quiet-button-font-size, 13px) !important;
+  padding: 0 14px !important;
+  font-size: 13px !important;
   font-weight: 500 !important;
   line-height: 1.2 !important;
   text-transform: none !important;
