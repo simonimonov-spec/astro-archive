@@ -374,37 +374,75 @@ internal sealed class Launcher : Form
                 Directory.CreateDirectory(Path.GetDirectoryName(path)); entry.ExtractToFile(path, true);
             }
     }
-    async Task Install()
+    Task Install()
     {
         phase = "Изтегляне на компоненти";
         Update("Изтегляне на Python 3.13.9…", "Официален източник: python.org", .35f);
         string stage = Path.Combine(root, ".runtime", "prepare-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(stage);
+        return PrepareRuntime(stage, () => InstallRuntime(stage));
+    }
+
+    static async Task PrepareRuntime(string stage, Func<Task> prepare)
+    {
         try
         {
-            Extract(await Download(PythonURL), stage);
-            // The embeddable runtime ignores registry, PATH, user site and other copies.
-            File.WriteAllText(Path.Combine(stage, "python313._pth"), "python313.zip\n.\nsite-packages\n", Encoding.ASCII);
-            Update("Подготовка на инсталатора за библиотеки…", "Официален източник: pypi.org • pip 25.3", .48f);
-            var metadata = Dict(Json.DeserializeObject(Encoding.UTF8.GetString(await Download(PipURL))));
-            var wheel = ArrayValue(metadata["urls"]).Select(Dict).Single(x => Str(x, "filename") == "pip-25.3-py3-none-any.whl");
-            string url = Str(wheel, "url");
-            if (new Uri(url).Scheme != "https" || new Uri(url).Host != "files.pythonhosted.org") throw new InvalidDataException("Непознат източник на библиотека.");
-            byte[] data = await Download(url);
-            if (Hash(data) != Str(Dict(wheel["digests"]), "sha256")) throw new InvalidDataException("Повреден инсталатор на библиотеки.");
-            Extract(data, Path.Combine(stage, "site-packages"));
-            Update("Изтегляне и инсталиране на библиотеките…", "Това може да отнеме няколко минути", .6f);
-            await Execute(Path.Combine(stage, "python.exe"), "-I -B -m pip --isolated install --disable-pip-version-check --index-url https://pypi.org/simple --only-binary=:all: --no-cache-dir --target \"" + Path.Combine(stage, "site-packages") + "\" -r \"" + Path.Combine(root, "requirements-lock.txt") + "\"", 1200000);
-            string check = (await Execute(Path.Combine(stage, "python.exe"), "-I -B \"" + Path.Combine(root, "Tools", "runtime_probe.py") + "\"", 60000)).Trim();
-            if (check != "READY") throw new InvalidOperationException(check);
-            // Commit only a complete, tested runtime. Keep the old one for recovery.
-            if (Directory.Exists(Runtime)) Directory.Move(Runtime, Runtime + ".previous-" + Guid.NewGuid().ToString("N"));
-            Directory.Move(stage, Runtime);
+            Directory.CreateDirectory(stage);
+            await prepare();
+        }
+        catch (Exception ex)
+        {
+            LogPreparationFailure(stage, "Python runtime preparation failed", ex);
+            throw;
         }
         finally
         {
-            if (Directory.Exists(stage)) Directory.Delete(stage, true);
+            try { if (Directory.Exists(stage)) Directory.Delete(stage, true); }
+            catch (Exception ex)
+            {
+                if (!IsFileAccessFailure(ex)) throw;
+                LogPreparationFailure(stage, "Python runtime staging cleanup failed", ex);
+            }
         }
+    }
+
+    static bool IsFileAccessFailure(Exception ex)
+    {
+        return ex is IOException || ex is UnauthorizedAccessException || ex is System.Security.SecurityException;
+    }
+
+    static void LogPreparationFailure(string stage, string operation, Exception ex)
+    {
+        try
+        {
+            File.AppendAllText(stage + ".log", DateTimeOffset.UtcNow.ToString("o") + " " + operation +
+                Environment.NewLine + ex + Environment.NewLine);
+        }
+        catch (Exception logError)
+        {
+            if (!IsFileAccessFailure(logError)) throw;
+        }
+    }
+
+    async Task InstallRuntime(string stage)
+    {
+        Extract(await Download(PythonURL), stage);
+        // The embeddable runtime ignores registry, PATH, user site and other copies.
+        File.WriteAllText(Path.Combine(stage, "python313._pth"), "python313.zip\n.\nsite-packages\n", Encoding.ASCII);
+        Update("Подготовка на инсталатора за библиотеки…", "Официален източник: pypi.org • pip 25.3", .48f);
+        var metadata = Dict(Json.DeserializeObject(Encoding.UTF8.GetString(await Download(PipURL))));
+        var wheel = ArrayValue(metadata["urls"]).Select(Dict).Single(x => Str(x, "filename") == "pip-25.3-py3-none-any.whl");
+        string url = Str(wheel, "url");
+        if (new Uri(url).Scheme != "https" || new Uri(url).Host != "files.pythonhosted.org") throw new InvalidDataException("Непознат източник на библиотека.");
+        byte[] data = await Download(url);
+        if (Hash(data) != Str(Dict(wheel["digests"]), "sha256")) throw new InvalidDataException("Повреден инсталатор на библиотеки.");
+        Extract(data, Path.Combine(stage, "site-packages"));
+        Update("Изтегляне и инсталиране на библиотеките…", "Това може да отнеме няколко минути", .6f);
+        await Execute(Path.Combine(stage, "python.exe"), "-I -B -m pip --isolated install --disable-pip-version-check --index-url https://pypi.org/simple --only-binary=:all: --no-cache-dir --target \"" + Path.Combine(stage, "site-packages") + "\" -r \"" + Path.Combine(root, "requirements-lock.txt") + "\"", 1200000);
+        string check = (await Execute(Path.Combine(stage, "python.exe"), "-I -B \"" + Path.Combine(root, "Tools", "runtime_probe.py") + "\"", 60000)).Trim();
+        if (check != "READY") throw new InvalidOperationException(check);
+        // Commit only a complete, tested runtime. Keep the old one for recovery.
+        if (Directory.Exists(Runtime)) Directory.Move(Runtime, Runtime + ".previous-" + Guid.NewGuid().ToString("N"));
+        Directory.Move(stage, Runtime);
     }
     Dictionary<string, object> ReadState()
     {
@@ -660,6 +698,36 @@ internal sealed class Launcher : Form
     {
         return new Dictionary<string, object> { { "id", id }, { "tag_name", tag }, { "published_at", published }, { "draft", draft } };
     }
+    bool TestPreparationFailure()
+    {
+        string stage = Path.Combine(root, ".runtime", "prepare-test-" + Guid.NewGuid().ToString("N"));
+        string lockedFile = Path.Combine(stage, "site-packages", "fk4_no_e_fk4.csv");
+        string logPath = stage + ".log";
+        var original = new InvalidOperationException("Runtime probe failed in self-test");
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(lockedFile));
+            using (File.Open(lockedFile, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                try { PrepareRuntime(stage, () => { throw original; }).GetAwaiter().GetResult(); }
+                catch (InvalidOperationException ex)
+                {
+                    if (!ReferenceEquals(ex, original) || !File.Exists(lockedFile)) return false;
+                    string log = File.ReadAllText(logPath);
+                    int preparation = log.IndexOf("Python runtime preparation failed", StringComparison.Ordinal);
+                    int cleanup = log.IndexOf("Python runtime staging cleanup failed", StringComparison.Ordinal);
+                    return preparation >= 0 && cleanup > preparation && log.Contains(original.Message);
+                }
+            }
+            return false;
+        }
+        finally
+        {
+            if (Directory.Exists(stage)) Directory.Delete(stage, true);
+            File.Delete(logPath);
+        }
+    }
+
     int SelfTest()
     {
         try
@@ -705,6 +773,7 @@ internal sealed class Launcher : Form
                 }
             }
             finally { if (Directory.Exists(temporary)) Directory.Delete(temporary, true); }
+            if (!TestPreparationFailure()) return 11;
             return 0;
         }
         catch { return 4; }
