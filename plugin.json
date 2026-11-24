@@ -2,7 +2,7 @@
   "apiVersion": 1,
   "id": "shared-archives",
   "name": "Shared Archives · LAN",
-  "version": "V-2.2",
+  "version": "V-2.3",
   "description": "Споделени архиви за кадри, стакове и снимки между копия на Astro Archive през LAN или VPN. Свързване с еднократен код, позволени устройства и шифрован трафик.",
   "author": "Astro Archive",
   "entry": "main.py",
