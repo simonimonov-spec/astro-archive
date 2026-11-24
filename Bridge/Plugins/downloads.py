@@ -14,7 +14,7 @@ import zipfile
 from Backend.Foundation.runtime import ROOT, read_json, atomic_json
 
 REPOSITORY = 'simonimonov-spec/astro-archive'
-CATALOG_URL = f'https://raw.githubusercontent.com/{REPOSITORY}/main/docs/plugin-catalog.json'
+CATALOG_URL = f'https://raw.githubusercontent.com/{REPOSITORY}/refs/heads/main/docs/plugin-catalog.json'
 MAX_ARCHIVE = 32_000_000
 
 
