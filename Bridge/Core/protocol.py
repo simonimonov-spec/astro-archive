@@ -7,6 +7,20 @@ from typing import Callable
 PROTOCOL_VERSION=1
 NAME=re.compile(r'^[a-z][a-zA-Z0-9_-]*(?:\.[a-zA-Z0-9_-]+)*$')
 
+
+class LocalizedError(ValueError):
+    def __init__(self, key, message):
+        super().__init__(message)
+        self.key = key
+
+
+def error_payload(error):
+    payload = {'error': str(error)}
+    if isinstance(error, LocalizedError):
+        payload['errorKey'] = error.key
+    return payload
+
+
 def data_only(value,limit=4_000_000):
     def check(item,depth=0):
         if depth>24:raise ValueError('Прекалено вложени данни.')
@@ -62,4 +76,4 @@ class Router:
             return dict(type='response',version=PROTOCOL_VERSION,id=ident,ok=True,result=result)
         except InterruptedError as error:return dict(type='response',version=PROTOCOL_VERSION,id=ident,ok=False,cancelled=True,code='cancelled',error=str(error))
         except PermissionError as error:return dict(type='response',version=PROTOCOL_VERSION,id=ident,ok=False,code='permission_denied',error=str(error))
-        except Exception as error:return dict(type='response',version=PROTOCOL_VERSION,id=ident,ok=False,code='operation_failed',error=str(error))
+        except Exception as error:return dict(type='response',version=PROTOCOL_VERSION,id=ident,ok=False,code='operation_failed',**error_payload(error))

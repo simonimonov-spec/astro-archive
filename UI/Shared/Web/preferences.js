@@ -13,6 +13,7 @@
   let messageKey = "", messageTone = "info";
   let selectedSettingsTab = "appearance";
   let pluginUpdatePending = false;
+  let catalogChecked = false;
   const pluginBrowser = window.AstroArchivePluginBrowser.create({
     controlsChanged: () => setBusy(busy),
     download: id => mutatePlugins('ui.plugins.download',{id}),
@@ -69,6 +70,7 @@
       bindings?.languageChanged();
       translateOptions();
       drawPlugins();
+      drawProblems();
       renderPluginStatus();
       renderUpdateStatus();
       if (updateTransfer.phase!=='idle') drawUpdateDownload(updateTransfer);
@@ -95,13 +97,12 @@
     apply(draft, imagePreview);
     bindings?.pluginsChanged(configuration.plugins);
     fillControls();
-    drawProblems();
-    renderPluginStatus();
   }
 
   function renderPluginStatus() {
     $("ui-plugin-folder-path").textContent = configuration.plugins?.length ? configuration.pluginsFolder : t('plugins.folderEmpty');
-    $("ui-plugin-catalog-status").textContent = configuration.catalogProblem || t('plugins.catalogInfo');
+    const catalogKey = configuration.catalogProblem ? 'plugins.catalogOffline' : catalogChecked ? 'plugins.catalogChecked' : 'plugins.catalogInfo';
+    $("ui-plugin-catalog-status").textContent = t(catalogKey);
   }
 
   function option(select, value, text) {
@@ -207,10 +208,29 @@
     catch (error) { report(error); }
     finally { setBusy(false); }
   }
+  function pluginUpdateMessages() {
+    const fallback = t('plugins.updateErrorDetail');
+    return (configuration.pluginUpdateNotices || (configuration.pluginUpdateProblems || []).map(() => ({}))).map(notice => {
+      const problem = i18n.errorText(notice, fallback);
+      if (!notice.plugin) return problem;
+      const plugin = configuration.plugins.find(item => item.id === notice.plugin);
+      const name = plugin ? i18n.pluginText(plugin, plugin.name) : notice.plugin;
+      return t('plugins.updateProblemFor', { name, problem });
+    });
+  }
   function drawProblems() {
-    $("ui-plugin-problems").hidden = !configuration.problems?.length;
-    $("ui-plugin-problem-list").replaceChildren();
-    for (const problem of configuration.problems || []) { const item = document.createElement("li"); item.textContent = problem; $("ui-plugin-problem-list").append(item); }
+    const otherProblems = (configuration.problems || []).slice(configuration.pluginUpdateProblems?.length || 0);
+    const problems = [...pluginUpdateMessages(), ...otherProblems];
+    $("ui-plugin-problems").hidden = !problems.length;
+    $("ui-plugin-problem-list").replaceChildren(...problems.map(problem => {
+      const item = document.createElement("li");
+      item.textContent = problem;
+      return item;
+    }));
+  }
+  function pluginUpdateValues(plugin) {
+    const installed = configuration.plugins.find(item => item.id === plugin.id);
+    return { ...plugin, name: i18n.pluginText(installed, plugin.name) };
   }
   async function mutatePlugins(method, params = {}) {
     if (busy || !bindings.desktop) return;
@@ -230,7 +250,7 @@
     pluginUpdatePending = true;
     let accepted = false, updating = false;
     try {
-      if (!await ui.confirm(t('plugins.update'), t('plugins.updateConfirm', plugin), t('plugins.updateRestart'))) return;
+      if (!await ui.confirm(t('plugins.update'), t('plugins.updateConfirm', pluginUpdateValues(plugin)), t('plugins.updateRestart'))) return;
       if (busy) return;
       updating = true;
       setBusy(true);
@@ -239,13 +259,14 @@
       const dialog = ui.modal(t('plugins.update'), body => body.append(status));
       try {
         const result = await bindings.call('ui.plugins.update', { id: plugin.id, commit: plugin.commit, confirmed: true });
-        if (result?.accepted !== true) throw new Error(t('diagnostics.restartFailed'));
+        if (result?.accepted !== true) throw Object.assign(new Error(), { errorKey: 'diagnostics.restartFailed' });
         accepted = true;
         status.textContent = t('diagnostics.restarting');
         setTimeout(() => window.close(), 1200);
       } catch (error) {
         dialog.close();
-        ui.modal(t('plugins.updateFailed'), body => body.append(ui.node('p', error.message, 'error-banner')));
+        const detail = i18n.errorText(error, t('plugins.updateErrorDetail'));
+        ui.modal(t('plugins.updateFailed'), body => body.append(ui.node('p', detail, 'error-banner')));
       }
     } finally {
       if (!accepted) {
@@ -256,16 +277,17 @@
   }
 
   async function checkPluginUpdates() {
-    const problems = configuration.pluginUpdateProblems || [];
     let updates = [];
     try {
       const result = await bindings.call('ui.plugins.catalog');
       configuration.pluginCatalog = result.pluginCatalog;
       configuration.catalogProblem = result.catalogProblem;
+      catalogChecked = true;
       drawPlugins();
-      $('ui-plugin-catalog-status').textContent = result.catalogProblem || t('plugins.catalogChecked');
+      renderPluginStatus();
       if (!result.catalogProblem) updates = result.pluginCatalog.filter(plugin => plugin.updateAvailable);
     } catch (_) { /* A failed startup request can be retried from Settings. */ }
+    const problems = pluginUpdateMessages();
     if (!updates.length && !problems.length) return;
     const ui = window.AstroArchiveFunctions;
     ui.modal(t(updates.length ? 'plugins.updatesTitle' : 'plugins.updateFailed'), body => {
@@ -275,7 +297,7 @@
         const button = ui.node('button', t('plugins.update'), 'primary-button');
         button.type = 'button';
         button.addEventListener('click', () => updatePlugin(plugin));
-        row.append(ui.node('span', t('plugins.updateNotice', plugin)), button);
+        row.append(ui.node('span', t('plugins.updateNotice', pluginUpdateValues(plugin))), button);
         body.append(row);
       }
     });

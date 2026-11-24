@@ -396,6 +396,15 @@
   });
   window.addEventListener('astroarchive-locations-saved',event=>{for(const archive of event.detail.archives||[])for(const{p,c}of approved('customization').filter(x=>x.p.id===archive.ownerPlugin&&x.c.archiveKey===archive.pluginArchiveKey&&x.c.activate))U.call('plugin.ui.activate',{pluginId:p.id,contributionId:c.id,context:{archiveId:archive.id}}).catch(error=>console.warn(error.message));});
   let messageTimer;
-  window.addEventListener('astroarchive-plugin-message',event=>{let status=$('extension-message');if(!status){status=node('div',null,'extension-message');status.id='extension-message';status.setAttribute('role','status');document.body.append(status);}status.textContent=event.detail.message;status.dataset.tone=['success','warning','error','primary'].includes(event.detail.tone)?event.detail.tone:'normal';status.hidden=false;clearTimeout(messageTimer);messageTimer=setTimeout(()=>{status.hidden=true;},4500);});
+  window.addEventListener('astroarchive-plugin-message',event=>{
+    let status=$('extension-message');
+    if(!status){status=node('div',null,'extension-message');status.id='extension-message';status.setAttribute('role','status');document.body.append(status);}
+    const {plugin:id,message,tone}=event.detail;
+    status.textContent=pluginText(plugins.find(plugin=>plugin.id===id),message);
+    status.dataset.tone=['success','warning','error','primary'].includes(tone)?tone:'normal';
+    status.hidden=false;
+    clearTimeout(messageTimer);
+    messageTimer=setTimeout(()=>{status.hidden=true;},4500);
+  });
   layout();
 })();

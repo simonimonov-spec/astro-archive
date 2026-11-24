@@ -8,6 +8,7 @@ from pathlib import Path
 from Backend.Foundation.branding import APP_NAME, KEY_HEADER, LEGACY_KEY_HEADER
 from Backend.Foundation.runtime import ROOT,CACHE,within,atomic_json,read_json
 from Bridge.Core.service import Service
+from Bridge.Core.protocol import LocalizedError, error_payload
 from Bridge.Desktop.single_instance import acquire,activate,release
 from Bridge.Desktop.identity import installation_id,window_title,matches,signal_ready
 from Bridge.Desktop import window_placement
@@ -39,7 +40,12 @@ def prepare_restart(root=ROOT):
 
 
 def schedule_restart(service, update=None):
-    service.jobs.begin_restart()
+    try:
+        service.jobs.begin_restart()
+    except ValueError as error:
+        raise LocalizedError('diagnostics.restartBusy', str(error)) from error
+    except RuntimeError as error:
+        raise LocalizedError('diagnostics.restartPending', str(error)) from error
     helper = None
     try:
         helper = prepare_restart()
@@ -57,7 +63,7 @@ def schedule_restart(service, update=None):
 def restart_for_plugin_update(service, parameters):
     ident, commit = parameters.get('id'), parameters.get('commit')
     if not isinstance(ident, str) or not isinstance(commit, str):
-        raise ValueError('Невалидна заявка за обновяване на плъгин.')
+        raise LocalizedError('error.request', 'Невалидна заявка за обновяване на плъгин.')
     # Keep normal requests available during the download. Reserve the restart
     # only when the verified package is ready and the app has no active work.
     with service.downloads.stage_update(ident, commit) as staged:
@@ -140,7 +146,7 @@ class Handler(BaseHTTPRequestHandler):
             except InterruptedError as error:self.send(200,dict(type='response',id=ident,ok=False,cancelled=True,error=str(error)))
             except Exception as error:
                 self.server.service.events.emit('app.log',entries=[dict(section='archive' if method.startswith('archive.') else 'analysis' if 'analysis' in method else 'preparation',time=time.strftime('%Y-%m-%dT%H:%M:%S'),category='ГРЕШКА',level='error',message=str(error))])
-                self.send(200,dict(type='response',id=ident,ok=False,error=str(error)))
+                self.send(200,dict(type='response',id=ident,ok=False,**error_payload(error)))
         except (BrokenPipeError,ConnectionResetError,ConnectionAbortedError):pass
         except Exception as error:self.send(400,dict(error=str(error)))
 

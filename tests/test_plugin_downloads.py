@@ -13,6 +13,7 @@ import zipfile
 
 from Backend.Foundation.runtime import Events, Jobs, Settings, Store
 from Backend.Foundation.updates import Updates
+from Bridge.Core.protocol import LocalizedError, error_payload
 from Bridge.Plugins.contracts import PluginGateway
 from Bridge.Plugins.manager import PluginManager
 from Bridge.Plugins.downloads import Downloads, newer_version, unpack, validate, REPOSITORY
@@ -111,8 +112,29 @@ class DownloadTests(unittest.TestCase):
 
         with patch.object(Path, 'rename', fail_package_rename):
             self.assertEqual(self.downloads.apply_pending(), ['sample: locked'])
+        self.assertEqual(self.downloads.update_notices, [dict(plugin='sample', error='locked')])
         self.assertEqual(self.manager.manifest(self.manager.folder/'sample')['version'], 'V-1')
         self.assertEqual(self.downloads.apply_pending(), [])
+        self.assertEqual(self.downloads.update_notices, [])
+
+    def test_changed_installed_plugin_reports_translatable_update_error(self):
+        data = self.install_and_offer_update()
+        with patch('Bridge.Plugins.downloads.fetch', return_value=data), self.downloads.stage_update('sample', self.entry['commit']) as staged:
+            (self.manager.folder/'sample'/'main.py').write_text('# Changed during update')
+            with self.assertRaises(LocalizedError) as caught:
+                self.downloads.queue_update('sample', staged)
+        self.assertEqual(error_payload(caught.exception)['errorKey'], 'plugins.installedChanged')
+        self.assertFalse((self.manager.folder/'.update-sample').exists())
+
+    def test_changed_pending_package_reports_translatable_startup_notice(self):
+        data = self.install_and_offer_update()
+        with patch('Bridge.Plugins.downloads.fetch', return_value=data), self.downloads.stage_update('sample', self.entry['commit']) as staged:
+            self.downloads.queue_update('sample', staged)
+        (self.manager.folder/'.update-sample'/'package'/'main.py').write_text('# Changed after queuing')
+        self.assertEqual(len(self.downloads.apply_pending()), 1)
+        notice, = self.downloads.update_notices
+        self.assertEqual((notice['plugin'], notice['errorKey']), ('sample', 'plugins.updateFilesChanged'))
+        self.assertEqual(self.manager.manifest(self.manager.folder/'sample')['version'], 'V-1')
 
     def test_startup_resumes_update_interrupted_between_package_moves(self):
         data = self.install_and_offer_update()

@@ -136,6 +136,7 @@
 | 2026-11-24 | Подготовка: групирани настройки на плъгин (модел C, по образа на Naztronomy) — рамки със заглавие върху линията в до три колони; група без заглавие с отметка отпред е подгрупа, включвана от отметката. Правилото е описано в `docs/plugin-api/API.md`; Siril V-2.1 го ползва. `UI/Shared/Web/preparation-layout.css`, `docs/plugin-api/API.md`. | `Beta 1.3 UI: grouped plugin settings in Preparation` |
 | 2026-11-24 | Windows стартерът използва запазения език от профила и стартира на английски при нов профил. Добавени са преводи на обичайните стъпки за 11 езика и общ каталог с Python входа. `Tools/Launcher/Launcher.cs`, `Tools/build_launcher.ps1`, `Bridge/Desktop/startup-locales.json`, `start.pyw`. | `Beta 1.3 UI: localize startup, archive and image viewer` |
 | 2026-11-24 | Преводи на контекстното меню, колоните и справката на Архива, както и на прегледа на изображения, включително сравнение, хистограма и предупреждението за липсващ плъгин. `UI/Archive/Web/context-menu.js`, `UI/Analysis/Web/viewer.js`, `UI/Shared/Web/{archive-rows,monitoring,extensions,i18n,locales}.js`. | `Beta 1.3 UI: localize startup, archive and image viewer` |
+| 2026-11-25 | Известията за обновяване на плъгини, включително грешките от Python и състоянието на каталога, използват текущия език. Известията от самите плъгини използват преводите от манифеста. | `Beta 1.3 UI: localize plugin update notifications` |
 
 ## Следващи стъпки (план)
 

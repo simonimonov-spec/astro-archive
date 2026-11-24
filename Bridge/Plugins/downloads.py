@@ -15,6 +15,7 @@ import uuid
 import zipfile
 
 from Backend.Foundation.runtime import ROOT, read_json, atomic_json, within
+from Bridge.Core.protocol import LocalizedError, error_payload
 
 REPOSITORY = 'simonimonov-spec/astro-archive'
 CATALOG_URL = f'https://raw.githubusercontent.com/{REPOSITORY}/refs/heads/main/docs/plugin-catalog.json'
@@ -123,6 +124,7 @@ class Downloads:
         self.lock = threading.Lock()
         self.cache = manager.service.store.folder/'plugin-catalog.json'
         self.problem = None
+        self.update_notices = []
         try:self.entries = validate(read_json(self.cache, read_json(ROOT/'docs/plugin-catalog.json', {})))
         except ValueError:self.entries = []
 
@@ -145,17 +147,23 @@ class Downloads:
     def entry(self, ident):
         item = next((entry for entry in self.entries if entry['id'] == ident), None)
         if item is None:
-            raise ValueError('Плъгинът не е в официалния каталог. Обнови списъка.')
+            raise LocalizedError('plugins.notInCatalog', 'Плъгинът не е в официалния каталог. Обнови списъка.')
         return item
 
     def download(self, item, target):
-        data = fetch(f'https://codeload.github.com/{REPOSITORY}/zip/{item["commit"]}', MAX_ARCHIVE)
+        try:
+            data = fetch(f'https://codeload.github.com/{REPOSITORY}/zip/{item["commit"]}', MAX_ARCHIVE)
+        except (OSError, ValueError) as error:
+            raise LocalizedError('plugins.downloadFailed', str(error)) from error
         if hashlib.sha256(data).hexdigest() != item['sha256']:
-            raise ValueError('Изтеглянето не съвпада с проверения ZIP. Обнови каталога.')
-        unpack(data, target)
-        manifest = self.manager.manifest(target)
+            raise LocalizedError('plugins.zipMismatch', 'Изтеглянето не съвпада с проверения ZIP. Обнови каталога.')
+        try:
+            unpack(data, target)
+            manifest = self.manager.manifest(target)
+        except (OSError, ValueError, zipfile.BadZipFile) as error:
+            raise LocalizedError('plugins.packageInvalid', str(error)) from error
         if manifest['id'] != item['id'] or manifest['version'] != item['version']:
-            raise ValueError('Версията или името на плъгина не съвпада с каталога.')
+            raise LocalizedError('plugins.packageMismatch', 'Версията или името на плъгина не съвпада с каталога.')
         return manifest
 
     def install(self, ident):
@@ -173,7 +181,7 @@ class Downloads:
             item = self.entry(ident)
             current = self.manager.records.get(ident)
             if item['commit'] != commit or current is None or not newer_version(current['version'], item['version']):
-                raise ValueError('Версията е сменена или вече е инсталирана. Обнови списъка.')
+                raise LocalizedError('plugins.updateVersionChanged', 'Версията е сменена или вече е инсталирана. Обнови списъка.')
         with tempfile.TemporaryDirectory(prefix='.download-', dir=self.manager.folder) as folder:
             staged = Path(folder)/'update'
             package = staged/'package'
@@ -186,12 +194,13 @@ class Downloads:
         with self.manager.lock:
             current = self.manager.manifest(within(self.manager.folder, ident))
             if current['uiRevision'] != read_json(staged/'revisions.json')['old']:
-                raise ValueError('Инсталираният плъгин е променен. Провери папката и опитай отново.')
+                raise LocalizedError('plugins.installedChanged', 'Инсталираният плъгин е променен. Провери папката и опитай отново.')
             staged.rename(self.manager.folder/('.update-'+ident))
 
     def apply_pending(self):
         """Replace packages before loading any plug-in in the restarted desktop process."""
         problems = []
+        self.update_notices = []
         for pending in self.manager.folder.glob('.update-*'):
             ident = pending.name.removeprefix('.update-')
             if not re.fullmatch(r'[a-z][a-z0-9_-]{0,63}', ident) or not pending.is_dir() or pending.is_symlink() or pending.is_junction():
@@ -200,6 +209,7 @@ class Downloads:
                 self.apply_update(ident, pending)
             except (OSError, ValueError, TypeError) as error:
                 problems.append(f'{ident}: {error}')
+                self.update_notices.append(dict(plugin=ident, **error_payload(error)))
         return problems
 
     def apply_update(self, ident, pending):
@@ -213,7 +223,7 @@ class Downloads:
                 old_path = within(pending, 'previous') if previous.exists() else within(self.manager.folder, ident)
                 old = self.manager.manifest(old_path)
                 if not isinstance(expected, dict) or new['id'] != ident or old['id'] != ident or new['uiRevision'] != expected.get('new') or old['uiRevision'] != expected.get('old'):
-                    raise ValueError('Файловете на плъгина са променени. Обновяването е прекратено.')
+                    raise LocalizedError('plugins.updateFilesChanged', 'Файловете на плъгина са променени. Обновяването е прекратено.')
                 if not previous.exists():
                     destination.rename(previous)
                 package.rename(destination)
@@ -225,7 +235,7 @@ class Downloads:
         if previous.exists():
             if not destination.exists():
                 previous.rename(destination)
-                raise ValueError('Обновяването е прекъснато. Възстановена е предишната версия.')
+                raise LocalizedError('plugins.updateRestored', 'Обновяването е прекъснато. Възстановена е предишната версия.')
             backup = self.cache.parent/'RemovedPlugins'/(ident+'-'+uuid.uuid4().hex)
             backup.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(previous), str(backup))

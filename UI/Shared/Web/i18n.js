@@ -169,6 +169,14 @@
       ?? messages[selected.id]?.[key] ?? fallback[key] ?? messages.en[key] ?? en[key] ?? messages.bg[key] ?? bg[key] ?? key;
     return String(text).replace(/\{([A-Za-z0-9_]+)\}/g, (match, name) => Object.hasOwn(parameters, name) ? String(parameters[name]) : match);
   }
+  function errorText(problem, fallback) {
+    const key = problem?.errorKey;
+    if (typeof key === "string") {
+      const text = t(key);
+      if (text !== key) return text;
+    }
+    return fallback || problem?.error || problem?.message || t("error.request");
+  }
   function apply() {
     document.documentElement.lang = selected.locale;
     document.title = t("app.title") + installationSuffix;
@@ -223,6 +231,7 @@
     return [unit(Math.floor(seconds / 3600), "hour"), unit(Math.floor(seconds / 60) % 60, "minute"), unit(seconds % 60, "second", 2)].join(" ");
   }
   window.AstroArchiveI18n = {
+    errorText,
     t, apply, archiveName, pluginText, permissionText, unit, duration, languages, defaultLanguage, get locale() { return selected.locale; },
     get isBulgarian() { return selected.locale.toLowerCase().startsWith("bg"); },
     select(language) {

@@ -79,7 +79,9 @@
     clearTimeout(request.timeout);
     pending.delete(message.id);
     if (message.ok) request.resolve(message.result);
-    else request.reject(Object.assign(new Error(message.error || t("error.request")), { cancelled: !!message.cancelled }));
+    else request.reject(Object.assign(new Error(i18n.errorText(message)), {
+      cancelled: !!message.cancelled, errorKey: message.errorKey
+    }));
   });
 
   function log(message, level = "info", section = state.route) {

@@ -63,8 +63,9 @@
   }
   function modal(title, build) {
     const dialog = node('dialog', null, 'function-dialog'), heading = node('div', null, 'panel-heading'); heading.append(node('h2', title));
-    const close = node('button', '×', 'icon-button'); close.type = 'button'; close.setAttribute('aria-label', tr('Затвори', 'Close'));
-    window.AstroArchiveIcons.mount(close,'close',tr('Затвори','Close'));
+    const closeLabel = window.AstroArchiveI18n.t('dialog.close');
+    const close = node('button', '×', 'icon-button'); close.type = 'button'; close.setAttribute('aria-label', closeLabel);
+    window.AstroArchiveIcons.mount(close,'close',closeLabel);
     heading.append(close); const body = node('div', null, 'function-dialog-body'); dialog.append(heading, body); document.body.append(dialog);
     close.onclick = () => dialog.close(); dialog.addEventListener('close', () => dialog.remove()); build(body, dialog); dialog.showModal(); return dialog;
   }
@@ -73,7 +74,7 @@
       let answer = false;
       const dialog = modal(title, (body, box) => {
         body.append(node('p', description)); const actions = node('div', null, 'function-actions');
-        const cancel = node('button', tr('Отказ', 'Cancel'), 'quiet-button'), accept = node('button', buttonText || tr('Потвърди', 'Confirm'), 'primary-button');
+        const cancel = node('button', window.AstroArchiveI18n.t('settings.cancel'), 'quiet-button'), accept = node('button', buttonText || tr('Потвърди', 'Confirm'), 'primary-button');
         cancel.onclick = () => box.close(); accept.onclick = () => { answer = true; box.close(); }; actions.append(cancel, accept); body.append(actions);
       });
       dialog.addEventListener('close', () => resolve(answer));
