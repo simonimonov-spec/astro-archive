@@ -61,18 +61,61 @@
     }
     return card;
   }
-  async function previewEdit(archiveId,relativePath,values={},restructure=false){const U=window.AstroArchiveFunctions,data=await call('archive.metadata.preview',{archiveId,relativePath,values,restructure});U.modal('Преглед на промените',(body,dialog)=>{
-    body.append(node('p',`${data.count} файла · ${data.moves} премествания · ${data.merges.length} съществуващи групи за обединяване`,'schema-preview'));
-    if(data.merges.length)body.append(node('p','✓ Обединяване с: '+data.merges.join(', '),'schema-merge'));
-    body.append(node('p','FITS: стойностите се записват в хедъра. Останалите формати: отделен .astroarchive.json до изображението, без промяна на пикселите. Резервно копие на оригиналите остава в скритата папка .astroarchive-edits на архива.','function-note'));
-    const rows=node('div');body.append(rows);U.table(rows,[{title:'Преди',value:r=>r.before},{title:'След',value:r=>r.after}],data.examples);
-    const save=button('Потвърди и запази',async()=>{save.disabled=true;try{const result=await window.AstroArchivePython.task('archive.metadata.commit',{token:data.token,confirmed:true});dialog.close();U.modal('Информацията е запазена',body=>body.append(node('p',`${result.updated} файла обновени. Индексът е проверен.`),node('p','Резервни оригинали: '+result.backup,'function-note')));}finally{save.disabled=false;}});save.className='primary-button';body.append(save);
-  });}
+  function showPreview(data,{title='Преглед на промените',action='Потвърди и запази',onSaved}={}) {
+    const U=window.AstroArchiveFunctions;
+    return U.modal(title,(body,dialog)=>{
+      body.append(node('p',data.backup?`${data.count} файла · ${data.moves} премествания`:'Преместване на празна папка','schema-preview'));
+      if(data.merges.length)body.append(node('p','Обединяване с '+data.merges.join(', '),'schema-merge'));
+      if(data.backup)body.append(node('p','Оригиналите се запазват в .astroarchive-edits. Пикселите остават същите.','function-note'));
+      if(data.examples.length<data.count)body.append(node('p',`Показани са първите ${data.examples.length} файла.`,'function-note'));
+      const rows=node('div');
+      body.append(rows);
+      const columns=[{title:'Преди',value:r=>r.before},{title:'След',value:r=>r.after}];
+      if(data.examples.some(row=>row.fields?.length)){
+        columns.push({title:'Промени в метаданните',value:row=>row.fields.map(field=>`${field.name}: ${field.before??'—'} → ${field.after}`).join(' · ')||'—'});
+      }
+      U.table(rows,columns,data.examples);
+      const save=button(action,async()=>{
+        save.disabled=true;
+        try{
+          const result=await window.AstroArchivePython.task('archive.metadata.commit',{token:data.token,confirmed:true});
+          dialog.close();
+          onSaved?.();
+          U.modal('Промените са запазени',content=>{
+            content.append(node('p',result.movedFolder?'Папката е преместена.':`${result.updated} файла обновени.`));
+            if(result.backup)content.append(node('p','Резервни оригинали · '+result.backup,'function-note'));
+          });
+        }finally{save.disabled=false;}
+      });
+      save.className='primary-button';
+      body.append(save);
+    });
+  }
+  async function previewEdit(archiveId,relativePath,values={},restructure=false) {
+    showPreview(await call('archive.metadata.preview',{archiveId,relativePath,values,restructure}));
+  }
+  async function renameBatch(archiveId,entry) {
+    const U=window.AstroArchiveFunctions;
+    const {structure}=await call('archive.structure.sample',{archiveId});
+    const depth=entry.relativePath.split(/[\\/]/).filter(Boolean).length;
+    U.modal('Именуване в '+entry.name,(body,dialog)=>{
+      const folders=structure.levels.slice(depth).map((level,index)=>input(
+        'Подпапка '+(depth+index+1)+' · '+(titles[level.field]||level.field),level.formula,()=>{}));
+      const file=input('Имена на файловете',structure.fileFormula||'{filename}',()=>{});
+      body.append(node('p','Формулите важат за изображенията в избраната папка и подпапките ѝ. Пример за име на файл: {object}_{filter}_{basename}.','function-note'),
+        ...folders.map(field=>field.wrap),file.wrap);
+      body.append(button('Преглед на имената',async()=>{
+        const data=await call('archive.entries.renamePreview',{archiveId,relativePath:entry.relativePath,
+          formulas:folders.map(field=>field.e.value),fileFormula:file.e.value});
+        dialog.close();showPreview(data,{title:'Преглед на имената',action:'Преименувай'});
+      }));
+    });
+  }
   async function edit(archiveId,entry){const U=window.AstroArchiveFunctions,data=await call('archive.metadata.describe',{archiveId,relativePath:entry.relativePath});U.modal('Редактиране на информацията',(body,dialog)=>{
     body.append(node('p',`${entry.name} · ${data.count} файла. Отметни само полетата, които искаш да промениш. Празно поле означава смесени или липсващи стойности.`,'function-note'));const inputs={};
     for(const f of data.fields){const row=node('div',null,'metadata-edit-row'),enabled=node('input');enabled.type='checkbox';enabled.setAttribute('aria-label','Промени '+f.title);const value=data.values[f.key],control=input(f.title,Array.isArray(value)?value.join('; '):value==null?'':value,()=>{}),hint=node('small',null,'schema-merge');inputs[f.key]={enabled,input:control.e};const list=node('datalist');list.id='meta-'+f.key+'-'+crypto.randomUUID();list.append(...(data.suggestions[f.key]||[]).map(v=>option(v,v)));control.e.setAttribute('list',list.id);control.e.oninput=()=>{enabled.checked=true;hint.textContent=(data.suggestions[f.key]||[]).some(v=>v.localeCompare(control.e.value,undefined,{sensitivity:'accent'})===0)?'✓ Съществуваща група · възможно обединяване':'';};row.append(enabled,control.wrap,hint,list);body.append(row);}
     body.append(button('Преглед преди записване',async()=>{const values={};for(const[k,v]of Object.entries(inputs))if(v.enabled.checked)values[k]=v.input.value;await previewEdit(archiveId,entry.relativePath,values);dialog.close();}));
   });}
   async function sourceNights(id){const U=window.AstroArchiveFunctions,nights=await call('archive.source.nights',{id});U.modal('Изходни наблюдателни нощи',(body,dialog)=>{if(!nights.length)body.append(node('p','Няма намерена връзка с изходни кадри. Попълни обект, телескоп и наблюдателна нощ или внеси резултат през подготовката.'));for(const night of nights)body.append(button(night.name,()=>{dialog.close();window.AstroArchiveArchiveView.navigate(night.archiveId,night.relativePath);}));});}
-  window.AstroArchiveArchiveSchema={render,edit,previewEdit,titles,sourceNights,chooseShared,usesSharedSource,sourceLocation};
+  window.AstroArchiveArchiveSchema={render,edit,previewEdit,showPreview,renameBatch,titles,sourceNights,chooseShared,usesSharedSource,sourceLocation};
 })();

@@ -20,6 +20,13 @@
   dock:'<path d="M17 4h3v8h-8m8 0-8-8M10 5H5a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-4"/>',
   up:'<path d="M12 19V5m-5 5 5-5 5 5"/>',
   down:'<path d="M12 5v14m-5-5 5 5 5-5"/>',
+  cut:'<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="m8.3 8.3 12.2 12.2M8.3 15.7 20.5 3.5"/>',
+  paste:'<rect x="5" y="5" width="14" height="16" rx="2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M8.5 12h7m-7 4h7"/>',
+  trash:'<path d="M5 6h14M9 6V3h6v3m2 0-.8 15H7.8L7 6m3 4v7m4-7v7"/>',
+  rename:'<path d="M4 5h7m3 0h6M4 19h7m3 0h6m-8-14v14M4 9v6m16-6v6"/>',
+  tag:'<path d="M3 4h8l9 9-7 7-9-9z"/><circle cx="8" cy="8" r="1"/>',
+  prepare:'<path d="M5 5h14v14H5zM8 15l3-4 3 2 3-4"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.2"/>',
   reset:'<path d="M5 8a8 8 0 1 1-1 8M5 8H1m4 0V4"/><path d="M9 12h6m-3-3v6" opacity=".55"/>',
   header:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Zm0 0v6h6M8 12h8m-8 4h5"/>',
   download:'<path d="M12 3v12m-4-4 4 4 4-4M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>'

@@ -66,6 +66,10 @@ class Service:
             'archive.metadata.describe':lambda p:self.archive_editor.describe(p['archiveId'],p.get('relativePath','')),
             'archive.metadata.preview':lambda p:self.archive_editor.preview(p['archiveId'],p.get('relativePath',''),p.get('values'),p.get('restructure',False)),
             'archive.metadata.commit':lambda p:self.commit_archive_edit(p),
+            'archive.entries.renamePreview':lambda p:self.preview_archive_entries(p,move=False),
+            'archive.entries.movePreview':lambda p:self.preview_archive_entries(p,move=True),
+            'archive.entries.delete':lambda p:self.task('archive','Преместване в кошчето',
+                lambda cancel,progress:self.archive_editor.delete_selection(p['archiveId'],p['relativePath'],cancel,progress,p.get('confirmed') is True),'important'),
             'archive.source.nights':lambda p:self.source_nights(p['id']),
             'archive.provenance':lambda p:self.provenance(p['id']),
             'bridge.describe':lambda p:self.bridge.describe(),
@@ -194,12 +198,19 @@ class Service:
             plugins=self.plugins.list(),pluginCatalog=self.downloads.list(),catalogProblem=self.downloads.problem,updates=dict(self.updates.value),problems=[*self.plugin_update_problems,*self.plugins.problems],pluginUpdateProblems=self.plugin_update_problems,backgroundDataUrl=self.settings.value.get('backgroundDataUrl'),pluginsFolder=str(self.plugins.folder),icons=self.settings.value.get('icons',[]))
     def bootstrap(self):
         return dict(protocol=1,archives=[dict(a,structure=schema(self.settings,a['id'])) for a in self.settings.value['archives'] if not a.get('hidden') and (not a.get('ownerPlugin') or a['ownerPlugin'] in self.plugins.live)],ui=self.configuration(),activity=self.jobs.snapshot(),problem=None)
+    def preview_archive_entries(self,p,move):
+        with self.catalog.operation_lock:
+            if move:return self.archive_editor.move_preview(p['archiveId'],p['relativePath'],p['targetArchiveId'],p['targetRelativePath'])
+            return self.archive_editor.rename_preview(p['archiveId'],p['relativePath'],p['formulas'],p['fileFormula'])
     def commit_archive_edit(self,p):
         def work(cancel,progress):
             plan=self.archive_editor.plans.get(p['token'])
             if not plan:raise ValueError('Направи нов предварителен преглед.')
-            archive=plan['archive'];result=self.archive_editor.commit(p['token'],cancel,progress,p.get('confirmed',False))
-            result['index']=self.catalog.scan(archive,cancel,progress,wait=True);return result
+            archive,target=plan['archive'],plan['targetArchive']
+            result=self.archive_editor.commit(p['token'],cancel,progress,p.get('confirmed') is True)
+            result['index']=self.catalog.scan(archive,cancel,progress,wait=True)
+            if target!=archive:result['targetIndex']=self.catalog.scan(target,cancel,progress,wait=True)
+            return result
         return self.task('archive','Записване на информацията и подреждане на архива',work,'important')
     def structure_preview(self,p):
         from Backend.Archive.structure import render

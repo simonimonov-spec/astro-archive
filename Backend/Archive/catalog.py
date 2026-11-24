@@ -353,12 +353,15 @@ class Catalog:
             for ident in ids:
                 self.record(ident);db.execute('INSERT OR REPLACE INTO decisions VALUES(?,?,?)',(ident,decision,time.time()))
         return dict(updated=len(ids))
-    def trash(self,ids,confirmed=False):
+    def trash(self,ids,confirmed=False,cancel=None,progress=None):
         if not confirmed:raise ValueError('Необходимо е потвърждение за кошчето.')
         if any(ident.startswith('shared-') for ident in ids):
             raise ValueError('Споделените оригинали се преместват в кошчето от хоста.')
         result=[];folder=self.store.folder/'Trash';folder.mkdir(exist_ok=True)
-        for ident in ids:
+        for index,ident in enumerate(ids,1):
+            if cancel is not None and cancel.is_set():
+                if result:self.events.emit('archive.changed')
+                raise InterruptedError('Преместването в кошчето е спряно.')
             with self.operation_lock:
                 row=self.record(ident);source=self.path(ident);original_hash=digest(source);entry=uuid.uuid4().hex
                 target=folder/(entry+'.zip');temporary=target.with_suffix('.partial')
@@ -383,6 +386,7 @@ class Catalog:
                     db.execute('UPDATE files SET deleted=1 WHERE id=?',(ident,));db.execute("UPDATE trash SET state='trashed' WHERE id=?",(entry,))
                 result.append(entry)
                 self.browse.cache.pop(row['archive'],None)
+            if progress is not None:progress(index,len(ids),'Преместване на изображения в кошчето')
         self.events.emit('archive.changed');return dict(trashed=result)
     def trash_list(self):
         with self.store.db() as db:return [dict(**json.loads(r['manifest']),state=r['state']) for r in db.execute('SELECT * FROM trash')]

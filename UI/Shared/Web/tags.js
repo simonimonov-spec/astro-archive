@@ -100,7 +100,7 @@
   }
 
   // Choose a tag for already archived data. Resolves to a tag, or undefined when cancelled.
-  function chooseTag({ stack = false, current = null, title = 'Етикет за данните' } = {}) {
+  function chooseTag({ stack = false, current = null, title = 'Етикет за данните', allowClear = false } = {}) {
     return new Promise(resolve => {
       let result; const options = stack ? STACK_OPTIONS : OPTIONS;
       let value = key(current) && options.some(o => o[0] === key(current)) ? key(current) : 'astro', label = current?.label || '';
@@ -110,6 +110,11 @@
         body.append(segmented(options, value, v => { value = v; field.hidden = v !== 'other'; }), field);
         const actions = node('div', null, 'function-actions tag-actions'), cancel = node('button', 'Отказ', 'quiet-button'), accept = node('button', 'Запази етикета', 'primary-button');
         cancel.type = accept.type = 'button'; cancel.onclick = () => box.close(); accept.onclick = () => { result = make(options.find(o => o[0] === value), label); box.close(); };
+        if(allowClear){
+          const clear=node('button','Махни етикета','quiet-button');
+          clear.type='button';clear.onclick=()=>{result=null;box.close();};
+          actions.append(clear);
+        }
         actions.append(cancel, accept); body.append(actions);
       });
       dialog.addEventListener('close', () => resolve(result));

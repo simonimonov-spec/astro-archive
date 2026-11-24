@@ -174,6 +174,7 @@
       button.type = "button";
       const archiveId = state.archiveId;
       button.addEventListener("click", () => navigateFolder(archiveId, path));
+      attachArchiveMenu(button,archiveId,{name:label,relativePath:path,kind:path?'folder':'archive'});
       fragment.append(button);
     }
     const home = element("button", "", t("archive.roots")); home.type = "button"; home.onclick = showArchiveHome; fragment.append(home);
@@ -207,6 +208,11 @@
       await call("image.open", { archiveId: entry.archiveId || archiveId, relativePath: entry.relativePath });
       log(t("file.opened", { name: entry.name }));
     } catch (error) { problem(error); }
+  }
+
+  function attachArchiveMenu(element,archiveId,entry) {
+    if(!webview)return;
+    window.AstroArchiveArchiveMenu.attach(element,()=>({archiveId,entry,archive:state.archives.find(row=>row.id===archiveId)}));
   }
 
   function drawFiles(folder) {
@@ -250,7 +256,7 @@
       }
       row.append(actionCell);
       window.AstroArchiveViewerWorkbench?.attachArchiveDrag(row, entry, folder.archiveId);
-      row.addEventListener('contextmenu',event=>{if(window.AstroArchivePython?.entry){event.preventDefault();window.AstroArchivePython.entry(entry.archiveId||folder.archiveId,entry);}});
+      attachArchiveMenu(row,entry.archiveId||folder.archiveId,entry);
       window.AstroArchiveRemote?.decorateEntry(actionCell,folder,entry);
       row.addEventListener("dblclick", () => activateEntry(folder.archiveId, entry));
       row.addEventListener("keydown", event => {
@@ -419,7 +425,13 @@
   window.AstroArchiveViewerWorkbench.connect({call, files:()=>state.folder?.entries
     .map(entry=>window.AstroArchiveViewerWorkbench.file(entry,state.folder.archiveId)).filter(Boolean) || []});
   window.AstroArchiveExtensions.connect({call});
-  archiveNavigation = window.AstroArchiveArchiveNavigation.create({call, name: archiveName, navigate: navigateFolder, home: showArchiveHome, problem});
+  archiveNavigation = window.AstroArchiveArchiveNavigation.create({call, name: archiveName, navigate: navigateFolder, home: showArchiveHome, problem, attachMenu:attachArchiveMenu});
+  if(webview)window.AstroArchiveArchiveMenu.attach(document.querySelector('#page-archive .content-panel'),event=>{
+    if(!state.entered||event.defaultPrevented||event.target.closest('tr,button,input,select,a'))return null;
+    const archive=state.archives.find(row=>row.id===state.archiveId);
+    const name=state.path.split(/[\\/]/).filter(Boolean).at(-1)||archiveName(archive);
+    return {archiveId:state.archiveId,archive,entry:{name,relativePath:state.path,kind:state.path?'folder':'archive'}};
+  });
   window.AstroArchiveMonitoring.connect({call, desktop: !!webview});
   activity.connect({ call, desktop: !!webview, route: () => state.route, overlayChanged: () => {}, openDiagnostics: () => window.AstroArchivePreferences.open("diagnostics") });
   window.AstroArchivePreferences.connect({ call, log, languageChanged, pluginsChanged, desktop: !!webview });

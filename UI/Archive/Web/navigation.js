@@ -85,6 +85,7 @@
           if (entry.isLink) { button.disabled = true; button.title = window.AstroArchiveI18n.t('file.linkBlocked'); }
           const archiveId = context.archiveId;
           button.onclick = () => actions.navigate(entry.archiveId || archiveId, entry.relativePath || ''); fragment.append(button);
+          actions.attachMenu?.(button,entry.archiveId||archiveId,entry);
         }
         if (!entries.length) fragment.append(make('p', 'archive-nav-empty', context.unavailable
           ? tr('Избери папка за този архив от настройките.', 'Choose an archive folder in Settings.')

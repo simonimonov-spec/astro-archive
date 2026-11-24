@@ -62,8 +62,8 @@ def schema(settings,archive):
     root=next(a for a in settings.value['archives'] if a['id']==archive)
     return root.get('structure') or preset(root.get('type',archive))
 
-def destination(settings,archive,meta,name):
-    layout=schema(settings,archive)
+def destination(settings,archive,meta,name,layout=None):
+    layout=layout or schema(settings,archive)
     # Display aliases must not split an existing telescope into two physical
     # groups when an unrelated object's metadata is edited.
     folders=[component(render(level['formula'],meta,name)) for level in layout['levels']]

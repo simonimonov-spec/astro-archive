@@ -123,6 +123,7 @@
 | 2026-11-24 | Долната лента на прегледите се показва при отворен файл и се скрива, когато няма файлове за възстановяване. `UI/Analysis/Web/viewer-workbench.js`. | `Beta 1.3 UI: hide viewer shelf when empty` |
 | 2026-11-24 | Долната лента на прегледите е висока 31 px с бутони 26 px. `UI/Analysis/Web/viewer-workbench.css`, `UI/Shared/Web/buttons.css`. | `Beta 1.3 UI: compact the viewer shelf` |
 | 2026-11-24 | Затваряне на отделен прибран преглед с „×“ в долната лента и правоъгълни, слети бутони за управление на прозореца. `UI/Analysis/Web/viewer-workbench.{js,css}`. | `Beta 1.3 UI: add close buttons to the viewer shelf` |
+| 2026-11-24 | Меню на Архива при курсора с именуване, етикет, подготовка и информация. Долният ред съдържа „Изрежи“, „Постави“ и „Изтрий“. `UI/Archive/Web/context-menu.{js,css}`, `Backend/Archive/editing.py`. | `Beta 1.3 UI: add archive file context actions` |
 
 ## Следващи стъпки (план)
 

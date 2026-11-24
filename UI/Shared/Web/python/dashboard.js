@@ -75,25 +75,5 @@
   window.addEventListener('astroarchive-python-index-changed',()=>{window.AstroArchiveAnalysis.reset();window.AstroArchivePreparation.reset();});
   window.AstroArchivePython.settings=settingsDialog;
   P.provenance=async id=>{const graph=await P.call('archive.provenance',{id});U.modal('Произход на резултата',body=>{const visit=(row,depth=0)=>{const section=node('div');section.style.marginLeft=Math.min(depth,5)*18+'px';section.append(node('strong',row.name||row.id),node('p',row.relativePath||'Липсващ или вече показан източник','function-note'));if(row.archiveId){section.append(button('Към папката',()=>{document.querySelectorAll('.function-dialog').forEach(d=>d.close());window.AstroArchiveArchiveView.navigate(row.archiveId,row.relativePath.split('/').slice(0,-1).join('/'));P.navigate('archive');}),button('Преглед',()=>P.image(row.id)));}body.append(section);for(const child of row.sources||[])visit(child,depth+1);};visit(graph);});};
-  P.entry=async(archiveId,entry)=>{try{U.modal(entry.name,(body,dialog)=>{
-    if(entry.kind==='archive')body.append(button('Внеси файлове в този архив…',()=>{dialog.close();return window.AstroArchiveTags.importWithTags({archiveId});}),button('Внеси папка в този архив…',()=>{dialog.close();return window.AstroArchiveTags.importWithTags({archiveId,folder:true});}));
-    if(entry.kind!=='archive'&&!entry.isLink&&!window.AstroArchiveArchiveView.current().shared){ // Beta 1.3 UI: data tag
-      const stack=entry.details?.kind==='stack'||archiveId==='stacks',current=entry.details?.tag&&entry.details.tag!=='mixed'?entry.details.tag:null;
-      const setTag=async tag=>{dialog.close();const done=await P.task('archive.tag.set',{archiveId,relativePaths:[entry.relativePath],tag});window.AstroArchiveArchiveView.reload?.();return done;};
-      body.append(button('Етикет за данните…',async()=>{const tag=await window.AstroArchiveTags.chooseTag({stack,current,title:'Етикет · '+entry.name});if(tag!==undefined)await setTag(tag);}));
-      if(entry.details?.tag)body.append(button('Махни етикета',()=>setTag(null)));
-    }
-    if(['fits','image'].includes(entry.kind)){
-      body.append(button('Преглед',async()=>{dialog.close();if(entry.id)await P.image(entry.id);else await P.call('image.open',{archiveId,relativePath:entry.relativePath});}));
-      const workbench=window.AstroArchiveViewerWorkbench, image=workbench?.file(entry,archiveId);
-      if(image && !window.AstroArchiveRemote)body.append(button(U.tr('Отвори в нов преглед','Open in a new viewer'),()=>{
-        dialog.close();workbench.openImage(image);
-      }));
-    }
-    body.append(button('Редактирай информацията…',async()=>{await window.AstroArchiveArchiveSchema.edit(archiveId,entry);dialog.close();}));
-    if(entry.id&&(entry.details?.sourceFiles?.length||entry.details?.kind==='stack'))body.append(button('От кои кадри / стакове е направен',async()=>{dialog.close();await P.provenance(entry.id);}));
-    if(entry.details?.kind==='stack'&&entry.id)body.append(button('Намери нощите с изходните кадри',async()=>{const nights=await P.call('archive.source.nights',{id:entry.id});U.modal('Изходни наблюдателни нощи',content=>{if(!nights.length)content.append(node('p','Няма намерена връзка с изходни кадри. Попълни обект, телескоп и наблюдателна нощ или внеси резултат през подготовката.'));for(const night of nights)content.append(button(night.name,()=>{document.querySelectorAll('.function-dialog').forEach(d=>d.close());window.AstroArchiveArchiveView.navigate(night.archiveId,night.relativePath);}));});}));
-    body.append(button('Към подготовката / изнасяне',async()=>{const data=await P.call('python.archive.query',{filters:{archive:archiveId,relative:entry.relativePath}});dialog.close();await window.AstroArchivePreparation.receive(data.rows.map(r=>r.id),archiveId==='stacks'?'stacks':'frames');P.navigate('preparation');}));
-  });}catch(e){U.error('archive',e);}};
   window.addEventListener('astroarchive-python-event',event=>{if(event.detail.name==='archive.changed'){window.AstroArchiveAnalysis.reset();window.AstroArchivePreparation.reset();}});
 })();

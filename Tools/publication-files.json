@@ -527,6 +527,14 @@
         "destination": "UI/Archive/Web/layout.css"
       },
       {
+        "source": "UI/Archive/Web/context-menu.css",
+        "destination": "UI/Archive/Web/context-menu.css"
+      },
+      {
+        "source": "UI/Archive/Web/context-menu.js",
+        "destination": "UI/Archive/Web/context-menu.js"
+      },
+      {
         "source": "UI/Archive/Web/sorting.js",
         "destination": "UI/Archive/Web/sorting.js"
       },
@@ -589,6 +597,10 @@
       {
         "source": "tests/test_tags.py",
         "destination": "tests/test_tags.py"
+      },
+      {
+        "source": "tests/test_archive_context.py",
+        "destination": "tests/test_archive_context.py"
       }
     ],
     "astro-archive-plugin-archive-overview": [
