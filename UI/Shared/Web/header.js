@@ -57,7 +57,7 @@
       wheel.setAttribute('aria-label', window.AstroArchiveI18n.t('activity.status', {status: caption}));
       wheel.title = caption + ' · ' + window.AstroArchiveI18n.t('activity.openDiary');
     }
-    settings.setAttribute('aria-label', tr('Настройки', 'Settings')); settings.title = tr('Настройки', 'Settings');
+    settings.setAttribute('aria-label', tr('Настройки', 'Settings')); settings.title = tr('Настройки', 'Settings') + ' (Ctrl+,)';
     text(resourceLabel, tr('Диск и връзка', 'Disk and connection'));
     text(free, $('header-disk-free')?.textContent || tr('Състояние на системата', 'System status'));
     summary.title = tr('Диск, връзка и добавки', 'Disk, connection and plugins'); summary.setAttribute('aria-label', summary.title);

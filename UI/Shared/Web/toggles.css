@@ -1,0 +1,115 @@
+/* Chosen models O5 "Switch" and R2 "Arrow and line" (with animations).
+   Checkbox options (label.checkbox-field) look like a sliding on/off switch;
+   the native checkbox stays in place, so keyboard, forms and scripts behave
+   exactly as before. Collapsible headings (details > summary) get a turning
+   arrow and a line; their content drops down and fades in. The header
+   "Disk and connection" menu is a dropdown, not a heading, and is left out. */
+:root {
+  --switch-w: 34px;
+  --switch-h: 20px;
+  --switch-knob: 14px;
+  --switch-ease: cubic-bezier(.34, 1.56, .64, 1); /* small overshoot: the knob "snaps" */
+}
+
+/* ---------- Switch ---------- */
+:root .checkbox-field input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  width: var(--switch-w) !important;
+  height: var(--switch-h) !important;
+  margin: 0;
+  border-radius: calc(var(--switch-h) / 2);
+  background: color-mix(in srgb, var(--muted) 28%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--muted) 30%, transparent);
+  cursor: pointer;
+  transition: background-color 260ms ease, box-shadow 320ms ease;
+}
+:root .checkbox-field input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  top: calc((var(--switch-h) - var(--switch-knob)) / 2);
+  left: calc((var(--switch-h) - var(--switch-knob)) / 2);
+  width: var(--switch-knob);
+  height: var(--switch-knob);
+  border-radius: 50%;
+  background: var(--muted);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--background) 60%, transparent);
+  transition: translate 360ms var(--switch-ease), background-color 260ms ease, box-shadow 320ms ease, width 200ms ease;
+}
+/* Model G1 (owner's choice): no glow, white knob; the track turns blue when on. */
+:root .checkbox-field input[type="checkbox"]::before { background: #f4f7fb; }
+:root .checkbox-field input[type="checkbox"]:checked {
+  background: color-mix(in srgb, var(--accent) 62%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 80%, transparent);
+}
+:root .checkbox-field input[type="checkbox"]:checked::before {
+  translate: calc(var(--switch-w) - var(--switch-h)) 0;
+  background: #ffffff;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--background) 55%, transparent);
+}
+/* The knob stretches a little while it is pressed. */
+:root .checkbox-field input[type="checkbox"]:active:not(:disabled)::before { width: calc(var(--switch-knob) + 4px); }
+:root .checkbox-field input[type="checkbox"]:checked:active:not(:disabled)::before { translate: calc(var(--switch-w) - var(--switch-h) - 4px) 0; }
+@media (hover: hover) and (pointer: fine) {
+  :root .checkbox-field:hover input[type="checkbox"]:not(:disabled):not(:checked) { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  :root .checkbox-field:hover input[type="checkbox"]:not(:disabled):not(:checked)::before { background: #ffffff; }
+}
+:root .checkbox-field input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:root .checkbox-field input[type="checkbox"]:disabled { opacity: .45; cursor: default; }
+:root .checkbox-field:has(input[type="checkbox"]) { cursor: pointer; }
+
+/* ---------- Arrow and line headings ---------- */
+:root details:not(.header-resources) { interpolate-size: allow-keywords; }
+:root details:not(.header-resources) > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: color 220ms ease, border-color 260ms ease;
+}
+:root details:not(.header-resources) > summary::-webkit-details-marker { display: none; }
+:root details:not(.header-resources) > summary::before {
+  content: "";
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  opacity: .7;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat;
+  transition: rotate 320ms var(--switch-ease), opacity 220ms ease;
+}
+:root details:not(.header-resources)[open] > summary { color: var(--accent); border-bottom-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+:root details:not(.header-resources)[open] > summary::before { rotate: 90deg; opacity: 1; }
+@media (hover: hover) and (pointer: fine) {
+  :root details:not(.header-resources) > summary:hover { color: var(--accent); }
+  :root details:not(.header-resources) > summary:hover::before { opacity: 1; }
+}
+:root details:not(.header-resources) > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+/* Opening: the content area drops down and the text fades in. */
+:root details:not(.header-resources)::details-content {
+  block-size: 0;
+  overflow: clip;
+  transition: block-size 380ms cubic-bezier(.2, .8, .2, 1), content-visibility 380ms allow-discrete;
+}
+:root details:not(.header-resources)[open]::details-content { block-size: auto; }
+:root details:not(.header-resources)[open] > :not(summary) { animation: details-text-in 460ms 80ms cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes details-text-in {
+  from { opacity: 0; translate: 0 -8px; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+/* No motion when animations are switched off in Settings or by the system. */
+:root[data-animations="off"] :is(.checkbox-field input[type="checkbox"], details > summary, details > :not(summary)),
+:root[data-animations="off"] :is(.checkbox-field input[type="checkbox"], details > summary)::before { animation: none !important; transition: none !important; }
+:root[data-animations="off"] details::details-content { transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  :root :is(.checkbox-field input[type="checkbox"], details > summary, details > :not(summary)),
+  :root :is(.checkbox-field input[type="checkbox"], details > summary)::before { animation: none !important; transition: none !important; }
+  :root details::details-content { transition: none !important; }
+}

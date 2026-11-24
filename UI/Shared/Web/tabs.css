@@ -1,0 +1,130 @@
+/* Tab style "Underlined" (chosen model 3) for every tab group: main
+   navigation, panel switches (function-segmented), Settings tabs and the
+   Analysis data source switch. No container box; one thin line under the
+   group; the chosen tab is accent-coloured with a glowing accent line that
+   slides and stretches between tabs (controls.js moves the indicator).
+   Animations: sliding line, a flash and lift of the
+   newly chosen tab, a bounce of its icon, and a hover line that grows from
+   the centre. All motion stops with the app's animation switch or the
+   system's reduced-motion setting. */
+:root {
+  --tab-height: 36px;
+  --tab-line: 2px;
+  --tab-glow: 0 9px 12px -10px color-mix(in srgb, var(--accent) 75%, transparent);
+  --tab-glow-strong: 0 10px 18px -8px color-mix(in srgb, var(--accent) 100%, transparent);
+  --tab-hover-line: color-mix(in srgb, var(--accent) 35%, var(--border));
+  --tab-ease: cubic-bezier(.2, .8, .2, 1);
+}
+
+/* The group: no box, only a base line. */
+:root :is(.navigation, .settings-tabs, .function-segmented, .flow-view-buttons).aa-slider-group,
+:root .q-source-switch {
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  gap: 2px !important;
+}
+
+/* The sliding indicator becomes the glowing underline. */
+:root .aa-route-indicator {
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: var(--tab-line) solid var(--accent) !important;
+  border-radius: 0 !important;
+  box-shadow: var(--tab-glow);
+  /* steady glow; the slow "breathing" pulse was removed at the owner's request */
+}
+@keyframes tab-breathe {
+  0%, 100% { box-shadow: var(--tab-glow); }
+  50% { box-shadow: var(--tab-glow-strong); }
+}
+
+/* The tabs themselves. */
+:root .aa-slider-group:is(.navigation, .settings-tabs, .function-segmented, .flow-view-buttons) > .aa-button,
+:root .q-source-switch > button {
+  min-height: var(--tab-height) !important;
+  height: var(--tab-height);
+  padding: 0 16px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background-color: transparent !important;
+  color: var(--muted);
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+  line-height: 1.2 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  /* hover line, drawn as a background that grows from the centre */
+  background-image: linear-gradient(var(--tab-hover-line), var(--tab-hover-line)) !important;
+  background-repeat: no-repeat !important;
+  background-position: 50% 100% !important;
+  background-size: 0% var(--tab-line) !important;
+  transition: color 220ms var(--tab-ease), background-size 280ms var(--tab-ease), scale 160ms var(--tab-ease) !important;
+}
+:root .aa-slider-group:not(.navigation) > .aa-button::before { display: none; }
+
+/* Chosen tab: colour, a lift and a short flash each time it becomes chosen. */
+:root .aa-slider-group:is(.navigation, .settings-tabs, .function-segmented, .flow-view-buttons) > .aa-button:is([aria-current="page"], [aria-selected="true"], [aria-pressed="true"]),
+:root .q-source-switch > button[aria-pressed="true"] {
+  color: var(--accent) !important;
+  font-weight: 600 !important;
+  animation: tab-activate 520ms var(--tab-ease);
+}
+@keyframes tab-activate {
+  0% { translate: 0 3px; text-shadow: 0 0 0 transparent; opacity: .55; }
+  35% { translate: 0 -1px; text-shadow: 0 0 14px color-mix(in srgb, var(--accent) 90%, transparent); opacity: 1; }
+  100% { translate: 0 0; text-shadow: 0 0 0 transparent; }
+}
+/* The icon of the chosen main section bounces once. */
+:root .navigation.aa-slider-group > button[aria-current="page"]::before {
+  opacity: 1 !important;
+  animation: tab-icon-pop 560ms var(--tab-ease);
+}
+@keyframes tab-icon-pop {
+  0% { scale: .7; rotate: -12deg; }
+  45% { scale: 1.22; rotate: 6deg; }
+  75% { scale: .95; rotate: -2deg; }
+  100% { scale: 1; rotate: 0deg; }
+}
+
+/* Hover: text lightens and a soft line grows from the centre. */
+@media (hover: hover) and (pointer: fine) {
+  :root .aa-slider-group:is(.navigation, .settings-tabs, .function-segmented, .flow-view-buttons) > .aa-button:not(:disabled):hover,
+  :root .q-source-switch > button:not(:disabled):hover {
+    color: var(--text);
+    background-size: 70% var(--tab-line) !important;
+  }
+  :root .aa-slider-group > .aa-button:is([aria-current="page"], [aria-selected="true"], [aria-pressed="true"]):hover { color: var(--accent) !important; background-size: 0% var(--tab-line) !important; }
+}
+:root .aa-slider-group > .aa-button:not(:disabled):active,
+:root .q-source-switch > button:not(:disabled):active { scale: .96; }
+
+/* The data source switch has no sliding indicator: its chosen tab draws its
+   own glowing line, which grows from the centre when chosen. */
+:root .q-source-switch > button[aria-pressed="true"] {
+  background-image: linear-gradient(var(--accent), var(--accent)) !important;
+  background-size: 100% var(--tab-line) !important;
+  animation: tab-activate 520ms var(--tab-ease), tab-line-in 420ms var(--tab-ease);
+  filter: drop-shadow(0 3px 5px color-mix(in srgb, var(--accent) 45%, transparent));
+}
+@keyframes tab-line-in { from { background-size: 0% var(--tab-line); } to { background-size: 100% var(--tab-line); } }
+
+/* Main navigation keeps its icons and a little more weight. */
+:root .navigation.aa-slider-group > button { min-height: 40px !important; height: 40px; padding: 0 18px !important; font-weight: 600 !important; }
+
+/* Hidden tabs stay hidden. */
+:root .aa-slider-group > [hidden], :root .q-source-switch > [hidden] { display: none !important; }
+
+/* No motion when animations are switched off in Settings or by the system. */
+:root[data-animations="off"] :is(.aa-route-indicator, .aa-slider-group > .aa-button, .q-source-switch > button),
+:root[data-animations="off"] .navigation > button::before { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  :root :is(.aa-route-indicator, .aa-slider-group > .aa-button, .q-source-switch > button),
+  :root .navigation > button::before { animation: none !important; transition: none !important; }
+}

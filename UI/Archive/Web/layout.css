@@ -1,0 +1,114 @@
+/* Compact workspace: low page headings, archive actions inside the table panel,
+   location in the footer and icon-only secondary buttons. */
+
+/* Lower page headings on every workspace. */
+.page-heading { margin: 2px 0 14px; }
+.page-heading .eyebrow, .page-heading .subtitle { display: none; }
+.page-heading h1 { font-size: 22px; letter-spacing: -.3px; }
+
+/* The Archive tab already names the page; show its title only when the header is collapsed. */
+#page-archive .archive-page-heading { display: none; }
+:root[data-header-collapsed="true"] #page-archive .archive-page-heading { display: flex; }
+
+/* Actions occupy the top of the table panel. */
+#page-archive .content-toolbar { padding: 12px 16px; gap: 12px; border-bottom: 1px solid var(--border); }
+#page-archive .archive-actions { gap: 8px; flex-wrap: wrap; }
+#page-archive .archive-actions > *, #page-archive .archive-actions .archive-import-choice > button { min-height: 34px; }
+#page-archive .archive-actions .checkbox-field { padding-right: 4px; }
+#page-archive .archive-actions .islands-toggle { display: none !important; }
+.archive-icon-button { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; min-width: 34px; padding: 0 !important; gap: 0 !important; }
+.archive-icon-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+#page-archive .search { min-height: 34px; padding-block: 4px; }
+
+/* The table uses the window height that the removed heading freed. */
+#page-archive .table-scroll { height: max(320px, calc(100vh - 240px)); }
+
+/* Rule: the window itself never scrolls. The Archive view is exactly as tall as
+   the window; lists, filters and the table scroll inside their own panels.
+   Safeguard: below 560 px height or in the narrow (stacked) layout the page may
+   scroll instead of squeezing the panels into uselessness. */
+@media (min-height: 560px) and (min-width: 761px) {
+  :root:has(#page-archive:not([hidden])) .app-shell { height: 100vh; min-height: 0; }
+  :root:has(#page-archive:not([hidden])) main { display: flex; flex-direction: column; min-height: 0; }
+  #page-archive:not([hidden]) { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  #page-archive > .page-heading { flex: none; }
+  #page-archive .archive-layout { flex: 1 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  #page-archive .archive-layout > * { min-height: 0; }
+  #page-archive .content-panel { min-height: 0; }
+  #page-archive .content-panel > * { flex: none; }
+  #page-archive .content-panel > .table-scroll { flex: 1 1 0; height: auto; min-height: 0; }
+  #page-archive .archive-sidebar { overflow: hidden; }
+  #page-archive .archive-sidebar > .archive-navigation-list { min-height: 60px; }
+  /* Filter mode: the filter fields scroll, the totals stay visible at the bottom. */
+  #page-archive .archive-sidebar.filter-mode > .py-archive-filters { flex: 1 1 0; min-height: 0; overflow: auto; }
+  #page-archive .archive-sidebar.filter-mode > .py-filter-stats { flex: none; margin: 0 16px 14px; padding-top: 12px; }
+}
+
+/* Location (breadcrumbs and full path) sits in the footer. */
+#page-archive .table-footer { gap: 16px; padding: 8px 16px; min-height: 48px; }
+.archive-location { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+#page-archive .archive-location #breadcrumbs { font-size: 12px; gap: 5px; flex-wrap: wrap; }
+#page-archive .archive-location .folder-description { padding: 0; font-size: 10px; justify-content: flex-start; gap: 10px; min-width: 0; }
+#page-archive .table-footer > #folder-counts { flex: none; white-space: nowrap; }
+
+/* Smaller archive chooser texts in the sidebar. */
+#page-archive .archive-navigation-heading { padding: 12px 14px 8px; min-height: 0; }
+#page-archive .archive-navigation-title h2 { font-size: 13px; }
+#page-archive #archive-root-count { font-size: 11px; }
+#page-archive #archive-nav-level { font-size: 10px; margin-top: 2px; }
+#page-archive .archive-navigation-list { padding: 0 6px 10px; }
+#page-archive .archive-nav-item { gap: 8px; padding: 7px 8px; margin: 2px 0; }
+#page-archive .archive-nav-item .archive-icon { --archive-icon-size: 18px; }
+#page-archive .archive-nav-caption strong { font-size: 11.5px; line-height: 1.35; }
+#page-archive .archive-nav-caption small { display: none; }
+#page-archive .archive-nav-chevron { font-size: 14px; }
+
+/* Sortable column headings. */
+#page-archive thead th.sortable { padding: 0; }
+#page-archive thead th.sortable > button { display: inline-flex; align-items: center; gap: 6px; width: 100%; padding: 10px 14px; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; text-align: left; white-space: nowrap; cursor: pointer; }
+#page-archive thead th.sortable > button:hover { color: var(--text); }
+#page-archive thead th.sortable > button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+#page-archive thead th.sortable .sort-arrow { font-size: 10px; opacity: 0; width: 8px; }
+#page-archive thead th.sortable > button:hover .sort-arrow { opacity: .45; }
+#page-archive thead th[aria-sort] > button { color: var(--accent); }
+#page-archive thead th[aria-sort] .sort-arrow { opacity: 1; }
+
+@media (max-width: 760px) {
+  #page-archive .content-toolbar { flex-direction: column; align-items: stretch; }
+  #page-archive .table-footer { flex-wrap: wrap; }
+}
+
+/* Import is the main action: a longer button with a clear label. */
+#page-archive #archive-import { min-width: 150px; padding-inline: 18px; justify-content: center; }
+
+/* The folder list fills all free sidebar height; the summary stays at the bottom. */
+#page-archive .archive-sidebar { min-height: 0; }
+#page-archive .archive-sidebar > .archive-navigation-list { flex: 1 1 0; max-height: none; min-height: 150px; }
+#page-archive .archive-sidebar > .folder-summary { flex: none; margin: 0 16px 16px; padding-top: 14px; }
+@media (max-width: 760px) { #page-archive .archive-sidebar > .archive-navigation-list { flex: none; max-height: 245px; } }
+
+/* Footer priority when the window is narrow:
+   left (location / filter state and its buttons) keeps its size and uses at most
+   two lines; the counts text on the right shrinks with "…" and disappears first;
+   the page buttons never shrink. */
+#page-archive .content-panel { container-type: inline-size; container-name: archive-panel; }
+#page-archive .table-footer { flex-wrap: nowrap; }
+#page-archive .table-footer > .archive-location { flex: 0 0 auto; min-width: 0; max-width: 100%; }
+#page-archive .table-footer > #folder-counts { flex: 1 1 0; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: right; }
+#page-archive .table-footer > .pagination { flex: 0 1 auto; min-width: 0; white-space: nowrap; }
+#page-archive .table-footer #page-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#page-archive .table-footer .pagination > button { flex: none; }
+#page-archive .archive-location #breadcrumbs { flex-wrap: nowrap; white-space: nowrap; overflow: hidden; justify-content: flex-start; }
+#page-archive .archive-location #breadcrumbs > * { flex: none; white-space: nowrap; }
+#page-archive .archive-location .folder-description > * { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; }
+/* Filter state in the footer: compact, never broken into single letters. */
+#page-archive .archive-location #breadcrumbs .filter-results-title { font-size: 12px; }
+#page-archive .archive-location #breadcrumbs .filter-results-badge { font-size: 8px; padding: 2px 5px; }
+#page-archive .archive-location #breadcrumbs .filter-clear { padding: 2px 9px; }
+@container archive-panel (max-width: 720px) {
+  #page-archive .table-footer > #folder-counts { display: none; }
+}
+@container archive-panel (max-width: 600px) {
+  #page-archive .table-footer #page-label { display: none; }
+  #page-archive .archive-location #breadcrumbs .filter-results-badge { display: none; }
+}

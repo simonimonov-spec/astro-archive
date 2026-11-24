@@ -73,7 +73,7 @@
     "plugins.runningNote": "The plugin is processing a task. Settings and deactivation will be available when it finishes."
   });
   Object.assign(bg, {
-    "settings.storage": "Папки и програми…", "archive.import": "Внеси… ▾", "archive.onlyFrames": "Само кадри",
+    "settings.storage": "Папки и програми…", "archive.import": "Внеси файлове ▾", "archive.onlyFrames": "Само кадри",
     "diagnostics.title": "Диагностика", "diagnostics.heading": "Бъгове и дневници", "diagnostics.folder": "Подробни лог файлове",
     "diagnostics.restartHint": "Затваря и стартира отново приложението и включените му услуги.", "diagnostics.restartConfirm": "Приложението ще се затвори и ще се опита да се отвори отново. Дистанционната връзка ще се прекъсне. Приключи дистанционните качвания и изтегляния, преди да продължиш. Неприключените действия няма да продължат автоматично. Да продължа ли?",
     "diagnostics.restartBusy": "Има текуща задача. Изчакай да приключи или я спри безопасно, преди да рестартираш.", "diagnostics.restartLocal": "Рестартирането е достъпно от приложението на компютъра.",
@@ -91,7 +91,7 @@
     "activity.tier.important": "Важна", "activity.tier.normal": "Честа", "activity.tier.ambient": "Фонова"
   });
   Object.assign(en, {
-    "settings.storage": "Folders and programs…", "archive.import": "Import… ▾", "archive.onlyFrames": "Frames only",
+    "settings.storage": "Folders and programs…", "archive.import": "Import files ▾", "archive.onlyFrames": "Frames only",
     "diagnostics.title": "Diagnostics", "diagnostics.heading": "Issues and logs", "diagnostics.folder": "Detailed log files",
     "diagnostics.restartHint": "Closes and starts the application and its enabled services again.", "diagnostics.restartConfirm": "The application will close and try to reopen. The remote connection will be interrupted. Finish remote uploads and downloads before continuing. Unfinished actions will not resume automatically. Continue?",
     "diagnostics.restartBusy": "A task is running. Wait for it to finish or stop it safely before restarting.", "diagnostics.restartLocal": "Restart is available from the application on the computer.",

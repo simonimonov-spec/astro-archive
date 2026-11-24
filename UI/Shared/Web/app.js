@@ -213,8 +213,9 @@
     const rowContext=window.AstroArchiveArchiveRows.context(folder);
     const columns = !window.AstroArchiveCustomization.archiveVariant(rowContext)&&folder.columns ? folder.columns.map(key=>({key,title:window.AstroArchiveArchiveSchema.titles[key]||key})) : window.AstroArchiveCustomization.archiveColumns(rowContext);
     const headings = document.querySelector('#page-archive .content-panel thead tr');
-    headings.replaceChildren(...columns.map(c=>element('th','',window.AstroArchiveArchiveRows.columnTitle(c,folder.entries,folder))),element('th','',''));
-    for (const entry of folder.entries) {
+    const sorting = window.AstroArchiveArchiveSort, redraw = () => drawFiles(folder);
+    headings.replaceChildren(...columns.map(c=>sorting.heading(c,window.AstroArchiveArchiveRows.columnTitle(c,folder.entries,folder),redraw)),element('th','',''));
+    for (const entry of sorting.apply(folder.entries, columns, folder)) {
       const row = element("tr");
       row.tabIndex = 0;
       const name = element("td");

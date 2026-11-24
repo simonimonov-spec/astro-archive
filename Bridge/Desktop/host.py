@@ -10,6 +10,9 @@ from Backend.Foundation.runtime import ROOT,CACHE,within,atomic_json,read_json
 from Bridge.Core.service import Service
 from Bridge.Desktop.single_instance import acquire,activate,release
 from Bridge.Desktop.identity import installation_id,window_title,matches,signal_ready
+from Bridge.Desktop import window_placement
+
+PLACEMENT=CACHE/'window-placement.json'
 
 class ThreadingHTTPServer(StandardHTTPServer):
     # Chromium loads UI resources and RPC concurrently; Windows' default backlog
@@ -116,7 +119,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def open_browser(url):
     edge=Path(os.environ.get('ProgramFiles(x86)',r'C:\Program Files (x86)'))/'Microsoft/Edge/Application/msedge.exe'
-    if edge.is_file():subprocess.Popen([str(edge),'--user-data-dir='+str(CACHE/'browser'),'--no-first-run','--app='+url],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    if edge.is_file():subprocess.Popen([str(edge),'--user-data-dir='+str(CACHE/'browser'),'--no-first-run',*window_placement.launch_arguments(PLACEMENT),'--app='+url],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     else:
         import webbrowser
         webbrowser.open(url)
@@ -153,6 +156,7 @@ def run():
     server=ThreadingHTTPServer(('127.0.0.1',0),Handler);server.daemon_threads=True
     server.service=Service(desktop_actions={'show':lambda:open_browser(server.url),'quit':server.shutdown});server.key=secrets.token_urlsafe(32);server.prefix='/s/'+server.key+'/'
     server.url=f'http://127.0.0.1:{server.server_port}'+server.prefix;server.last_seen=time.monotonic()
+    placement_stopped=threading.Event();window_placement.track(window_title(ROOT),PLACEMENT,placement_stopped)
     atomic_json(runtime,dict(url=server.url,pid=os.getpid(),installation=installation_id(ROOT)));open_browser(server.url);signal_ready(ROOT)
     def idle():
         while True:
@@ -161,6 +165,7 @@ def run():
     threading.Thread(target=idle,daemon=True).start()
     try:server.serve_forever()
     finally:
+        placement_stopped.set()
         for ident in list(server.service.plugins.live):server.service.plugins.unload(ident)
         server.server_close()
         if read_json(runtime,{}).get('pid')==os.getpid():runtime.unlink(missing_ok=True)

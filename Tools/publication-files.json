@@ -505,6 +505,50 @@
       {
         "source": "tests/test_update_download.py",
         "destination": "tests/test_update_download.py"
+      },
+      {
+        "source": "Bridge/Desktop/window_placement.py",
+        "destination": "Bridge/Desktop/window_placement.py"
+      },
+      {
+        "source": "UI/Archive/Web/layout.css",
+        "destination": "UI/Archive/Web/layout.css"
+      },
+      {
+        "source": "UI/Archive/Web/sorting.js",
+        "destination": "UI/Archive/Web/sorting.js"
+      },
+      {
+        "source": "UI/Shared/Web/buttons.css",
+        "destination": "UI/Shared/Web/buttons.css"
+      },
+      {
+        "source": "UI/Shared/Web/cards.css",
+        "destination": "UI/Shared/Web/cards.css"
+      },
+      {
+        "source": "UI/Shared/Web/fit.css",
+        "destination": "UI/Shared/Web/fit.css"
+      },
+      {
+        "source": "UI/Shared/Web/shortcuts.js",
+        "destination": "UI/Shared/Web/shortcuts.js"
+      },
+      {
+        "source": "UI/Shared/Web/switches.css",
+        "destination": "UI/Shared/Web/switches.css"
+      },
+      {
+        "source": "UI/Shared/Web/tabs.css",
+        "destination": "UI/Shared/Web/tabs.css"
+      },
+      {
+        "source": "UI/Shared/Web/toggles.css",
+        "destination": "UI/Shared/Web/toggles.css"
+      },
+      {
+        "source": "tests/test_window_placement.py",
+        "destination": "tests/test_window_placement.py"
       }
     ],
     "astro-archive-plugin-archive-overview": [

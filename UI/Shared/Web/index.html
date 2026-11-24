@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="monitoring.css">
   <link rel="stylesheet" href="customization.css">
   <link rel="stylesheet" href="Archive/navigation.css">
+  <link rel="stylesheet" href="Archive/layout.css">
   <link rel="stylesheet" href="Analysis/analysis.css">
   <link rel="stylesheet" href="Analysis/viewer.css">
   <link rel="stylesheet" href="python/python.css">
@@ -25,6 +26,12 @@
   <link rel="stylesheet" href="workflow-ui.css">
   <link rel="stylesheet" href="controls.css">
   <link rel="stylesheet" href="header.css">
+  <link rel="stylesheet" href="buttons.css">
+  <link rel="stylesheet" href="tabs.css">
+  <link rel="stylesheet" href="toggles.css">
+  <link rel="stylesheet" href="switches.css">
+  <link rel="stylesheet" href="cards.css">
+  <link rel="stylesheet" href="fit.css">
   <script src="python/transport.js"></script>
   <script src="i18n.js" defer></script>
   <script src="icons.js" defer></script>
@@ -55,8 +62,10 @@
   <script src="islands.js" defer></script>
   <script src="controls.js" defer></script>
   <script src="header.js" defer></script>
+  <script src="Archive/sorting.js" defer></script>
   <script src="app.js" defer></script>
   <script src="python/dashboard.js" defer></script>
+  <script src="shortcuts.js" defer></script>
 </head>
 <body>
   <div class="background-layer" aria-hidden="true"><img id="background-image" alt="" hidden><div class="background-shade"></div></div>
@@ -82,7 +91,7 @@
     <aside id="pending-archive-notice" class="pending-archive-notice" role="status" hidden><div><strong id="pending-archive-title"></strong><p id="pending-archive-description"></p><small id="pending-archive-path"></small></div><button type="button" id="pending-archive-open" class="quiet-button">Отвори запазените файлове ↗</button></aside>
     <main id="main" tabindex="-1">
       <section id="page-archive" class="page" aria-labelledby="archive-heading">
-        <div class="page-heading"><div><p class="eyebrow">БИБЛИОТЕКА</p><h1 id="archive-heading">Архив</h1><p class="subtitle">Кадри, стакове и готови снимки на едно място.</p></div><div class="archive-actions"><label class="checkbox-field"><input type="checkbox" id="archive-only-frames" checked><span data-i18n="archive.onlyFrames">Само кадри</span></label><button type="button" id="archive-import" class="primary-button" data-i18n="archive.import" aria-haspopup="menu" aria-expanded="false" aria-controls="archive-import-menu">Внеси… ▾</button><button type="button" id="refresh" class="quiet-button archive-refresh-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.6-2.2L20 8M4 16l2.3 3.2A7 7 0 0 0 17.9 17"/></svg><span>Обнови</span></button></div></div>
+        <div class="page-heading archive-page-heading"><div><h1 id="archive-heading">Архив</h1></div></div>
         <div class="archive-layout">
           <aside class="panel archive-sidebar" aria-label="Избор на архив">
             <div class="archive-navigation-heading"><div class="archive-navigation-title"><span id="archive-nav-icon" hidden></span><h2 id="archive-nav-title">Моите архиви</h2><span id="archive-root-count" class="muted">03</span></div><p id="archive-nav-level"></p><div class="archive-navigation-controls"><button type="button" id="archive-nav-back" class="text-button" hidden>← Назад</button><button type="button" id="archive-nav-home" class="text-button" hidden>Всички архиви</button></div></div>
@@ -96,15 +105,14 @@
           </aside>
 
           <section class="panel content-panel" aria-label="Съдържание на папката">
-            <div class="content-toolbar"><nav id="breadcrumbs" aria-label="Текуща папка"></nav><label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Търси в тази папка…" maxlength="120" aria-label="Търси в текущата папка"></label></div>
+            <div class="content-toolbar"><div class="archive-actions"><label class="checkbox-field"><input type="checkbox" id="archive-only-frames" checked><span data-i18n="archive.onlyFrames">Само кадри</span></label><button type="button" id="archive-import" class="primary-button" data-i18n="archive.import" aria-haspopup="menu" aria-expanded="false" aria-controls="archive-import-menu">Внеси файлове ▾</button><button type="button" id="refresh" class="quiet-button archive-refresh-button archive-icon-button" title="Обнови"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.6-2.2L20 8M4 16l2.3 3.2A7 7 0 0 0 17.9 17"/></svg><span class="sr-only">Обнови</span></button></div><label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Търси в тази папка…" maxlength="120" aria-label="Търси в текущата папка"></label></div>
             <div id="archive-filter-summary" class="archive-filter-summary" aria-label="Избрани филтри" hidden></div>
-            <div class="folder-description"><span id="folder-path">Избери архив</span><span id="loading" class="loading-label" hidden>Зареждане…</span></div>
             <div id="error-banner" class="error-banner" role="alert" hidden></div>
             <div class="table-scroll">
               <table><thead><tr><th scope="col">Име</th><th scope="col">Тип</th><th scope="col">Размер</th><th scope="col">Променен</th><th scope="col"><span class="sr-only">Действия</span></th></tr></thead><tbody id="files"></tbody></table>
               <div id="empty" class="empty-state"><div class="empty-orbit" aria-hidden="true">◎</div><h2>Място за твоите наблюдения</h2><p id="empty-message">Зареждане на запазените места за архивите…</p><button type="button" data-storage-settings class="quiet-button" data-i18n="settings.storage">Папки и програми…</button> <button type="button" id="empty-shared-source" class="quiet-button" hidden>Избери споделен архив…</button></div>
             </div>
-            <footer class="table-footer"><span id="folder-counts">Само съдържанието на избраната папка</span><div class="pagination"><span id="page-label"></span><button type="button" id="previous" class="icon-button" aria-label="Предишна страница" disabled>←</button><button type="button" id="next" class="icon-button" aria-label="Следваща страница" disabled>→</button></div></footer>
+            <footer class="table-footer"><div class="archive-location"><nav id="breadcrumbs" aria-label="Текуща папка"></nav><div class="folder-description"><span id="folder-path">Избери архив</span><span id="loading" class="loading-label" hidden>Зареждане…</span></div></div><span id="folder-counts">Само съдържанието на избраната папка</span><div class="pagination"><span id="page-label"></span><button type="button" id="previous" class="icon-button" aria-label="Предишна страница" disabled>←</button><button type="button" id="next" class="icon-button" aria-label="Следваща страница" disabled>→</button></div></footer>
           </section>
         </div>
       </section>

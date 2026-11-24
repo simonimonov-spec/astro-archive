@@ -1,0 +1,99 @@
+/* Button style "Tonal with glow" (chosen model 6H).
+   Main actions: a deep tone of the accent with accent text; on hover a thin
+   accent ring and a soft glow. Secondary and icon buttons follow the same
+   shape in a quieter, neutral version. Colours come from the theme tokens,
+   so every theme (night, day, red, custom) keeps working. */
+:root {
+  --control-radius: 8px;
+  --tonal-bg: color-mix(in srgb, var(--accent) 22%, var(--surface));
+  --tonal-bg-hover: color-mix(in srgb, var(--accent) 27%, var(--surface));
+  --tonal-ring: color-mix(in srgb, var(--accent) 42%, transparent);
+  --tonal-glow: color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+/* Main actions */
+.primary-button,
+.aa-button.primary-button {
+  background: var(--tonal-bg);
+  background-image: none;
+  color: var(--accent);
+  border: 0;
+  border-radius: var(--control-radius);
+  font-weight: 600;
+  box-shadow: none;
+}
+.primary-button:hover:not(:disabled) { filter: none; }
+.aa-button.primary-button::before { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .primary-button:not(:disabled):hover,
+  .aa-button.primary-button:not(:disabled):hover {
+    translate: none;
+    background: var(--tonal-bg-hover);
+    color: var(--accent);
+    box-shadow: 0 0 0 1px var(--tonal-ring), 0 0 14px var(--tonal-glow);
+  }
+}
+.aa-button.primary-button:focus-visible { box-shadow: 0 0 0 1px var(--tonal-ring), 0 0 14px var(--tonal-glow); }
+.primary-button:disabled, .aa-button.primary-button:disabled { opacity: .45; box-shadow: none; }
+
+/* Secondary and icon buttons: same shape, neutral and quiet. */
+.aa-button:is(.quiet-button, .icon-button):not(.activity-button) {
+  background: var(--surface);
+  background-image: none;
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+.aa-button:is(.quiet-button, .icon-button):not(.activity-button)::before { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .aa-button:is(.quiet-button, .icon-button):not(.activity-button):not(:disabled):hover {
+    translate: none;
+    background: var(--surface-hover);
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 16%, transparent);
+  }
+}
+/* A pressed toggle (e.g. Filters on) uses the tonal look of the main actions. */
+.aa-button:is(.quiet-button, .icon-button)[aria-pressed="true"] {
+  background: var(--tonal-bg);
+  border-color: var(--tonal-ring);
+  color: var(--accent);
+}
+
+/* One size for every secondary button, wherever it sits: 34 px high,
+   13 px text, the same inner spacing. Menu entries, cards and big
+   multi-line choices keep their own layout. */
+:root .quiet-button:not([hidden]):not([role="menuitem"]):not(.theme-card):not(.flow-card):not(.plugin-choice) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 34px !important;
+  height: auto;
+  padding: 0 14px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+}
+:root #page-archive .archive-actions .quiet-button.archive-icon-button { padding: 0 !important; width: 34px; min-width: 34px; }
+:root .archive-icon-button svg { flex: none; }
+:root .icon-button:not(.header-toggle) { min-width: 34px; min-height: 34px; padding: 0 10px; font-size: 13px; }
+
+/* Main actions share the same height and text size. */
+:root .primary-button:not([hidden]):not([role="menuitem"]) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 34px !important;
+  padding: 0 16px !important;
+  font-size: 13px !important;
+  line-height: 1.2 !important;
+}
+
+/* Text links: one size. */
+:root :is(.text-button, .flow-back, .row-action):not(#breadcrumbs *) { font-size: 12.5px !important; font-weight: 500; }
+
+/* Narrow two-column tool grids (Analysis): same text size, allowed to wrap. */
+:root #q-tools-panel #q-decision-tools .quiet-button { white-space: normal !important; padding: 6px 10px !important; text-align: center; }

@@ -1,0 +1,83 @@
+/* Rule: the window itself never scrolls (Analysis and Preparation).
+   Each workspace is exactly as tall as the window; lists, tables and panels
+   scroll inside. Safeguard: below 560 px height or in the narrow stacked
+   layout the page may scroll instead of squeezing panels into uselessness. */
+@media (min-height: 560px) and (min-width: 761px) {
+  :root:has(#page-analysis:not([hidden])) .app-shell,
+  :root:has(#page-preparation:not([hidden])) .app-shell { height: 100vh; min-height: 0; }
+  :root:has(#page-analysis:not([hidden])) main,
+  :root:has(#page-preparation:not([hidden])) main { display: flex; flex-direction: column; min-height: 0; }
+
+  :is(#page-analysis, #page-preparation):not([hidden]) { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  :is(#page-analysis, #page-preparation) > * { flex: none; }
+  :is(#page-analysis, #page-preparation) > .function-content { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  :is(#analysis-content, #preparation-content) > * { flex: none; }
+
+  /* Any step: the active step fills the space and scrolls inside if it must. */
+  :is(#analysis-content, #preparation-content) > [data-flow-phase]:not([hidden]) { flex: 1 1 auto; min-height: 0; overflow: auto; }
+
+  /* Step 1 (choose nights): the night list takes all free height. */
+  :is(#q-data, #w-data):not([hidden]) { display: flex; flex-direction: column; overflow: hidden; }
+  :is(#q-data, #w-data) > * { flex: none; }
+  :is(#q-data, #w-data) > .flow-picker { flex: 1 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  :is(#q-data, #w-data) .flow-picker > * { min-height: 0; }
+  :is(#q-data, #w-data) .flow-picker-filters { overflow: auto; }
+  :is(#q-data, #w-data) .flow-days-panel { display: flex; flex-direction: column; }
+  :is(#q-data, #w-data) .flow-days-panel > * { flex: none; }
+  :is(#q-data, #w-data) .flow-days-panel > .flow-days { flex: 1 1 0; max-height: none; min-height: 0; }
+  #q-data > :not(.flow-picker):not(.q-source-switch) { flex: 1 1 auto; min-height: 0; overflow: auto; }
+
+  /* Preparation history under the picker stays compact. */
+  #preparation-activity { max-height: 30vh; overflow: auto; margin-top: 12px; }
+
+  /* Result workspaces: panels side by side fill the height; their contents scroll. */
+  :is(#analysis-content, #preparation-content) > .islands-grid:not([hidden]) { align-items: stretch !important; grid-auto-rows: minmax(100%, auto); }
+  :is(#analysis-content, #preparation-content) > .islands-grid > .island-frame { min-height: 0; max-height: 100%; }
+  :is(#analysis-content, #preparation-content) > .islands-grid > .island-frame:not([data-sized=true]) { height: 100%; }
+  :is(#analysis-content, #preparation-content) > .islands-grid > .island-frame > .island-body { overflow: auto; }
+  #analysis-content .flow-analysis-tools { max-height: none; }
+  /* The quality chart grows with its panel instead of forcing a square. */
+  #analysis-content #q-plot-panel { display: flex; flex-direction: column; }
+  #analysis-content #q-plot-panel > * { flex: none; }
+  #analysis-content #q-plot-panel > .py-quality-chart { flex: 1 1 0; height: auto !important; min-height: 180px !important; aspect-ratio: auto; }
+}
+
+/* Short windows: tighter headings and footers so the lists keep room. */
+@media (min-height: 560px) and (max-height: 820px) and (min-width: 761px) {
+  :is(#q-data, #w-data) .flow-panel-heading { padding: 12px 18px; }
+  :is(#q-data, #w-data) .flow-picker-footer { padding: 10px 18px; }
+  :is(#q-data, #w-data) .flow-picker-filters { padding: 16px; gap: 12px; }
+  :is(#q-data, #w-data) .flow-days { padding-block: 8px; }
+  #preparation-activity { margin-top: 8px; }
+  #preparation-activity .flow-history { padding-block: 0; }
+  #preparation-activity .function-actions { padding-block: 6px; }
+}
+
+/* Header in one row from 900 px wide (it used to wrap below 1280 px and take
+   ~120 px of height). Less important header text gives way first
+   (the disk text and the Settings label; icons remain,
+   with their names as tooltips), then the tab padding. */
+@media (min-width: 900px) and (max-width: 1279.98px) {
+  body .header-shell > .topbar {
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    grid-template-areas: "brand resources navigation actions";
+    gap: 12px;
+    padding-block: 10px;
+  }
+  body .header-shell .navigation { justify-self: center; }
+}
+@media (min-width: 900px) and (max-width: 1179.98px) {
+  body .header-shell .header-resource-copy, body .header-shell .header-resource-chevron { display: none !important; }
+  body .header-shell .header-resources > summary { padding: 8px; }
+  body .header-shell .header-actions .header-settings-label { display: none; }
+  :root body .header-shell #settings-open.settings-button { width: 36px; min-width: 36px; padding: 0 !important; }
+}
+@media (min-width: 900px) and (max-width: 1023.98px) {
+  :root body .header-shell .navigation.aa-slider-group > button { padding: 0 11px !important; gap: 6px; }
+  body .header-shell .brand strong { font-size: 17px; }
+}
+
+/* "Move and resize" is no longer offered in any workspace (owner's choice):
+   the toggle and its help bar are hidden; saved panel layouts still apply and
+   can be restored to the original in Settings. */
+:root .islands-toggle, :root .islands-help { display: none !important; }
