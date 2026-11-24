@@ -287,8 +287,14 @@ class LocalHost:
                     self.clients[identity] = dict(name=label(data["name"]), status="pending",
                                                   lastSeen=time.time())
                     self.record(identity, "pending")
-                self.clients[identity]["lastSeen"] = time.time()
-                return dict(status=self.clients[identity]["status"], catalog=2)
+                client = self.clients[identity]
+                client["lastSeen"] = time.time()
+                rtt = data.get("rttMs")
+                if client["status"] == "approved" and type(rtt) is int and 1 <= rtt <= 1000:
+                    client["rtt"] = (rtt, time.monotonic())
+                else:
+                    client.pop("rtt", None)
+                return dict(status=client["status"], catalog=2)
             client = self.client(identity)
             if action == "archives":
                 return [dict(id=ident, name=name, kind=kind, source=self.archive_sources[ident])

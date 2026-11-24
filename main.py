@@ -12,7 +12,7 @@ def option(value,label):return dict(value=value,label=label)
 class SharedArchives:
     def __init__(self,context):
         self.ctx=context;self.folder=Path(context.storage());self.closed=threading.Event();self.lock=threading.RLock();self.controller=windows.Controller(self.folder,Path(__file__).with_name('host.ps1'))
-        self.environment={};self.problem='';self.remote=[];self.selected=0;self.plan_text='';self.last_status=None
+        self.environment={};self.problem='';self.remote=[];self.selected=0;self.plan_text='';self.last_header=None
         self.reviewed=None;self.consent_id='host-approved'
         self.archives=self.ctx.archives('list')['archives']
         try:self.environment=windows.environment()
@@ -224,8 +224,23 @@ class SharedArchives:
     def status(self,p):return dict(**self.controller.status(),configuredExports=len(self.options['exports']),transport='SMB 3',account=self.options['account'])
 
     def publish_header(self):
-        status=self.controller.status();running=status['state']=='running';text='Включен · SMB 3 · шифрован' if running else 'Изключен' if status['state'] in ('off','stopped') else status.get('problem') or status['state']
-        self.ctx.publish('state',[field('metric','sharing-state',label='Споделени LAN архиви',value=text,tone='success' if running else 'normal',help=f"Отворени мрежови файлове: {status.get('openFiles',0)}")])
+        status = self.controller.status()
+        state = status['state']
+        local = self.local.header_status()
+        smb_visible = state not in ('off', 'stopped')
+        elements = []
+        if local or not smb_visible:
+            elements.append(field('metric', 'sharing-state', label='Връзка за споделен архив',
+                                  **(local or dict(value='Няма активна връзка'))))
+        if smb_visible:
+            running = state == 'running'
+            text = 'Включен · шифрован' if running else status.get('problem') or state
+            elements.append(field('metric', 'smb-state', label='Споделяне през SMB 3', value=text,
+                                  tone='success' if running else 'normal',
+                                  help=f"Отворени мрежови файлове: {status.get('openFiles',0)}"))
+        if elements != self.last_header:
+            self.ctx.publish('state', elements)
+            self.last_header = elements
 
     def publish(self):
         archives=[a for a in self.archives if a.get('path') and re.match(r'^[A-Za-z]:\\',a['path'])];networks=self.environment.get('networks',[]);o=self.options;running=self.controller.status()['state'] not in ('off','stopped','error')
@@ -271,10 +286,10 @@ class SharedArchives:
     def watch(self):
         while not self.closed.wait(4):
             try:
-                self.local.tick()
-                state=self.status({});fingerprint=json.dumps(state,sort_keys=True)
+                self.local.tick(background=True)
+                state=self.status({})
                 if state['state'] in ('off','stopped','error'):self.ctx.archives('hold',dict(active=False))
-                if fingerprint!=self.last_status:self.last_status=fingerprint;self.publish_header()
+                self.publish_header()
                 if state['state']!='running' or not self.options['workspaceEnabled']:continue
                 root=Path(self.options['workspace']);descriptor=metadata(root/SHARE_MARKER,'workspace')
                 if descriptor.get('hostId')!=self.options['hostId']:continue

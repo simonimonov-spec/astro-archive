@@ -104,8 +104,40 @@ class LocalPanelTests(unittest.TestCase):
                 cache = client.folder / "ViewerCache"
                 self.assertFalse(cache.exists())
                 from types import SimpleNamespace
-                with patch("shutil.disk_usage", return_value=SimpleNamespace(total=100000, free=40000)) as usage:
-                    disk = service.call("archive.disk", {"archiveId": "frames"})
+                self.assertIn("Свързан", client.header_status()["value"])
+                self.assertRegex(client.header_status()["value"], r"\d+ ms")
+                client.tick()
+                self.assertRegex(host.header_status()["value"], r"\d+ ms")
+                host_runtime = host_manager.live["shared-archives"]
+                host_plugin = host_runtime["stop"].__self__
+                with patch.object(host_plugin.controller, "status", return_value=dict(state="error")):
+                    host_plugin.publish_header()
+                sharing = {element["id"]: element for element in host_runtime["documents"]["state"]}
+                self.assertRegex(sharing["sharing-state"]["value"], r"\d+ ms")
+                self.assertIn("smb-state", sharing)
+                sync_started, sync_done = threading.Event(), threading.Event()
+
+                def wait_on_catalog(_client):
+                    sync_started.set()
+                    sync_done.wait(5)
+
+                with patch.object(client, "sync_catalogs", side_effect=wait_on_catalog):
+                    client.tick(background=True)
+                    try:
+                        self.assertTrue(sync_started.wait(2))
+                        with patch.object(client.client, "call", wraps=client.client.call) as calls:
+                            client.tick(background=True)
+                        self.assertTrue(any(call.args == ("join",) for call in calls.call_args_list))
+                    finally:
+                        sync_done.set()
+                # Even when catalog sync fails, the approved peer can report its drive.
+                available = client.available_catalogs.copy()
+                client.available_catalogs.clear()
+                try:
+                    with patch("shutil.disk_usage", return_value=SimpleNamespace(total=100000, free=40000)) as usage:
+                        disk = service.call("archive.disk", {"archiveId": "frames"})
+                finally:
+                    client.available_catalogs = available
                 usage.assert_called_once_with(source.resolve())
                 self.assertEqual((disk["totalBytes"], disk["freeBytes"], disk["archiveBytes"]),
                                  (100000, 40000, (source / "image.fit").stat().st_size))

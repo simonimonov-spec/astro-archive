@@ -9,6 +9,7 @@ import os
 import secrets
 import tempfile
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -77,10 +78,12 @@ class LocalPanel:
         self.lock = threading.RLock()
         self.publish_lock = threading.Lock()
         self.catalog_sync = threading.Lock()
+        self.catalog_worker = None
         self.mode = "receive"
         self.host = self.client = None
         self.peers = []
         self.connection = ""
+        self.rtt_ms = None
         self.archives = []
         self.selected = ""
         self.files = {}
@@ -129,7 +132,7 @@ class LocalPanel:
         atomic(self.trust_path, dict(installation=self.identity, credential=credential, host=""))
         return credential, ""
 
-    def tick(self):
+    def tick(self, *, background=False):
         if not self.lock.acquire(blocking=False):
             return
         host = catalog_client = None
@@ -154,15 +157,31 @@ class LocalPanel:
                         if current["proof"] != self.client.peer["proof"]:
                             self.available_catalogs.clear()
                             self.connection = ""
+                            self.rtt_ms = None
                         self.client.peer = current
                         if self.update_client():
                             catalog_client = self.client
                     except RequestError:
                         self.connection = "offline"
+                        self.rtt_ms = None
                         self.available_catalogs.clear()
                 notify_availability = previous == "approved" and self.connection != previous
         finally:
             self.lock.release()
+        if host or catalog_client:
+            if background:
+                with self.lock:
+                    if not self.closed and (self.catalog_worker is None or not self.catalog_worker.is_alive()):
+                        self.catalog_worker = threading.Thread(target=self.refresh_catalogs, args=(host, catalog_client),
+                                                               daemon=True, name="SharedArchives-catalog")
+                        self.catalog_worker.start()
+            else:
+                self.refresh_catalogs(host, catalog_client)
+        if notify_availability:
+            self.note_changes([])
+        self.publish()
+
+    def refresh_catalogs(self, host, catalog_client):
         if catalog_client:
             self.sync_catalogs(catalog_client)
         if host:
@@ -173,15 +192,15 @@ class LocalPanel:
                     changed = []
             if changed:
                 self.note_changes(changed)
-        if notify_availability:
-            self.note_changes([])
-        self.publish()
 
     def update_client(self):
         previous = self.connection
-        joined = self.client.call("join", timeout=1)
+        started = time.perf_counter()
+        joined = self.client.call("join", timeout=1, rttMs=self.rtt_ms)
         self.connection = joined["status"]
+        self.rtt_ms = None
         if self.connection == "approved":
+            self.rtt_ms = min(1000, max(1, round((time.perf_counter() - started) * 1000)))
             if previous != "approved":
                 self.archives = self.client.call("archives")
             if joined.get("catalog") != 2:
@@ -303,12 +322,20 @@ class LocalPanel:
                             total=len(items), revision=document["revision"])
             if action not in ("disk", "ingest", "refresh") and (action != "open" or view.rows.get(relative, {}).get("kind") != "file"):
                 raise ValueError("Файлът вече не е в запазения каталог.")
-            if key not in self.available_catalogs or self.connection != "approved" or self.client is None:
-                raise ValueError("Споделеният хост е недостъпен." if action == "disk"
-                                 else "Свържи се с хоста, за да използваш файла.")
             client = self.client
+            approved = self.connection == "approved" and client is not None
+            if action == "disk":
+                if not approved or client.peer["identity"] != document["host"]:
+                    raise ValueError("Споделеният хост е недостъпен.")
+            elif not approved or key not in self.available_catalogs:
+                raise ValueError("Свържи се с хоста, за да използваш файла.")
         if action == "disk":
-            return client.call("disk", archive=document["archive"], source=document["source"], timeout=3)
+            try:
+                return client.call("disk", archive=document["archive"], source=document["source"], timeout=3)
+            except RequestError as error:
+                if error.status == 404 and str(error) == "Непозната операция.":
+                    raise ValueError("Хостът е със стар код. Обнови и рестартирай плъгина там.") from error
+                raise
         if action == "ingest":
             result = client.ingest(document["archive"], Path(parameters["file"]), parameters["fingerprint"],
                                    parameters.get("context", {}), document["source"])
@@ -392,6 +419,7 @@ class LocalPanel:
             if mode != self.mode:
                 self.available_catalogs.clear()
                 self.connection = ""
+                self.rtt_ms = None
                 self.client = None
             self.mode = mode
         elif command == "local-start":
@@ -430,6 +458,7 @@ class LocalPanel:
                                          host=self.preferred_peer))
             self.client = LocalClient(peer, self.credential, self.name)
             self.connection, self.selected, self.files = "", "", {}
+            self.rtt_ms = None
             self.update_client()
         elif command == "local-archive" and self.connection == "approved" and not self.lease:
             paths = self.client.call("files", archive=item)
@@ -525,6 +554,32 @@ class LocalPanel:
         if fields != self.last_document:
             self.ctx.publish("local-sharing", fields)
             self.last_document = fields
+
+    def header_status(self):
+        with self.lock:
+            if self.host:
+                now, monotonic = time.time(), time.monotonic()
+                active = [row for row in self.host.status()["clients"]
+                          if row["status"] == "approved" and now - row["lastSeen"] <= 12]
+                samples = [row["rtt"][0] for row in active
+                           if "rtt" in row and monotonic - row["rtt"][1] <= 12]
+                count = len(active)
+                value = "Хост · " + ("1 активен клиент" if count == 1 else f"{count} активни клиента")
+                if samples:
+                    value += f" · до {max(samples)} ms"
+                return dict(value=value, tone="success",
+                            help="Време за отговор, измерено от свързаните копия." if samples else "")
+            state = self.connection
+            rtt = self.rtt_ms
+            configured = self.mode == "receive" and (self.client is not None or bool(self.preferred_peer))
+        if not configured:
+            return None
+        if state == "approved" and rtt is not None:
+            quality = "Бърза" if rtt <= 30 else "Умерена" if rtt <= 120 else "Бавна"
+            return dict(value=f"Свързан · {quality} · {rtt} ms",
+                        tone="success" if rtt <= 30 else "warning",
+                        help="Време за отговор между копията на този компютър.")
+        return dict(value=STATES[state or "offline"], tone="warning", help="")
 
     def host_fields(self):
         if not self.host:
