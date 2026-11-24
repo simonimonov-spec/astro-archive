@@ -66,7 +66,7 @@
       : tr('Избери архив', 'Select an archive');
     set('header-disk-title', label); set('resource-disk-name', label);
     set('header-disk-free', disk ? `${bytes(disk.freeBytes)} ${tr('свободни от', 'free of')} ${bytes(disk.totalBytes)}` : diskStatus);
-    set('header-disk-detail', disk ? `${tr('Архив', 'Archive')} ${disk.reading || disk.skipped ? '≈ ' : ''}${bytes(disk.archiveBytes)} · ${tr('Други', 'Others')} ${bytes(other)}` : '');
+    set('header-disk-detail', disk ? `${tr('Архив', 'Archive')} ${disk.reading || disk.skipped ? '≈ ' : ''}${bytes(disk.archiveBytes)} · ${tr('Други', 'Others')} ${bytes(other)}` : selection?.sharedId ? diskError : '');
     set('resource-disk-app', tr('Архив: ', 'Archive: ') + bytes(disk?.archiveBytes) + ' · ' + pct(appShare));
     set('resource-disk-other', tr('Други: ', 'Others: ') + bytes(other) + ' · ' + pct(otherShare));
     set('resource-disk-free', tr('Свободни: ', 'Free: ') + bytes(disk?.freeBytes) + ' / ' + bytes(disk?.totalBytes));
