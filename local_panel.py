@@ -74,7 +74,7 @@ class LocalPanel:
         self.identity = hashlib.sha256(os.fsencode(str(self.folder).casefold())).hexdigest()[:32]
         self.trust_folder = self.folder / "LocalTrust"
         self.trust_path = self.trust_folder / "client.json"
-        self.credential, self.preferred_peer = self.load_identity()
+        self.credential, self.preferred_peer, self.receiving = self.load_identity()
         self.settings_path = self.trust_folder / "connections.json"
         self.settings = self.load_connections()
         self.name = "Astro Archive " + self.identity[:8]
@@ -105,7 +105,7 @@ class LocalPanel:
         self.closed = False
         self.busy = False
 
-        for name in ("mode", "host-switch", "exports", "join", "add-device", "pair", "address", "code",
+        for name in ("mode", "host-switch", "receive-switch", "exports", "join", "add-device", "pair", "address", "code",
                      "approve", "block", "unblock",
                      "archive", "download", "begin", "save", "release"):
             command = "local-" + name
@@ -127,7 +127,7 @@ class LocalPanel:
         try:
             state = json.loads(self.trust_path.read_text(encoding="utf-8"))
             if state["installation"] == self.identity and CREDENTIAL.fullmatch(state["credential"]):
-                return state["credential"], state.get("host") or ""
+                return state["credential"], state.get("host") or "", state.get("receiving", True) is True
         except (OSError, ValueError, KeyError, TypeError):
             pass
         if self.private_registry:
@@ -136,7 +136,7 @@ class LocalPanel:
             self.trust_folder.mkdir(parents=True, exist_ok=True)
         credential = secrets.token_hex(32)
         atomic(self.trust_path, dict(installation=self.identity, credential=credential, host=""))
-        return credential, ""
+        return credential, "", True
 
     def load_connections(self):
         try:
@@ -175,7 +175,7 @@ class LocalPanel:
                 saved_peers = self.settings["peers"]
                 self.peers = list(saved_peers.values()) + [peer for peer in local_peers
                                                            if peer["identity"] not in saved_peers]
-                if self.client is None:
+                if self.receiving and self.client is None:
                     peer = next((row for row in self.peers if row["identity"] == self.preferred_peer), None)
                     if peer:
                         self.client = LocalClient(peer, self.credential, self.name)
@@ -508,14 +508,24 @@ class LocalPanel:
                 self.update_client()
             self.add_device = False
             return {"message": STATES[self.connection]}
-        elif command == "local-join":
-            if self.lease:
-                raise ValueError("Първо приключи текущата редакция.")
+        elif command in ("local-join", "local-receive-switch"):
+            if self.mode != "receive" or self.lease:
+                raise ValueError("Първо приключи текущата редакция и отвори „Получател“.")
+            if command == "local-receive-switch":
+                if not self.preferred_peer or type(values.get("local-receive-switch")) is not bool:
+                    raise ValueError("Първо избери приложение.")
+                if not values["local-receive-switch"]:
+                    self.select_peer(None, receiving=False)
+                    self.note_changes([])
+                    return
+                item = self.preferred_peer
             peer = next((peer for peer in self.peers if peer["identity"] == item), None)
             if peer is None:
-                raise ValueError("Хостът вече е недостъпен.")
-            client = LocalClient(peer, self.credential, self.name)
-            self.select_peer(client)
+                if command == "local-join":
+                    raise ValueError("Хостът вече е недостъпен.")
+                self.select_peer(None, "offline")
+                return
+            self.select_peer(LocalClient(peer, self.credential, self.name))
             try:
                 self.update_client()
             except RequestError:
@@ -543,10 +553,12 @@ class LocalPanel:
             self.lease = self.lease_problem = ""
             return {"message": "Работното копие остава запазено."}
 
-    def select_peer(self, client, status=""):
-        ident = client.peer["identity"]
-        atomic(self.trust_path, dict(installation=self.identity, credential=self.credential, host=ident))
+    def select_peer(self, client, status="", *, receiving=True):
+        ident = client.peer["identity"] if client else self.preferred_peer
+        atomic(self.trust_path, dict(installation=self.identity, credential=self.credential,
+                                     host=ident, receiving=receiving))
         self.preferred_peer = ident
+        self.receiving = receiving
         self.client = client
         self.connection, self.selected, self.files = status, "", {}
         self.archives = []
@@ -679,7 +691,7 @@ class LocalPanel:
                             help="Време за отговор, измерено от свързаните копия." if samples else "")
             state = self.connection
             rtt = self.rtt_ms
-            configured = self.mode == "receive" and (self.client is not None or bool(self.preferred_peer))
+            configured = self.mode == "receive" and self.receiving and bool(self.preferred_peer)
         if not configured:
             return None
         if state == "approved" and rtt is not None:
@@ -729,14 +741,21 @@ class LocalPanel:
         return fields
 
     def receive_fields(self):
+        selected = next((peer for peer in self.peers if peer["identity"] == self.preferred_peer), None)
+        status = STATES[self.connection or "offline"] if self.receiving else "Откачено"
         peers = [dict(id=peer["identity"], label=peer["name"],
-                      status=STATES[self.connection] if self.client and peer["identity"] == self.preferred_peer
-                      else f'{peer["address"]}:{peer["port"]}' if "address" in peer else "На този компютър")
+                      status=status if peer is selected
+                      else f'{peer["address"]}:{peer["port"]}' if "address" in peer else "На този компютър",
+                      disabled=peer is selected and self.receiving)
                  for peer in self.peers]
         fields = [field("list", "local-peers", label="Връзки с други устройства", items=peers,
                         command="local-join", actionLabel="Свържи", disabled=bool(self.lease or self.busy))]
-        if self.client:
-            status = STATES[self.connection]
+        if self.preferred_peer:
+            name = selected["name"] if selected else "избраното приложение"
+            fields.append(field("checkbox", "local-receive-switch", label=f"Връзка с {name}", span=2,
+                                value=self.receiving, command="local-receive-switch",
+                                disabled=bool(self.lease or self.busy),
+                                help="Изключи, за да откачиш. Включи, за да се свържеш отново."))
             if self.connection == "pending":
                 status += f" · На хоста заявката е от {self.name}."
             fields.append(field("text", "local-connection", value=status, span=2))
