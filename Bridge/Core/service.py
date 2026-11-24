@@ -613,6 +613,11 @@ class Service:
         result=dict(fileName=uuid.uuid4().hex+'.png',dataUrl='data:image/png;base64,'+base64.b64encode(stream.getvalue()).decode(),name=Path(path).name)
         self.settings.value.setdefault('icons',[]).append(result);self.settings.save();return result
     def disk(self,archive):
+        if source := self.shared_sources.get(archive):
+            disk = self.shared_sources.request("disk", id=source["id"])
+            groups = self.shared_sources.folder_groups(archive, source["id"])
+            return dict(disk, archiveBytes=groups[""]["bytes"] if groups is not None else None,
+                        reading=False, skipped=False, problem=None)
         try:
             root=self.catalog.root(archive);usage=shutil.disk_usage(root)
             return dict(name=root.anchor,volume=root.anchor,totalBytes=usage.total,freeBytes=usage.free,archiveBytes=self.catalog.browse.group(archive)['bytes'],reading=False,skipped=False,problem=None)

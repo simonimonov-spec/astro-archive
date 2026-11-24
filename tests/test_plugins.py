@@ -247,6 +247,19 @@ class CoreIntegrationTests(unittest.TestCase):
             self.assertEqual(info['meta']['resolution'], '16 × 12')
             self.assertNotIn('open', [call.args[0] for call in request.call_args_list])
 
+    def test_shared_archive_disk_uses_host_usage_and_saved_archive_size(self):
+        from unittest.mock import patch
+        service, _, _, _ = self.shared_archive()
+        host_disk = dict(name='Test host', volume='D:', totalBytes=100000, freeBytes=40000)
+        with (patch.object(service.shared_sources, 'request', return_value=host_disk) as request,
+              patch.object(service.catalog, 'root', side_effect=AssertionError('Local root was used'))):
+            result = service.call('archive.disk', {'archiveId': 'frames', 'refresh': True})
+        self.assertEqual(result, dict(host_disk, archiveBytes=5760, reading=False, skipped=False, problem=None))
+        request.assert_called_once_with('disk', id='a'*64)
+        with self.assertRaises(PermissionError):
+            service.host_services.invoke('remote-operation', 'core',
+                                         {'method': 'archive.disk', 'params': {'archiveId': 'frames'}})
+
     def test_shared_archive_refresh_routes_to_provider(self):
         from unittest.mock import patch
         service, _, _, _ = self.shared_archive()

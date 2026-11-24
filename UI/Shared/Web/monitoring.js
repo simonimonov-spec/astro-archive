@@ -4,7 +4,7 @@
   const tr = (bg, en) => window.AstroArchiveI18n.locale.startsWith('en') ? en : bg;
   let api, usage = null, disk = null, selection = null, summary = null, recovery = null;
   let summaryKey, summaryVersion = 0, resourceBusy = false, diskBusy = false, pendingBusy = false;
-  let diagnostics = false, timer, diskTime = 0, pendingTime = 0;
+  let diagnostics = false, timer, diskTime = 0, pendingTime = 0, diskVersion = 0, diskError = '';
   let summaryReading = false, archiveWorking = false;
   let audit = null, auditBusy = false, auditTask = null, auditStatusLoaded = false, auditProblem = null;
   const n = (value, digits = 1) => Number.isFinite(value) ? new Intl.NumberFormat(window.AstroArchiveI18n.locale,
@@ -59,16 +59,20 @@
     const barApp = disk ? appShare ?? 0 : null;
     const barOther = disk && appShare == null ? percent(disk.totalBytes - disk.freeBytes, disk.totalBytes) : otherShare;
     meter('header-disk-meter', barApp, barOther); meter('diagnostic-disk-meter', barApp, barOther);
-    const label = disk ? `${disk.name} (${disk.volume.replace(/[\\/]/g, '')})` : tr('Архивен диск', 'Archive drive');
+    const volume = disk?.volume.replace(/[\\/]/g, '');
+    const label = disk ? (volume ? `${disk.name} (${volume})` : disk.name) : tr('Архивен диск', 'Archive drive');
+    const diskStatus = diskError || (selection?.sharedId && diskTime) ? tr('Дискът не е достъпен', 'Drive unavailable')
+      : selection?.enabled && selection.sharedId ? tr('Проверка на диска…', 'Checking drive…')
+      : tr('Избери архив', 'Select an archive');
     set('header-disk-title', label); set('resource-disk-name', label);
-    set('header-disk-free', disk ? `${bytes(disk.freeBytes)} ${tr('свободни от', 'free of')} ${bytes(disk.totalBytes)}` : tr('Избери архив', 'Select an archive'));
+    set('header-disk-free', disk ? `${bytes(disk.freeBytes)} ${tr('свободни от', 'free of')} ${bytes(disk.totalBytes)}` : diskStatus);
     set('header-disk-detail', disk ? `${tr('Архив', 'Archive')} ${disk.reading || disk.skipped ? '≈ ' : ''}${bytes(disk.archiveBytes)} · ${tr('Други', 'Others')} ${bytes(other)}` : '');
     set('resource-disk-app', tr('Архив: ', 'Archive: ') + bytes(disk?.archiveBytes) + ' · ' + pct(appShare));
     set('resource-disk-other', tr('Други: ', 'Others: ') + bytes(other) + ' · ' + pct(otherShare));
     set('resource-disk-free', tr('Свободни: ', 'Free: ') + bytes(disk?.freeBytes) + ' / ' + bytes(disk?.totalBytes));
     const description = tr('Зелено: избраният архив. Виолетово: други файлове. Сиво: свободно място. Размерът на архива е ориентировъчен сбор на файловете.', 'Green: selected archive. Violet: other files. Gray: free space. Archive size is an approximate sum of file sizes.')
       + (disk && appShare == null ? tr('\nРазмерът на архива се изчислява; засега цялото заето място е виолетово.', '\nArchive size is being calculated; all occupied space is temporarily violet.') : '') + (disk?.problem ? '\n' + disk.problem : '');
-    $('resource-monitor').title = description; $('resource-disk-row').title = description;
+    $('resource-monitor').title = diskError || description; $('resource-disk-row').title = diskError || description;
     $('header-disk-meter').setAttribute('aria-label', `${label}: ${bytes(disk?.freeBytes)} ${tr('свободни', 'free')}`);
     $('diagnostic-disk-meter').setAttribute('aria-label', description);
     $('resource-monitor').dataset.low = String(!!disk && disk.freeBytes < Math.max(512 * 1024 ** 2, disk.totalBytes * .01));
@@ -83,13 +87,23 @@
   }
   async function readDisk(refresh = false) {
     if (!selection?.enabled || diskBusy || !api?.desktop) return;
-    diskBusy = true; const archiveId = selection.archiveId, root = selection.root;
+    diskBusy = true;
+    $('disk-refresh').disabled = true;
+    const version = diskVersion, archiveId = selection.archiveId;
     try {
       const value = await api.call('archive.disk', {archiveId, refresh});
-      if (selection?.archiveId === archiveId && selection.root === root) { disk = value; diskTime = Date.now(); renderDisk(); }
+      if (version === diskVersion) { disk = value; diskError = ''; }
     } catch (error) {
-      if (selection?.archiveId === archiveId) { disk = null; renderDisk(); $('resource-monitor').title = error.message; set('header-disk-free', tr('Дискът не е достъпен', 'Drive unavailable')); diskTime = Date.now(); }
-    } finally { diskBusy = false; $('disk-refresh').disabled = !selection?.enabled || !!disk?.reading; }
+      if (version === diskVersion) { disk = null; diskError = error.message; }
+    } finally {
+      diskBusy = false;
+      if (version === diskVersion) {
+        diskTime = Date.now();
+        renderDisk();
+      } else {
+        readDisk();
+      }
+    }
   }
   function renderPending() {
     const show = !!recovery?.message;
@@ -196,11 +210,15 @@
   window.AstroArchiveMonitoring = {
     connect(value) { api = value; renderAudit(); if (api.desktop) { checkPending(true); timer = setInterval(() => { resources(); if (document.hidden) return; checkPending(); if (summary?.building && !summaryReading) loadSummary(); if (selection?.enabled && Date.now() - diskTime > (disk?.reading ? 2000 : 15000)) readDisk(); }, 1500); } },
     select(value, refresh = false) {
-      const key = JSON.stringify([value.archiveId, value.root, value.relativePath, value.enabled, value.summaryEnabled]), changed = key !== summaryKey;
-      const archiveChanged = value.archiveId !== selection?.archiveId || value.root !== selection?.root || value.enabled !== selection?.enabled;
+      const key = JSON.stringify([value.archiveId, value.root, value.sharedId, value.relativePath, value.enabled, value.summaryEnabled]), changed = key !== summaryKey;
+      const archiveChanged = value.archiveId !== selection?.archiveId || value.root !== selection?.root ||
+        value.sharedId !== selection?.sharedId || value.enabled !== selection?.enabled;
       selection = value;
       if (changed || refresh) { summaryKey = key; loadSummary(changed); }
-      if (archiveChanged || refresh) { disk = null; diskTime = 0; renderDisk(); readDisk(refresh); }
+      if (archiveChanged || refresh) {
+        diskVersion++; disk = null; diskError = ''; diskTime = 0;
+        renderDisk(); readDisk(refresh);
+      }
     },
     diagnosticsVisible(value) { diagnostics = value; if (value) { resources(); if (!auditStatusLoaded) loadAudit(); } },
     updateActivity(snapshot) {

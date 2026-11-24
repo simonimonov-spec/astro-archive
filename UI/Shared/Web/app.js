@@ -275,7 +275,8 @@
     state.locationUnavailable = false;
     window.AstroArchiveMonitoring.select({ archiveId: state.archiveId, relativePath: state.path,
       name: state.entered ? state.path.split(/[\\/]/).filter(Boolean).at(-1) || archiveName(selected) : t("folder.choose"),
-      rootName: archiveName(selected), root: selected?.path || "", enabled: !!webview && !!(selected?.path || selected?.sharedSource), summaryEnabled: state.entered }, refresh);
+      rootName: archiveName(selected), root: selected?.path || "", sharedId: selected?.sharedSource?.id,
+      enabled: !!webview && !!(selected?.path || selected?.sharedSource), summaryEnabled: state.entered }, refresh);
     $("error-banner").hidden = true;
     drawBreadcrumbs();
     $("previous").disabled = $("next").disabled = true;
