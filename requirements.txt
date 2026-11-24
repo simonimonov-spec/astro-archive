@@ -4,3 +4,4 @@ scipy>=1.16,<2
 astropy>=7,<9
 photutils>=3,<4
 Pillow>=10,<13
+cryptography>=50,<51

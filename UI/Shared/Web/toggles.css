@@ -61,6 +61,16 @@
 :root .checkbox-field input[type="checkbox"]:disabled { opacity: .45; cursor: default; }
 :root .checkbox-field:has(input[type="checkbox"]) { cursor: pointer; }
 
+:root [data-element="local-exports"] .checkbox-field input[type="checkbox"] {
+  appearance: auto;
+  -webkit-appearance: checkbox;
+  width: 16px !important;
+  height: 16px !important;
+  accent-color: var(--accent);
+  box-shadow: none;
+}
+:root [data-element="local-exports"] .checkbox-field input[type="checkbox"]::before { content: none; }
+
 /* ---------- Arrow and line headings ---------- */
 :root details:not(.header-resources) { interpolate-size: allow-keywords; }
 :root details:not(.header-resources) > summary {

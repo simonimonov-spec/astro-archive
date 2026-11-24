@@ -22,7 +22,7 @@ def problems(root):
             actual = None
         if actual != expected:
             result.append(f'{name}=={expected} (installed: {actual or "missing"})')
-    for name in ('numpy', 'scipy', 'astropy.io.fits', 'photutils', 'PIL.Image'):
+    for name in ('numpy', 'scipy', 'astropy.io.fits', 'photutils', 'PIL.Image', 'cryptography.x509'):
         try:
             importlib.import_module(name)
         except Exception as error:

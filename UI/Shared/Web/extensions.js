@@ -75,7 +75,16 @@
       if(response?.advanceViewer===true&&p.id==='ai-training'&&c.id==='rating'&&c.slot==='viewer-tools'&&viewerContext?.viewerId===parameters.context.viewerId)await window.AstroArchiveViewer?.next(parameters.context.viewerId);
       if(response?.message)window.dispatchEvent(new CustomEvent('astroarchive-plugin-message',{detail:{plugin:p.id,message:response.message}}));
       await runActions(p,c,response,applySharedSource?{archiveId:scope.archiveId,apply:applySharedSource}:null);
-    }catch(error){U.modal(p.name,body=>body.append(node('p',error.message,'error-banner')));}};
+    }catch(error){
+      if(e.type==='checkbox'&&e.command&&fields(p,c).get(e.id)===parameters.values[e.id]){
+        fields(p,c).set(e.id,!!e.value);
+        for(const container of mounts.get(key(p,c))||[]){
+          const input=[...container.querySelectorAll('[data-plugin-field]')].find(field=>field.dataset.pluginField===e.id);
+          if(input)input.checked=!!e.value;
+        }
+      }
+      U.modal(p.name,body=>body.append(node('p',error.message,'error-banner')));
+    }};
     const next=(actionQueues.get(p.id)||Promise.resolve()).then(perform);actionQueues.set(p.id,next.catch(()=>{}));return next;
   }
   function selection(slot){if(slot==='viewer-tools')return viewerContext||{};return (slot.startsWith('preparation')?window.AstroArchivePreparation:window.AstroArchiveAnalysis)?.selection?.(slot)||{};}
