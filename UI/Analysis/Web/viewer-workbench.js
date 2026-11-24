@@ -16,6 +16,7 @@
     close:['Затвори прегледа','Close viewer'], closeImage:['Затвори снимката','Close image'],
     hideImage:['Скрий снимката','Hide image'], hiddenImages:['Скрити снимки','Hidden images'],
     closePicker:['Затвори избора на снимка','Close image picker'],
+    imageSelection:['Снимки в прегледа','Images in the viewer'],
     shelf:['Отворени прегледи','Open viewers'], move:['Премести снимката спрямо друга','Move image relative to another'],
     settingsSide:['Премести настройките от другата страна','Move controls to the other side'],
     up:['Премести панела нагоре','Move panel up'],down:['Премести панела надолу','Move panel down'],
@@ -173,7 +174,13 @@
     const root=node('section','viewer-comparison');
     const heading=node('header','viewer-comparison-heading');
     const title=node('h2',null,t('title'));
+    const images=node('div','viewer-image-selection');
+    images.setAttribute('role','group');
+    images.setAttribute('aria-label',t('imageSelection'));
+    images.hidden=true;
     const controls=node('div','viewer-comparison-actions');
+    const tools=node('div','viewer-shared-tools');
+    tools.hidden=true;
     const body=node('div','viewer-comparison-body');
     const grid=node('div','viewer-comparison-grid');
     const picker=node('aside','viewer-image-picker');
@@ -181,21 +188,25 @@
     const hiddenImages=node('div','viewer-hidden-images'), hiddenPanes=node('div');
     hiddenImages.hidden=hiddenPanes.hidden=true;
     hiddenImages.setAttribute('aria-label',t('hiddenImages'));
-    const group={root,title,grid,picker,status,hiddenImages,hiddenPanes,tree:null,panes:new Map(),name:'',popup:null,token:null};
+    const group={root,title,images,tools,grid,picker,status,hiddenImages,hiddenPanes,
+      tree:null,panes:new Map(),selected:null,name:'',popup:null,token:null};
     const add=button('add',()=>pick(group), 'add');
-    dropTarget(add,image=>pick(group,null,image),key=>placeDraggedPane(group,firstPane(group),key));
+    dropTarget(add,image=>pick(group,null,image),key=>placeDraggedPane(group,group.selected,key));
+    group.hideImage=button('hideImage',()=>hidePane(group,group.selected),'minimize');
+    group.closeImage=button('closeImage',()=>removePane(group,group.selected),'close');
+    group.hideImage.hidden=group.closeImage.hidden=true;
     group.detach=button('detach',()=>openWindow(group),'detach');
     group.dock=button('dock',()=>returnToApp(group,true),'dock');
     group.dock.hidden=true;
-    controls.append(add,group.detach,group.dock,
+    controls.append(add,group.hideImage,group.closeImage,group.detach,group.dock,
       button('minimize',()=>hide(group),'minimize'),
       button('maximize',()=>{
         if(group.popup)native(group,'maximize').catch(error=>report(group,error.message));
         else root.classList.toggle('viewer-comparison-expanded');
       },'maximize'),button('close',()=>closeGroup(group),'close'));
-    heading.append(title,controls);
+    heading.append(title,images,controls);
     status.hidden=true;status.setAttribute('role','status');
-    body.append(grid,picker);root.append(heading,status,hiddenImages,body,hiddenPanes);
+    body.append(grid,picker);root.append(heading,tools,status,hiddenImages,body,hiddenPanes);
     document.body.append(root);groups.add(group);show(group);pick(group);
     return group;
   }
@@ -233,13 +244,38 @@
     group.grid.replaceChildren(...(content?[content]:[]));
     const hidden=[...group.panes.values()].filter(pane=>pane.hidden);
     group.hiddenPanes.replaceChildren(...hidden.map(pane=>pane.element));
+    const visible=[...group.panes.values()].filter(pane=>!pane.hidden);
+    group.images.replaceChildren(...visible.map(pane=>pane.selector));
+    group.images.hidden=!visible.length;
+    group.title.hidden=Boolean(visible.length);
+    selectPane(group,visible.includes(group.selected)?group.selected:visible[0]);
     group.hiddenImages.hidden=!hidden.length;
     group.hiddenImages.replaceChildren(...hidden.map(pane=>{
       const restore=node('button','quiet-button viewer-shelf-item',pane.name);
       restore.type='button';restore.title=pane.name;
-      restore.onclick=()=>{pane.hidden=false;render(group);pane.element.querySelector('.viewer-stage')?.focus();};
+      restore.onclick=()=>{pane.hidden=false;render(group);selectPane(group,pane);pane.selector.focus();};
       return restore;
     }));
+  }
+  function selectPane(group, pane) {
+    if(pane?.hidden)return;
+    if(group.selected!==pane){
+      group.selected?.viewer.mountTools(null);
+      group.selected=pane;
+      for(const item of group.panes.values()){
+        item.selector.setAttribute('aria-pressed',String(item===pane));
+        item.element.classList.toggle('viewer-tile-active',item===pane);
+      }
+    }
+    pane?.viewer.mountTools(group.tools);
+    group.tools.hidden=group.hideImage.hidden=group.closeImage.hidden=!pane;
+  }
+  function hidePane(group, pane) {
+    if(!pane)return;
+    pane.hidden=true;
+    render(group);
+    group.hiddenImages.lastElementChild?.focus();
+    if(!group.picker.hidden)pick(group);
   }
   function move(group, pane, target, direction) {
     if(!pane || !target || pane===target || !group.panes.has(pane.key) || !group.panes.has(target.key))return;
@@ -248,6 +284,7 @@
     group.picker.hidden=true;
   }
   function removePane(group,pane) {
+    if(!pane)return;
     pane.viewer.destroy();
     group.panes.delete(pane.key);
     group.tree=replace(group.tree,pane,null);
@@ -259,20 +296,18 @@
     if(group.panes.size>=maxPanes){report(group,t('limit'));return false;}
     report(group,'');
     target=target&&group.panes.has(target.key)?target:firstPane(group);
-    const pane={key:++nextPane, element:node('div','viewer-tile'), name:image.name};
+    const selector=node('button','quiet-button viewer-image-choice',image.name);
+    selector.type='button';selector.title=image.name;selector.draggable=true;
+    selector.setAttribute('aria-pressed','false');
+    const pane={key:++nextPane, element:node('div','viewer-tile'), name:image.name, selector};
+    selector.onclick=()=>selectPane(group,pane);
+    selector.addEventListener('dragstart',event=>writeDrag(event,paneType,pane.key,'move'));
+    dropTarget(selector, image=>pick(group,pane,image), key=>placeDraggedPane(group,pane,key));
+    pane.element.addEventListener('focusin',()=>selectPane(group,pane));
+    pane.element.addEventListener('pointerdown',()=>selectPane(group,pane));
     const callbacks={
       close:()=>removePane(group,pane),
-      hide:()=>{
-        pane.hidden=true;
-        render(group);
-        group.hiddenImages.lastElementChild?.focus();
-        if(!group.picker.hidden)pick(group);
-      },
-      choose:()=>pick(group,pane),
-      add:image=>pick(group,pane,image),
-      move:key=>placeDraggedPane(group,pane,key),
-      drag:event=>writeDrag(event,paneType,pane.key,'move'),
-      ready:data=>{pane.name=data.name;},
+      ready:data=>{pane.name=selector.textContent=selector.title=data.name;},
     };
     pane.viewer=window.AstroArchiveViewer.createPane(pane.element,callbacks);
     pane.viewer.connect(api);
@@ -283,7 +318,9 @@
     }
     group.picker.hidden=true;
     render(group);
-    return pane.viewer.open(image.source,image.name,presentation);
+    const opened=pane.viewer.open(image.source,image.name,presentation);
+    selectPane(group,pane);
+    return opened;
   }
   function select(label,values) {
     const field=node('label','viewer-picker-field',label), input=node('select');
@@ -292,7 +329,7 @@
     return {field,input};
   }
   function firstPane(group) {
-    return [...group.panes.values()].find(pane=>!pane.hidden) || group.panes.values().next().value;
+    return group.selected || group.panes.values().next().value;
   }
   function placeDraggedPane(group, target, key) {
     const ownPane=group.panes.get(key);
@@ -423,23 +460,16 @@
   function configureViewer(dialog, prefix, callbacks) {
     dialog.classList.add('viewer-workbench-controls');
     panelSections(dialog);
+    translate(dialog);
+    if(callbacks)return;
     const heading=dialog.querySelector('.viewer-heading');
     const close=dialog.querySelector('#'+prefix+'close');
     const actions=node('div','viewer-comparison-actions');
-    const add=button('add',()=>callbacks?callbacks.choose():compareCurrent(window.AstroArchiveViewer,dialog,null,add),'add');
+    const add=button('add',()=>compareCurrent(window.AstroArchiveViewer,dialog,null,add),'add');
     add.classList.add('viewer-add-image');
     add.title=t('addHint');
-    dropTarget(add,image=>callbacks?callbacks.add(image):compareCurrent(window.AstroArchiveViewer,dialog,image,add),callbacks?.move);
-    heading.append(actions);actions.append(add);
-    if(callbacks)actions.append(button('hideImage',callbacks.hide,'minimize'));
-    actions.append(close);
-    if(callbacks){
-      const title=heading.querySelector('h2');
-      title.draggable=true;
-      title.addEventListener('dragstart',callbacks.drag);
-      close.dataset.label='closeImage';
-    }
-    translate(dialog);
+    dropTarget(add,image=>compareCurrent(window.AstroArchiveViewer,dialog,image,add));
+    heading.append(actions);actions.append(add,close);
     add.title=t('addHint');
   }
   function languageChanged() {
@@ -447,6 +477,7 @@
     if(primary)translate(primary);
     for(const group of groups){
       translate(group.root);
+      group.images.setAttribute('aria-label',t('imageSelection'));
       for(const pane of group.panes.values())pane.viewer.languageChanged();
     }
     if(shelf){shelf.setAttribute('aria-label',t('shelf'));drawShelf();}

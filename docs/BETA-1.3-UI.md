@@ -106,6 +106,7 @@
 | 2026-11-24 | Shared Archives: ключ за откачане и повторно свързване в „Получател“. `Plugins/shared-archives/local_panel.py`. | `Beta 1.3 UI: allow disconnecting from a Shared Archives host` |
 | 2026-11-24 | Известие при стартиране и бутон „Обнови“ за нови версии на инсталираните плъгини. `UI/Shared/Web/preferences.js`, `UI/Shared/Web/plugin-browser.js`, `UI/Shared/Web/i18n.js`. | `Beta 1.3 UI: update installed plugins from GitHub` |
 | 2026-11-24 | Сравнение на снимки с влачене върху „Добави“, подредба по четирите посоки и независими, преместваеми панели за настройки. Отделяне, прибиране и връщане на прегледи като прозорци на Astro Archive в Windows. `UI/Analysis/Web/viewer.js`, `UI/Analysis/Web/viewer-workbench.{js,css}`, `Bridge/Desktop/viewer_windows.py`. | `Beta 1.3 UI: add image comparison workspaces` |
+| 2026-11-24 | Сравнението е на общо поле с тънка разделителна линия и обща лента с инструменти за избраната снимка. `UI/Analysis/Web/viewer.js`, `UI/Analysis/Web/viewer-workbench.{js,css}`. | `Beta 1.3 UI: unify the image comparison viewer` |
 
 ## Следващи стъпки (план)
 
