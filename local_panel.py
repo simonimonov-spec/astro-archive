@@ -1,4 +1,4 @@
-"""Desktop controls for the managed same-computer prototype."""
+"""Desktop controls for managed archive sharing."""
 from __future__ import annotations
 
 import base64
@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import secrets
 import tempfile
 import threading
@@ -14,9 +15,9 @@ from datetime import datetime
 from pathlib import Path
 
 from .catalog_documents import CatalogView, identifier, saved, store
-from .local_sharing import CREDENTIAL, FITS, LocalClient, LocalHost, RequestError, discover
+from .local_sharing import CREDENTIAL, FITS, LOOPBACK, LocalClient, LocalHost, RequestError, discover, endpoint, private_ip
 from .validation import atomic
-from .windows import private_directory
+from .windows import private_directory, sharing_addresses
 
 OPERATIONS = {"pending": "Поискан достъп", "approved": "Разрешен достъп",
               "blocked": "Блокиран", "download": "Изтеглен файл",
@@ -74,12 +75,16 @@ class LocalPanel:
         self.trust_folder = self.folder / "LocalTrust"
         self.trust_path = self.trust_folder / "client.json"
         self.credential, self.preferred_peer = self.load_identity()
+        self.settings_path = self.trust_folder / "connections.json"
+        self.settings = self.load_connections()
         self.name = "Astro Archive " + self.identity[:8]
         self.lock = threading.RLock()
         self.publish_lock = threading.Lock()
         self.catalog_sync = threading.Lock()
         self.catalog_worker = None
         self.mode = "receive"
+        self.add_device = False
+        self.addresses = []
         self.host = self.client = None
         self.peers = []
         self.connection = ""
@@ -100,7 +105,8 @@ class LocalPanel:
         self.closed = False
         self.busy = False
 
-        for name in ("mode", "start", "stop", "join", "refresh", "approve", "block", "unblock",
+        for name in ("mode", "host-switch", "exports", "join", "add-device", "pair", "address", "code",
+                     "approve", "block", "unblock",
                      "archive", "download", "begin", "save", "release"):
             command = "local-" + name
             context.command(command, lambda p, command=command: self.action(command, p))
@@ -132,6 +138,28 @@ class LocalPanel:
         atomic(self.trust_path, dict(installation=self.identity, credential=credential, host=""))
         return credential, ""
 
+    def load_connections(self):
+        try:
+            data = json.loads(self.settings_path.read_text(encoding="utf-8"))
+            peers = data["peers"]
+            if (not isinstance(peers, dict) or len(peers) > 64 or not isinstance(data["exports"], list)
+                    or any(not isinstance(ident, str) for ident in data["exports"])
+                    or type(data["port"]) is not int or not 0 <= data["port"] <= 65535):
+                raise ValueError("Невалидни настройки за споделяне.")
+            for ident, peer in peers.items():
+                if (not re.fullmatch(r"[a-f0-9]{32}", ident) or ident != peer["identity"]
+                        or not CREDENTIAL.fullmatch(peer["pin"]) or not isinstance(peer["name"], str)):
+                    raise ValueError("Невалиден запазен хост.")
+                endpoint(f'{peer["address"]}:{peer["port"]}')
+            return data
+        except (OSError, KeyError, TypeError, ValueError):
+            return dict(peers={}, exports=[], port=0)
+
+    def save_connections(self, **changes):
+        settings = self.settings | changes
+        atomic(self.settings_path, settings)
+        self.settings = settings
+
     def tick(self, *, background=False):
         if not self.lock.acquire(blocking=False):
             return
@@ -143,7 +171,10 @@ class LocalPanel:
             host = self.host
             previous = self.connection
             if self.mode == "receive":
-                self.peers = discover(self.registry, self.identity)
+                local_peers = discover(self.registry, self.identity)
+                saved_peers = self.settings["peers"]
+                self.peers = list(saved_peers.values()) + [peer for peer in local_peers
+                                                           if peer["identity"] not in saved_peers]
                 if self.client is None:
                     peer = next((row for row in self.peers if row["identity"] == self.preferred_peer), None)
                     if peer:
@@ -154,7 +185,7 @@ class LocalPanel:
                                         if peer["identity"] == self.client.peer["identity"]), None)
                         if current is None:
                             raise RequestError(503, "Хостът е недостъпен.")
-                        if current["proof"] != self.client.peer["proof"]:
+                        if current != self.client.peer:
                             self.available_catalogs.clear()
                             self.connection = ""
                             self.rtt_ms = None
@@ -196,7 +227,7 @@ class LocalPanel:
     def update_client(self):
         previous = self.connection
         started = time.perf_counter()
-        joined = self.client.call("join", timeout=1, rttMs=self.rtt_ms)
+        joined = self.client.call("join", timeout=2, rttMs=self.rtt_ms)
         self.connection = joined["status"]
         self.rtt_ms = None
         if self.connection == "approved":
@@ -270,7 +301,7 @@ class LocalPanel:
 
         with self.lock:
             if (self.closed or self.client is not client or self.connection != "approved"
-                    or self.client.peer["proof"] != peer["proof"]):
+                    or self.client.peer != peer):
                 return
             names = []
             for key, document in changed.items():
@@ -365,9 +396,6 @@ class LocalPanel:
         return {"cacheFile": target.relative_to(cache).as_posix()}
 
     def action(self, command, parameters):
-        if command == "local-refresh":
-            self.tick()
-            return {}
         item = parameters.get("selected", {}).get("id")
         operation = None
         with self.lock:
@@ -414,52 +442,84 @@ class LocalPanel:
     def dispatch(self, command, values, item):
         if command == "local-mode":
             mode = values["local-mode"]
-            if mode != self.mode and (self.host or self.lease):
-                raise ValueError("Първо приключи редакцията или спри локалния хост.")
+            if mode not in ("receive", "host") and not (mode == "server" and self.host):
+                raise ValueError("Сървърът е спрян.")
+            if mode != self.mode and self.lease:
+                raise ValueError("Първо приключи текущата редакция.")
             if mode != self.mode:
                 self.available_catalogs.clear()
                 self.connection = ""
                 self.rtt_ms = None
                 self.client = None
             self.mode = mode
-        elif command == "local-start":
-            if self.mode != "host" or self.host or self.smb_active():
-                raise ValueError("Избери „Хостване“ и спри другото споделяне, ако е включено.")
-            selected = {row["id"]: (row["name"], row["type"] or
-                        (row["id"] if row["id"] in ("frames","stacks","photos") else "frames"), Path(row["path"]))
-                        for row in self.exports if values.get(archive_checkbox(row["id"])) is True}
-            if self.private_registry:
-                private_directory(self.registry)
-            host = LocalHost(self.registry, self.identity, self.name, selected,
-                             catalog_folder=self.folder / "SharedCatalogs" / "Host",
-                             access_file=self.trust_folder / "approved.json",
-                             metadata=lambda ident, root: self.ctx.archives("source-metadata",
-                                 dict(archiveId=ident, root=str(root))),
-                             importer=lambda ident, root, path, context: self.ctx.archives("source-ingest",
-                                 dict(archiveId=ident, root=str(root), path=str(path), context=context)),
-                             incoming=self.folder / "Incoming")
-            host.start()
-            self.host = host
-        elif command == "local-stop" and self.host:
-            self.host.close()
-            self.host = None
+        elif command in ("local-exports", "local-host-switch"):
+            if self.mode != "host":
+                raise ValueError("Отвори настройките на хоста.")
+            if self.host:
+                if command != "local-host-switch" or values.get("local-host-switch") is not False:
+                    raise ValueError("Спри сървъра, преди да промениш архивите.")
+                self.host.close()
+                self.host = None
+                self.ctx.archives("hold", dict(active=False))
+                return
+            selected = [row["id"] for row in self.exports
+                        if values.get(archive_checkbox(row["id"]), row["id"] in self.settings["exports"])]
+            if selected != self.settings["exports"]:
+                self.save_connections(exports=selected)
+            if command == "local-host-switch" and values.get("local-host-switch") is True:
+                self.start_host()
+        elif command == "local-address" and self.host:
+            address = values.get("local-address-choice")
+            if address not in self.addresses:
+                raise ValueError("Избери адрес от списъка.")
+            return {"copyText": f"{address}:{self.host.server.server_port}", "message": "Адресът е копиран."}
+        elif command == "local-code" and self.host:
+            return {"copyText": self.host.pairing_code(), "message": "Кодът е копиран и важи 10 минути за едно устройство."}
         elif command in ("local-approve", "local-block", "local-unblock") and self.host:
             status = {"local-approve": "approved", "local-block": "blocked",
                       "local-unblock": "pending"}[command]
             self.host.set_access(item, status)
+        elif command == "local-add-device" and self.mode == "receive" and not self.lease:
+            self.add_device = not self.add_device
+        elif command == "local-pair" and self.mode == "receive" and self.add_device and not self.lease:
+            address, port = endpoint(values.get("local-peer-address", ""))
+            pin, _, code = values.get("local-peer-code", "").strip().partition(".")
+            if not CREDENTIAL.fullmatch(pin) or not re.fullmatch(r"[a-f0-9]{32}", code):
+                raise ValueError("Постави еднократния код, копиран от хоста.")
+            peer = dict(address=address, port=port, pin=pin)
+            probe = LocalClient(peer, "", "").call("ping", timeout=3)
+            ident = probe["identity"]
+            if not re.fullmatch(r"[a-f0-9]{32}", ident) or ident == self.identity:
+                raise ValueError("Избери друго копие на Astro Archive.")
+            peers = self.settings["peers"]
+            if len(peers) >= 64 and ident not in peers:
+                raise ValueError("Списъкът със запазени хостове е пълен.")
+            if ident in peers and peers[ident]["pin"] != pin:
+                raise ValueError("Запазеният хост има друга самоличност.")
+            peer.update(identity=ident, name=str(probe["name"])[:160])
+            client = LocalClient(peer, self.credential, self.name)
+            joined = client.call("join", timeout=3, code=code)
+            if joined["status"] == "blocked":
+                raise ValueError("Хостът е премахнал достъпа на това устройство.")
+            self.save_connections(peers=peers | {ident: peer})
+            self.peers = [row for row in self.peers if row["identity"] != ident] + [peer]
+            self.select_peer(client, joined["status"] if joined["status"] == "pending" else "")
+            if not self.connection:
+                self.update_client()
+            self.add_device = False
+            return {"message": STATES[self.connection]}
         elif command == "local-join":
             if self.lease:
                 raise ValueError("Първо приключи текущата редакция.")
             peer = next((peer for peer in self.peers if peer["identity"] == item), None)
             if peer is None:
                 raise ValueError("Хостът вече е недостъпен.")
-            self.preferred_peer = peer["identity"]
-            atomic(self.trust_path, dict(installation=self.identity, credential=self.credential,
-                                         host=self.preferred_peer))
-            self.client = LocalClient(peer, self.credential, self.name)
-            self.connection, self.selected, self.files = "", "", {}
-            self.rtt_ms = None
-            self.update_client()
+            client = LocalClient(peer, self.credential, self.name)
+            self.select_peer(client)
+            try:
+                self.update_client()
+            except RequestError:
+                self.connection = "offline"
         elif command == "local-archive" and self.connection == "approved" and not self.lease:
             paths = self.client.call("files", archive=item)
             self.selected = item
@@ -482,6 +542,51 @@ class LocalPanel:
                     raise
             self.lease = self.lease_problem = ""
             return {"message": "Работното копие остава запазено."}
+
+    def select_peer(self, client, status=""):
+        ident = client.peer["identity"]
+        atomic(self.trust_path, dict(installation=self.identity, credential=self.credential, host=ident))
+        self.preferred_peer = ident
+        self.client = client
+        self.connection, self.selected, self.files = status, "", {}
+        self.archives = []
+        self.available_catalogs.clear()
+        self.rtt_ms = None
+
+    def start_host(self):
+        if self.smb_active():
+            raise ValueError("Спри SMB споделянето, преди да включиш сървъра.")
+        selected = {row["id"]: (row["name"], row["type"] or
+                    (row["id"] if row["id"] in ("frames", "stacks", "photos") else "frames"), Path(row["path"]))
+                    for row in self.exports if row["id"] in self.settings["exports"]}
+        protected = (self.folder, Path(__file__).resolve().parents[2])
+        for _, _, path in selected.values():
+            root = path.resolve(strict=True)
+            if any(root.is_relative_to(folder) or folder.is_relative_to(root) for folder in protected):
+                raise ValueError("Служебната папка на програмата не може да се споделя като архив.")
+        if self.private_registry:
+            private_directory(self.registry)
+            private_directory(self.trust_folder)
+        addresses = sorted({address for address in sharing_addresses() if private_ip(address) and address != LOOPBACK})
+        self.addresses = addresses + [LOOPBACK]
+        host = LocalHost(self.registry, self.identity, self.name, selected,
+                         catalog_folder=self.folder / "SharedCatalogs" / "Host",
+                         access_file=self.trust_folder / "approved.json",
+                         metadata=lambda ident, root: self.ctx.archives("source-metadata",
+                             dict(archiveId=ident, root=str(root))),
+                         importer=lambda ident, root, path, context: self.ctx.archives("source-ingest",
+                             dict(archiveId=ident, root=str(root), path=str(path), context=context)),
+                         incoming=self.folder / "Incoming", certificate=self.trust_folder / "host.pem",
+                         port=self.settings["port"])
+        host.start()
+        try:
+            if self.settings["port"] != host.server.server_port:
+                self.save_connections(port=host.server.server_port)
+            self.ctx.archives("hold", dict(active=True))
+        except BaseException:
+            host.close()
+            raise
+        self.host = host
 
     def matches_cached(self):
         return (self.connection == "approved" and self.cached is not None and self.client
@@ -547,10 +652,13 @@ class LocalPanel:
                 self.exports = [row for row in archives if row.get("path")
                                 and Path(row["path"]).drive
                                 and not row["path"].startswith("\\\\")]
-            fields = [field("select", "local-mode", label="Роля на това копие", value=self.mode,
-                            options=[dict(value="receive", label="Приемане"), dict(value="host", label="Хостване")],
-                            disabled=bool(self.host or self.lease or self.busy), command="local-mode")]
-            fields.extend(self.host_fields() if self.mode == "host" else self.receive_fields())
+            options = [dict(value="receive", label="Получател"), dict(value="host", label="Настройки на хоста")]
+            if self.host:
+                options.append(dict(value="server", label="Контрол на сървъра"))
+            fields = [field("select", "local-mode", label="Режим на Shared Archives", value=self.mode,
+                            options=options, span=2, disabled=bool(self.lease or self.busy), command="local-mode")]
+            fields.extend({"host": self.host_fields, "server": self.server_fields,
+                           "receive": self.receive_fields}[self.mode]())
         if fields != self.last_document:
             self.ctx.publish("local-sharing", fields)
             self.last_document = fields
@@ -578,31 +686,37 @@ class LocalPanel:
             quality = "Бърза" if rtt <= 30 else "Умерена" if rtt <= 120 else "Бавна"
             return dict(value=f"Свързан · {quality} · {rtt} ms",
                         tone="success" if rtt <= 30 else "warning",
-                        help="Време за отговор между копията на този компютър.")
+                        help="Време за отговор от споделящия сървър.")
         return dict(value=STATES[state or "offline"], tone="warning", help="")
 
     def host_fields(self):
-        if not self.host:
-            choices = [field("checkbox", archive_checkbox(row["id"]), label=row["name"], value=False)
-                       for row in self.exports]
-            return [field("group", "local-exports", label="Избери архиви за пробно споделяне", span=2,
-                          children=choices or [field("text", "local-empty",
-                                                     value="Това копие няма настроени локални архиви.")]),
-                    field("button", "local-start", label="Включи локалния хост",
-                          command="local-start", tone="primary", disabled=not choices)]
+        choices = [field("checkbox", archive_checkbox(row["id"]), label=row["name"],
+                         value=row["id"] in self.settings["exports"], disabled=bool(self.host),
+                         command="local-exports") for row in self.exports]
+        return [field("checkbox", "local-host-switch", label="LAN сървър", span=2,
+                      value=bool(self.host), disabled=not choices, command="local-host-switch"),
+                field("group", "local-exports", label="Архиви за споделяне", span=2,
+                      children=choices or [field("text", "local-empty", value="Няма настроени локални архиви.")])]
+
+    def server_fields(self):
         status = self.host.status()
-        fields = [field("text", "local-state", value="Споделя се на този компютър", tone="success"),
-                  field("button", "local-stop", label="Спри локалния хост", command="local-stop"),
+        port = self.host.server.server_port
+        fields = [field("select", "local-address-choice", label="Адрес на сървъра", span=2,
+                        value=self.addresses[0], options=[dict(value=address, label=f"{address}:{port}")
+                                                          for address in self.addresses]),
+                  field("button", "local-address", label="Копирай адреса", command="local-address"),
+                  field("button", "local-code", label="Копирай нов код за свързване", command="local-code",
+                        help="Еднократен код с валидност 10 минути."),
                   field("list", "local-shared", label="Споделени архиви",
                         items=[dict(id=ident, label=name)
                                for ident, (name, _, _) in self.host.archives.items()])]
         for access, command, label, action in (
                 ("pending", "approve", "Заявки за достъп", "Одобри"),
-                ("approved", "block", "Одобрени клиенти", "Блокирай"),
+                ("approved", "block", "Позволени устройства", "Премахни достъпа"),
                 ("blocked", "unblock", "Блокирани клиенти", "Отблокирай")):
             items = [dict(id=row["id"], label=row["name"]) for row in status["clients"]
                      if row["status"] == access]
-            if items:
+            if items or access == "approved":
                 fields.append(field("list", "local-" + command, label=label, items=items,
                                     command="local-" + command, actionLabel=action))
         events = [dict(id=index, at=datetime.fromtimestamp(row["time"]).strftime("%H:%M:%S"),
@@ -615,29 +729,35 @@ class LocalPanel:
         return fields
 
     def receive_fields(self):
-        peers = [dict(id=peer["identity"], label=peer["name"], status="На този компютър")
+        peers = [dict(id=peer["identity"], label=peer["name"],
+                      status=STATES[self.connection] if self.client and peer["identity"] == self.preferred_peer
+                      else f'{peer["address"]}:{peer["port"]}' if "address" in peer else "На този компютър")
                  for peer in self.peers]
-        fields = [field("button", "local-refresh", label="Провери за хостове", command="local-refresh"),
-                  field("list", "local-peers", label="Открити хостове", items=peers,
+        fields = [field("list", "local-peers", label="Връзки с други устройства", items=peers,
                         command="local-join", actionLabel="Свържи", disabled=bool(self.lease or self.busy))]
-        if not peers:
-            fields.append(field("text", "local-find-help", span=2,
-                                value="Включи хостването в другото копие на Astro Archive."))
         if self.client:
             status = STATES[self.connection]
             if self.connection == "pending":
                 status += f" · На хоста заявката е от {self.name}."
-            fields.append(field("text", "local-connection", value=status))
-        if self.connection == "approved":
-            fields.append(field("list", "local-archives", label="Споделени архиви",
-                                items=[dict(id=row["id"], label=row["name"]) for row in self.archives],
+            fields.append(field("text", "local-connection", value=status, span=2))
+        fields.append(field("list", "local-archives", label="Достъпни архиви",
+                                items=[dict(id=row["id"], label=row["name"]) for row in self.archives
+                                       if self.connection == "approved"],
                                 command="local-archive", actionLabel="Покажи файловете", disabled=bool(self.busy or self.lease)))
-            if self.selected:
-                fields.append(field("list", "local-files", label="Файлове",
-                                    items=[dict(id=ident, label=path) for ident, path in self.files.items()],
-                                    command="local-download", actionLabel="Отвори копие",
-                                    disabled=bool(self.lease or self.busy)))
-        return fields + self.working_copy_fields()
+        if self.connection == "approved" and self.selected:
+            fields.append(field("list", "local-files", label="Файлове",
+                                items=[dict(id=ident, label=path) for ident, path in self.files.items()],
+                                command="local-download", actionLabel="Отвори копие",
+                                disabled=bool(self.lease or self.busy)))
+        fields.extend(self.working_copy_fields())
+        fields.append(field("button", "local-add-device", label="Отказ" if self.add_device else "Добави устройство",
+                            command="local-add-device", disabled=bool(self.lease or self.busy)))
+        if self.add_device:
+            fields.extend([field("input", "local-peer-address", label="Копиран адрес", maxLength=21, span=2),
+                           field("input", "local-peer-code", label="Еднократен код", maxLength=97, span=2),
+                           field("button", "local-pair", label="Свържи с код", command="local-pair", tone="primary",
+                                 disabled=bool(self.lease or self.busy))])
+        return fields
 
     def working_copy_fields(self):
         fields = []
@@ -667,3 +787,4 @@ class LocalPanel:
             if self.host:
                 self.host.close()
                 self.host = None
+                self.ctx.archives("hold", dict(active=False))

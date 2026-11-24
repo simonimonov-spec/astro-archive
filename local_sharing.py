@@ -1,20 +1,25 @@
-"""Managed sharing between copies in the same Windows user profile."""
+"""Managed sharing between Astro Archive installations."""
 from __future__ import annotations
 
 import base64
 import gzip
 import hashlib
+import hmac
 import http.client
+import ipaddress
 import json
 import os
 import re
 import secrets
 import shutil
+import socket
+import ssl
 import tempfile
 import threading
 import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -29,6 +34,92 @@ MAX_TRANSFER = 8 * 1024 ** 3
 MAX_WIRE_TRANSFER = MAX_TRANSFER + MAX_TRANSFER // 500 + 65536
 CREDENTIAL = re.compile(r"[a-f0-9]{64}")
 LOOPBACK = "127.0.0.1"
+PRIVATE_NETWORKS = tuple(map(ipaddress.IPv4Network, ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
+                                                   "100.64.0.0/10", "127.0.0.0/8")))
+
+
+def private_ip(address):
+    ip = ipaddress.IPv4Address(address)
+    return any(ip in network and ip not in (network.network_address, network.broadcast_address)
+               for network in PRIVATE_NETWORKS)
+
+
+def endpoint(value):
+    address, _, port = value.strip().partition(":")
+    if not re.fullmatch(r"[0-9.]{7,15}", address) or not re.fullmatch(r"[0-9]{1,5}", port):
+        raise ValueError("Постави копирания IPv4 адрес с порта, например 192.168.1.10:49783.")
+    if not private_ip(address) or not 1 <= int(port) <= 65535:
+        raise ValueError("Използвай частен LAN или VPN адрес и валиден порт.")
+    return address, int(port)
+
+
+def host_tls(path):
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+
+    if not path.exists():
+        key = ec.generate_private_key(ec.SECP256R1())
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Astro Archive Shared Archives")])
+        now = datetime.now(timezone.utc)
+        cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+                .public_key(key.public_key()).serial_number(x509.random_serial_number())
+                .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=3650))
+                .sign(key, hashes.SHA256()))
+        with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(cert.public_bytes(serialization.Encoding.PEM))
+            stream.write(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                           serialization.NoEncryption()))
+        try:
+            temporary.replace(path)
+        finally:
+            temporary.unlink(missing_ok=True)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.load_cert_chain(path)
+    cert = x509.load_pem_x509_certificate(path.read_bytes())
+    return context, cert.fingerprint(hashes.SHA256()).hex()
+
+
+class SharingServer(ThreadingHTTPServer):
+    def __init__(self, address, host):
+        self.host = host
+        self.slots = threading.BoundedSemaphore(16)
+        super().__init__(address, LocalHandler)
+
+    def server_bind(self):
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            self.allow_reuse_address = False
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+    def verify_request(self, request, address):
+        return private_ip(address[0]) and private_ip(request.getsockname()[0])
+
+    def process_request(self, request, address):
+        if not self.slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, address)
+        except BaseException:
+            self.slots.release()
+            raise
+
+    def process_request_thread(self, request, address):
+        try:
+            if self.host.tls:
+                request.settimeout(5)
+                try:
+                    request = self.host.tls.wrap_socket(request, server_side=True)
+                except OSError:
+                    self.shutdown_request(request)
+                    return
+            super().process_request_thread(request, address)
+        finally:
+            self.slots.release()
 
 
 class RequestError(ValueError):
@@ -46,8 +137,10 @@ def discover(folder, own_identity):
             peer = json.loads(path.read_text(encoding="utf-8"))
             if (peer["identity"] == own_identity or type(peer["port"]) is not int
                     or not 1 <= peer["port"] <= 65535 or not CREDENTIAL.fullmatch(peer["proof"])
+                    or ("pin" in peer and not CREDENTIAL.fullmatch(peer["pin"]))
                     or path.stem != peer["identity"] or not label(peer["name"])):
                 continue
+            peer = {key: value for key, value in peer.items() if key in ("identity", "name", "port", "proof", "pin")}
             probe = LocalClient(peer, "", "")
             if probe.call("ping", timeout=0.3)["identity"] == peer["identity"]:
                 peers.append(peer)
@@ -58,7 +151,7 @@ def discover(folder, own_identity):
 
 class LocalHost:
     def __init__(self, folder, identity, name, archives, *, catalog_folder=None, access_file=None,
-                 metadata=None, importer=None, incoming=None):
+                 metadata=None, importer=None, incoming=None, certificate=None, port=0):
         if not re.fullmatch(r"[a-zA-Z0-9_-]{1,80}", identity):
             raise ValueError("Невалиден идентификатор на инсталацията.")
         if not archives:
@@ -83,6 +176,10 @@ class LocalHost:
             self.archive_sources[ident] = identifier(self.identity, ident, str(files.root).casefold(),
                                                       str(stat.st_dev), str(stat.st_ino))
         self.proof = secrets.token_hex(32)
+        self.tls, self.pin = host_tls(certificate) if certificate is not None else (None, "")
+        self.port = port
+        self.invitation = ""
+        self.invitation_expires = 0
         self.server = None
         self.thread = None
         self.lock = threading.RLock()
@@ -102,12 +199,13 @@ class LocalHost:
         if self.server is not None:
             raise ValueError("Хостът вече е включен.")
         self.folder.mkdir(parents=True, exist_ok=True)
-        server = ThreadingHTTPServer((LOOPBACK, 0), LocalHandler)
+        server = SharingServer(("0.0.0.0" if self.tls else LOOPBACK, self.port), self)
         self.server = server
-        server.host = self
         try:
-            atomic(self.registration, dict(identity=self.identity, name=self.name,
-                                          port=server.server_port, proof=self.proof))
+            peer = dict(identity=self.identity, name=self.name, port=server.server_port, proof=self.proof)
+            if self.pin:
+                peer["pin"] = self.pin
+            atomic(self.registration, peer)
         except OSError:
             server.server_close()
             self.server = None
@@ -116,6 +214,12 @@ class LocalHost:
                                        daemon=True, name="SharedArchivesLocalHost")
         self.stopping = False
         self.thread.start()
+
+    def pairing_code(self):
+        with self.lock:
+            self.invitation = secrets.token_hex(16)
+            self.invitation_expires = time.monotonic() + 600
+            return f"{self.pin}.{self.invitation}"
 
     def close(self):
         with self.lock:
@@ -274,17 +378,25 @@ class LocalHost:
         if source is not None and self.archive_sources.get(ident) != source:
             raise RequestError(409, "Споделеният архив сочи към друга папка.")
 
-    def dispatch(self, identity, action, data):
+    def dispatch(self, identity, action, data, *, local=False):
         with self.lock:
             if self.stopping:
                 raise RequestError(503, "Локалният хост е спрян.")
             if action == "ping":
-                return dict(identity=self.identity)
+                return dict(identity=self.identity, name=self.name)
             if action == "join":
                 if identity not in self.clients:
                     if len(self.clients) >= 64:
                         raise RequestError(429, "Списъкът за достъп е пълен.")
-                    self.clients[identity] = dict(name=label(data["name"]), status="pending",
+                    name = label(data["name"])
+                    if self.tls and not local:
+                        invitation = data.get("code", "")
+                        if (time.monotonic() >= self.invitation_expires
+                                or not isinstance(invitation, str) or not re.fullmatch(r"[a-f0-9]{32}", invitation)
+                                or not secrets.compare_digest(invitation, self.invitation)):
+                            raise RequestError(403, "Нужен е нов еднократен код от хоста.")
+                        self.invitation_expires = 0
+                    self.clients[identity] = dict(name=name, status="pending",
                                                   lastSeen=time.time())
                     self.record(identity, "pending")
                 client = self.clients[identity]
@@ -388,13 +500,23 @@ class LocalHandler(BaseHTTPRequestHandler):
         self.request.settimeout(5)
         super().setup()
 
+    def handle_one_request(self):
+        try:
+            super().handle_one_request()
+        except (ConnectionError, ssl.SSLError):
+            self.close_connection = True
+
     def do_POST(self):
         try:
             host = self.server.host
-            if (self.headers.get("Host") != f"{LOOPBACK}:{self.server.server_port}"
+            destination = self.connection.getsockname()[0]
+            proof = self.headers.get("Authorization", "")
+            local = (self.client_address[0] == LOOPBACK and destination == LOOPBACK
+                     and proof.isascii() and secrets.compare_digest(proof, host.proof))
+            if (self.headers.get("Host") != f"{destination}:{self.server.server_port}"
                     or self.headers.get("Origin") or self.headers.get("Transfer-Encoding")
-                    or not secrets.compare_digest(self.headers.get("Authorization", ""), host.proof)):
-                raise RequestError(403, "Невалидна локална връзка.")
+                    or (not host.tls and not local)):
+                raise RequestError(403, "Невалидна връзка.")
             action = self.path.removeprefix("/")
             credential = self.headers.get("X-Archive-Client", "")
             if action != "ping" and not CREDENTIAL.fullmatch(credential):
@@ -478,7 +600,7 @@ class LocalHandler(BaseHTTPRequestHandler):
                     with host.lock:
                         host.record(identity, "download", archive, path)
                 return
-            self.json(200, host.dispatch(identity, action, payload))
+            self.json(200, host.dispatch(identity, action, payload, local=local))
         except RequestError as error:
             self.json(error.status, {"error": str(error)})
         except Conflict as error:
@@ -513,14 +635,29 @@ class LocalHandler(BaseHTTPRequestHandler):
 class LocalClient:
     def __init__(self, peer, credential, name):
         self.peer = peer
-        self.credential = credential
-        self.identity = hashlib.sha256(credential.encode("ascii")).hexdigest()
+        self.credential = (hmac.digest(bytes.fromhex(credential), bytes.fromhex(peer["pin"]), "sha256").hex()
+                           if credential and "address" in peer else credential)
+        self.identity = hashlib.sha256(self.credential.encode("ascii")).hexdigest()
         self.name = name
 
     def request(self, action, body, consumed, *, timeout=8, headers=None):
-        connection = http.client.HTTPConnection(LOOPBACK, self.peer["port"], timeout=timeout)
-        fields = {"Authorization": self.peer["proof"], "X-Archive-Client": self.credential}
+        address = self.peer.get("address", LOOPBACK)
+        pin = self.peer.get("pin")
+        if pin:
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            context.minimum_version = ssl.TLSVersion.TLSv1_2
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            connection = http.client.HTTPSConnection(address, self.peer["port"], timeout=timeout, context=context)
+        else:
+            connection = http.client.HTTPConnection(LOOPBACK, self.peer["port"], timeout=timeout)
+        fields = {"Authorization": self.peer.get("proof", ""), "X-Archive-Client": self.credential}
         try:
+            if pin:
+                connection.connect()
+                actual = hashlib.sha256(connection.sock.getpeercert(binary_form=True)).hexdigest()
+                if not secrets.compare_digest(actual, pin):
+                    raise RequestError(403, "Сертификатът не съвпада със запазената самоличност на хоста.")
             connection.request("POST", "/" + action, body, fields | (headers or {}))
             with connection.getresponse() as response:
                 if response.status != 200:

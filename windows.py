@@ -20,6 +20,12 @@ def environment():
     data['networks'] = [n for n in data['networks'] if _valid_lan(n)]
     return data
 
+def sharing_addresses():
+    return powershell("[Console]::OutputEncoding=[Text.UTF8Encoding]::new(); "
+                      "ConvertTo-Json -InputObject @(Get-NetIPAddress -AddressFamily IPv4 "
+                      "-AddressState Preferred | Where-Object { -not $_.SkipAsSource } | "
+                      "Select-Object -ExpandProperty IPAddress) -Compress") or []
+
 def _valid_lan(n):
     try:lan(n['address'],n['prefix']);return True
     except (ValueError,TypeError,KeyError):return False

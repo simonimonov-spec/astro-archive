@@ -42,6 +42,80 @@ class Context:
 
 
 class LocalPanelTests(unittest.TestCase):
+    def test_tls_invitation_persists_until_access_is_removed(self):
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as temporary, patch.object(panel, "sharing_addresses", return_value=[]):
+            root = Path(temporary)
+            archive = root / "archive"
+            archive.mkdir()
+            rows = [dict(id="frames", name="Кадри", path=str(archive), type="frames")]
+
+            def installation(name, archives=()):
+                folder = root / name
+                return panel.LocalPanel(Context(folder, archives), folder, registry=folder / "registry")
+
+            host, client, other = installation("host", rows), installation("client"), installation("other")
+            for copy in (host, client, other):
+                self.addCleanup(copy.close)
+
+            def action(copy, command, item=None, **values):
+                return copy.action("local-" + command, dict(values=values, selected=dict(id=item)))
+
+            action(host, "mode", **{"local-mode": "host"})
+            action(host, "exports", **{panel.archive_checkbox("frames"): True})
+            action(host, "host-switch", **{"local-host-switch": True})
+            archive_option = host.host_fields()[1]["children"][0]
+            self.assertTrue(archive_option["disabled"])
+            action(host, "mode", **{"local-mode": "server"})
+            address = action(host, "address", **{"local-address-choice": panel.LOOPBACK})["copyText"]
+            code = action(host, "code")["copyText"]
+
+            def pair(copy, value):
+                return action(copy, "pair", **{"local-peer-address": address, "local-peer-code": value})
+
+            action(client, "add-device")
+            action(other, "add-device")
+            with self.assertRaisesRegex(panel.RequestError, "Сертификатът"):
+                pair(client, "0" * 64 + code[64:])
+            with self.assertRaisesRegex(panel.RequestError, "еднократен код"):
+                with patch.object(host.host, "invitation_expires", 0):
+                    pair(client, code)
+            pair(client, code)
+            self.assertEqual(client.connection, "pending")
+            self.assertFalse(client.peers[0].get("proof"))
+            with self.assertRaisesRegex(panel.RequestError, "еднократен код"):
+                pair(other, code)
+            with self.assertRaises(panel.RequestError):
+                client.client.call("archives")
+            client_id = client.client.identity
+            action(host, "approve", item=client_id)
+            client.tick()
+            self.assertEqual(client.connection, "approved")
+            self.assertEqual([row["id"] for row in client.archives], ["frames"])
+            self.assertNotIn(code, client.settings_path.read_text(encoding="utf-8"))
+
+            host.close()
+            client.close()
+            host, client = installation("host", rows), installation("client")
+            self.addCleanup(host.close)
+            self.addCleanup(client.close)
+            action(host, "mode", **{"local-mode": "host"})
+            action(host, "host-switch", **{"local-host-switch": True})
+            self.assertEqual(host.host.pin, code[:64])
+            client.tick()
+            self.assertEqual(client.connection, "approved")
+            action(host, "mode", **{"local-mode": "server"})
+            action(host, "block", item=client_id)
+            client.tick()
+            self.assertEqual(client.connection, "blocked")
+            self.assertEqual(client.archives, [])
+            with self.assertRaises(panel.RequestError):
+                client.client.call("archives")
+            action(host, "mode", **{"local-mode": "host"})
+            action(host, "host-switch", **{"local-host-switch": False})
+            self.assertEqual([item["value"] for item in host.ctx.elements[0]["options"]], ["receive", "host"])
+
     def test_plugin_manager_routes_real_list_selections(self):
         import os
         import shutil
@@ -85,10 +159,11 @@ class LocalPanelTests(unittest.TestCase):
                     self.assertEqual(result["uiActions"], [dict(type="choose-archive-source", archiveId=archive_id)])
                     self.assertIsNone(client_manager.service.shared_sources.get(archive_id))
                 ui(host_manager, "local-mode", {"local-mode": "host"})
-                ui(host_manager, "local-start", {panel.archive_checkbox("frames"): True})
+                ui(host_manager, "local-host-switch", {"local-host-switch": True, panel.archive_checkbox("frames"): True})
                 client.tick()
                 ui(client_manager, "local-peers", item=host.identity)
                 host.tick()
+                ui(host_manager, "local-mode", {"local-mode": "server"})
                 ui(host_manager, "local-approve", item=client.client.identity)
                 client.tick()
                 service = client_manager.service
@@ -216,7 +291,7 @@ class LocalPanelTests(unittest.TestCase):
                 try:
                     self.assertIn("local-sharing", context.documents)
                     self.assertIn("network", context.documents)
-                    self.assertIn("local-start", context.commands)
+                    self.assertIn("local-host-switch", context.commands)
                 finally:
                     close()
 
@@ -234,7 +309,7 @@ class LocalPanelTests(unittest.TestCase):
             self.addCleanup(host.close)
             self.addCleanup(client.close)
             host.action("local-mode", {"values": {"local-mode": "host"}})
-            host.action("local-start", {"values": {panel.archive_checkbox("frames"): True}})
+            host.action("local-host-switch", {"values": {"local-host-switch": True, panel.archive_checkbox("frames"): True}})
             client.tick()
             peer = host.identity
             client.action("local-join", {"selected": {"id": peer}})
@@ -274,7 +349,7 @@ class LocalPanelTests(unittest.TestCase):
                                          registry=root / "registry")
             self.addCleanup(restarted.close)
             restarted.action("local-mode", {"values": {"local-mode": "host"}})
-            restarted.action("local-start", {"values": {panel.archive_checkbox("frames"): True}})
+            restarted.action("local-host-switch", {"values": {"local-host-switch": True, panel.archive_checkbox("frames"): True}})
             offline.tick()
             self.assertEqual(offline.connection, "approved")
             restarted.close()

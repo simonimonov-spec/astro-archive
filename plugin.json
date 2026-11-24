@@ -3,7 +3,7 @@
   "id": "shared-archives",
   "name": "Shared Archives · LAN",
   "version": "V-2.2",
-  "description": "Споделени източници за кадри, стакове и снимки, дискова справка и измерено време за отговор между две копия на Astro Archive на един Windows компютър. Шифрован SMB 3 за споделяне между компютри.",
+  "description": "Споделени архиви за кадри, стакове и снимки между копия на Astro Archive през LAN или VPN. Свързване с еднократен код, позволени устройства и шифрован трафик.",
   "author": "Astro Archive",
   "entry": "main.py",
   "permissions": [
@@ -14,7 +14,7 @@
     {
       "id": "local-sharing",
       "slot": "settings",
-      "title": "Shared Archives · Проба на този компютър",
+      "title": "Shared Archives · Връзки между приложенията",
       "clients": ["desktop"]
     },
     {
@@ -30,7 +30,7 @@
     {
       "id": "network",
       "slot": "settings",
-      "title": "Shared Archives · хост и връзки",
+      "title": "Shared Archives · Windows SMB",
       "clients": [
         "desktop"
       ]

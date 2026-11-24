@@ -130,7 +130,10 @@ class SharedArchives:
         plan=self.plan();self.plan_text=json.dumps(plan,ensure_ascii=False,indent=2);atomic(self.folder/'last-plan.json',plan)
         if self.reviewed!=hashlib.sha256(json.dumps(plan,sort_keys=True).encode()).hexdigest():raise ValueError('Планът е променен. Прегледай и потвърди актуалните папки, права и мрежа.')
         self.reviewed=None;self.consent_id='host-approved-'+uuid.uuid4().hex[:12]
-        self.smb_starting = True
+        with self.local.lock:
+            if self.local.host or self.smb_active():
+                raise ValueError('Първо спри активното споделяне.')
+            self.smb_starting = True
         def work(cancel,progress):
             try:
                 if cancel.is_set():raise InterruptedError('Включването е отменено.')
@@ -157,7 +160,11 @@ class SharedArchives:
             deadline=time.monotonic()+20
             while time.monotonic()<deadline:
                 result=self.controller.status()
-                if result['state'] in ('off','stopped','error'):self.ctx.archives('hold',dict(active=False));self.publish();return result
+                if result['state'] in ('off','stopped','error'):
+                    with self.local.lock:
+                        if not self.local.host and not self.smb_active():
+                            self.ctx.archives('hold',dict(active=False))
+                    self.publish();return result
                 progress(0,1,'Windows затваря собствените мрежови дялове и връзките към тях');cancel.wait(.3)
             raise ValueError('Windows още не потвърждава спирането. Провери състоянието.')
         return self.ctx.task('Спиране на споделените архиви',work,'archive')
@@ -287,8 +294,10 @@ class SharedArchives:
         while not self.closed.wait(4):
             try:
                 self.local.tick(background=True)
-                state=self.status({})
-                if state['state'] in ('off','stopped','error'):self.ctx.archives('hold',dict(active=False))
+                with self.local.lock:
+                    state=self.status({})
+                    if not self.local.host and not self.smb_starting and state['state'] in ('off','stopped','error'):
+                        self.ctx.archives('hold',dict(active=False))
                 self.publish_header()
                 if state['state']!='running' or not self.options['workspaceEnabled']:continue
                 root=Path(self.options['workspace']);descriptor=metadata(root/SHARE_MARKER,'workspace')
