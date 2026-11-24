@@ -1,0 +1,206 @@
+/* Beta 1.3 UI (в разработка, не е издание) · виж docs/BETA-1.3-UI.md */
+/* Preparation layout (chosen model A + 4B, proposals 1–9).
+   Step 1: no page title; the filter card keeps only the filters and a tasks
+   line at its bottom (the task panel opens from it); totals live in the
+   footer; refresh sits with the list tools.
+   Step 2: underlined, clickable steps; ways of working in a left column with
+   plugin cards under a "Плъгини" divider; options on the right; an action bar
+   at the bottom that is always visible. Without a program the start button is
+   off and the bar says why. Dark/Flat/Bias fade while calibration is off.
+   Animations: step underline and tasks line respond to hover; everything stops
+   with the app's animation switch or the system's reduced-motion setting. */
+
+/* ---------- Step 1 ---------- */
+#page-preparation > .page-heading { display: none !important; }
+:root[data-header-collapsed="true"] #page-preparation > .page-heading { display: flex !important; }
+
+#w-data .flow-picker-filters > .flow-kicker,
+#w-data .flow-picker-filters > h2,
+#w-data #w-basket { display: none !important; }
+#w-data .flow-field-row { display: block !important; }
+#w-data .flow-picker-filters { display: flex; flex-direction: column; }
+
+.flow-count-wrap { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.flow-count-detail { color: var(--muted); font-size: 12px; font-weight: 500; }
+#q-data .flow-count-detail { display: none; }
+
+/* Tasks line (4B) */
+#w-data .flow-tasks-line {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 10px !important;
+  background: color-mix(in srgb, var(--text) 4%, transparent) !important;
+  color: var(--muted) !important;
+  font-size: 12.5px !important;
+  font-weight: 400 !important;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 220ms ease, background-color 220ms ease;
+}
+#w-data .flow-tasks-line b { color: var(--text); font-weight: 600; }
+.flow-tasks-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.flow-tasks-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--success, #67d391); }
+#w-data .flow-tasks-line[data-state="pending"] .flow-tasks-dot { background: var(--warning, #ffcf89); }
+.flow-tasks-go { margin-left: auto; color: var(--accent); flex: none; }
+#w-data .flow-tasks-line[aria-expanded="true"] { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)) !important; }
+@media (hover: hover) and (pointer: fine) {
+  #w-data .flow-tasks-line:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)) !important; background: color-mix(in srgb, var(--text) 7%, transparent) !important; }
+}
+#page-preparation[data-activity="closed"] > #preparation-activity { display: none !important; }
+
+/* ---------- Step 2 ---------- */
+#w-action { max-width: none; padding: 0 !important; display: flex; flex-direction: column; }
+#w-action[hidden] { display: none !important; }
+#w-action > .flow-stepper {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 12px 22px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+#w-action .flow-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 11px !important;
+  margin-bottom: -1px;
+  border: 0 !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  color: var(--muted) !important;
+  font-size: 13px !important;
+  font-weight: 500;
+  transition: color 220ms ease, border-color 260ms ease;
+}
+#w-action .flow-step i {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-style: normal;
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+}
+#w-action .flow-step[aria-current="step"] {
+  color: var(--accent) !important;
+  border-bottom-color: var(--accent) !important;
+  box-shadow: var(--tab-glow, 0 9px 12px -10px color-mix(in srgb, var(--accent) 75%, transparent)) !important;
+}
+#w-action .flow-step[aria-current="step"] i { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+#w-action .flow-step-done { cursor: pointer; }
+#w-action .flow-step-done i { background: color-mix(in srgb, var(--success, #67d391) 22%, transparent); color: var(--success, #67d391); }
+#w-action .flow-step:last-child { opacity: .7; }
+@media (hover: hover) and (pointer: fine) {
+  #w-action .flow-step-done:hover { color: var(--text) !important; border-bottom-color: color-mix(in srgb, var(--accent) 35%, var(--border)) !important; }
+}
+
+#w-action .flow-action-body {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  column-gap: 28px;
+  row-gap: 12px;
+  align-content: start;
+  padding: 18px 22px;
+}
+#w-action .flow-action-body > h2 { grid-column: 1 / -1; margin: 0 0 4px; font-size: 17px; }
+#w-action .flow-action-modes { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+#w-action .flow-action-options { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+#w-action .flow-action-options .flow-option-fields { margin-top: 0; }
+#w-action .flow-plan { margin: 0; }
+
+/* Ways of working: compact cards in one column (left icon, title, one line). */
+#w-action .flow-action-modes > .flow-cards { display: flex !important; flex-direction: column; gap: 8px !important; margin: 0 !important; }
+#w-action .flow-action-modes .flow-card {
+  display: grid !important;
+  grid-template-columns: 32px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 12px !important;
+  row-gap: 2px !important;
+  align-items: center !important;
+  align-content: center;
+  text-align: left !important;
+  min-height: 0 !important;
+  padding: 9px 12px !important;
+}
+#w-action .flow-action-modes .flow-card > span:first-child:not(.extension-plugin-badge),
+#w-action .flow-action-modes .flow-card > .extension-card-logo {
+  grid-row: 1 / 3;
+  grid-column: 1;
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 15px !important;
+}
+#w-action .flow-action-modes .flow-card strong { grid-column: 2; align-self: end; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#w-action .flow-action-modes .flow-card small { grid-column: 2; align-self: start; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Plugin cards: the "Плъгини" divider already names them. */
+#w-action .flow-action-modes .extension-plugin-badge { display: none !important; }
+#w-action .flow-plugin-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+#w-action .flow-plugin-heading::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+#w-action .flow-plugin-heading:has(+ #w-plugin-actions[hidden]) { display: none; }
+
+/* Program row: the settings button lines up with the field; empty path stays hidden. */
+#w-program-options .flow-option-fields { align-items: flex-end; }
+#w-settings { height: 40px !important; min-height: 0 !important; padding-block: 0 !important; }
+#w-program-path[hidden] { display: none !important; }
+/* Dark/Flat/Bias depend on "Налични калибрационни кадри". */
+#w-program-options .function-actions:has(#w-calibrations:not(:checked)) > .checkbox-field:not(:has(#w-calibrations)) { opacity: .38; filter: saturate(.3); }
+#w-program-options .function-actions > .checkbox-field { transition: opacity 260ms ease, filter 260ms ease; }
+
+/* Action bar: always visible at the bottom of the step. */
+#w-action .flow-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 22px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--text) 2.5%, transparent);
+}
+#w-action .flow-action-summary { display: flex; flex-direction: column; gap: 2px; min-width: 0; margin-right: auto; }
+#w-action .flow-action-summary strong { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#w-action .flow-action-summary small { color: var(--muted); font-size: 12px; }
+#w-action .flow-action-why { color: var(--warning, #ffcf89); font-size: 12.5px; text-align: right; }
+#w-action .flow-action-why[hidden] { display: none; }
+#w-action .flow-action-bar .function-actions { margin: 0 !important; padding: 0 !important; flex: none; }
+
+/* Fit the window: the bar stays, the body scrolls inside (rule: the window never scrolls). */
+@media (min-height: 560px) and (min-width: 761px) {
+  #preparation-content > #w-action:not([hidden]) { overflow: hidden !important; }
+  #w-action > .flow-stepper, #w-action > .flow-action-bar { flex: none; }
+  #w-action > .flow-action-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+}
+/* Narrow windows: one column. */
+@media (max-width: 1000px) {
+  #w-action .flow-action-body { grid-template-columns: minmax(0, 1fr); }
+  #w-action .flow-action-bar { flex-wrap: wrap; }
+}
+
+/* No motion when animations are off. */
+:root[data-animations="off"] :is(#w-data .flow-tasks-line, #w-action .flow-step, #w-program-options .function-actions > .checkbox-field) { transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  :is(#w-data .flow-tasks-line, #w-action .flow-step, #w-program-options .function-actions > .checkbox-field) { transition: none !important; }
+}
+
+/* Spacing inside the program options (their rows are nested, not direct children). */
+#w-program-options:not([hidden]) { display: flex; flex-direction: column; gap: 14px; }
+#w-return-options:not([hidden]) { display: flex; flex-direction: column; gap: 6px; }
+#w-program-options :is(.flow-option-fields, .function-actions), #w-program-path, #w-destination-note { margin-block: 0 !important; }

@@ -539,6 +539,10 @@
         "destination": "UI/Shared/Web/fit.css"
       },
       {
+        "source": "UI/Shared/Web/preparation-layout.css",
+        "destination": "UI/Shared/Web/preparation-layout.css"
+      },
+      {
         "source": "UI/Shared/Web/shortcuts.js",
         "destination": "UI/Shared/Web/shortcuts.js"
       },

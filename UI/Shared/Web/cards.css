@@ -46,7 +46,7 @@
   gap: 9px !important;
   padding: 20px 16px 20px !important;
 }
-:root .flow-card > span:first-child {
+:root .flow-card > span:first-child:not(.extension-plugin-badge) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -59,6 +59,18 @@
   line-height: 1;
   transition: box-shadow 320ms ease, background-color 320ms ease;
 }
+/* Plugin cards: the "ПЛЪГИН" tag is a small corner label, not the round icon
+   (it is the card's first span); the plugin logo takes the icon's place. */
+:root .flow-card > .extension-plugin-badge {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  margin: 0;
+  font-size: 8.5px !important;
+  line-height: 1.2;
+  padding: 2px 5px !important;
+}
+:root .flow-card > .extension-card-logo { width: 46px; height: 46px; object-fit: contain; }
 :root .flow-card strong { font-size: 14px; }
 :root .flow-card small { font-size: 11.5px; line-height: 1.55 !important; }
 /* Theme cards: centred name. */
@@ -75,7 +87,7 @@
 :root .flow-card[aria-pressed="true"] strong,
 :root .theme-card[aria-pressed="true"] strong,
 :root .plugin-choice[aria-selected="true"] .plugin-choice-name { color: var(--accent); }
-:root .flow-card[aria-pressed="true"] > span:first-child { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+:root .flow-card[aria-pressed="true"] > span:first-child:not(.extension-plugin-badge) { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 @keyframes card-line-in { from { scale: 0 1; } to { scale: 1 1; } }
 
 /* Hover */
