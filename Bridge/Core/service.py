@@ -394,7 +394,51 @@ class Service:
         if method=='archive.audit.status':return self.audit
         if method=='archive.audit.open':os.startfile(self.store.folder/'archive-check.json');return dict(opened=True)
         if method in ('archive.summary.stop','archive.read.stop'):return dict(requested=True)
-        if method=='archive.import':
+        if method=='archive.tag.set':
+            # Beta 1.3 UI: tag by file ids or by folder paths (all files below them).
+            if p.get('ids') is not None and not isinstance(p.get('ids'),list):raise ValueError('Невалиден списък с файлове.')
+            if p.get('ids'):ids=[str(i) for i in p['ids']]
+            else:
+                paths=[str(x) for x in (p.get('relativePaths') or [])]
+                if not paths or not p.get('archiveId'):raise ValueError('Избери папка или файлове за етикета.')
+                ids=self.catalog.tag_ids(str(p['archiveId']),paths)
+            if len(ids)<=200:return self.catalog.set_tag(ids,p.get('tag'))
+            return self.task('archive','Етикет за данните',lambda c,r:self.catalog.set_tag(ids,p.get('tag'),progress=r,cancel=c),'important')
+        if method in ('archive.import','archive.import.preview'):
+            # Beta 1.3 UI: preview -> "what are you importing" dialog -> import with a tag per file.
+            from Backend.Archive import tags as tag_model
+            previews=self.__dict__.setdefault('import_previews',tag_model.ImportPreviews())
+            if method=='archive.import' and p.get('token') is not None:
+                import re
+                raw=p.get('tags') or {}
+                if not isinstance(raw,dict):raise ValueError('Невалидни етикети за внасяне.')
+                entry=previews.take(p['token']);paths=entry['paths']
+                chosen={paths[int(i)]:t for i,t in raw.items() if re.fullmatch(r'\d+',str(i)) and int(i)<len(paths) and t}
+                try:return self.task('archive','Внасяне в архива',lambda c,r:self.catalog.import_files(paths,c,r,forced_archive=entry['archiveId'],tags=chosen),'important')
+                except Exception:previews.put_back(p['token'],entry);raise
+            if method=='archive.import.preview':
+                if p.get('folder'):
+                    from Backend.Fits.images import IMAGES
+                    folder=self.choose_folder('Внеси папка с изображения (включително подпапките)')
+                    if not folder:return dict(cancelled=True)
+                    def collect(cancel,progress):
+                        found=[]
+                        for parent,dirs,files in os.walk(folder,followlinks=False):
+                            if cancel.is_set():raise InterruptedError()
+                            dirs[:]=[d for d in dirs if not d.startswith('.') and not (Path(parent)/d).is_symlink() and not getattr(Path(parent)/d,'is_junction',lambda:False)()]
+                            found.extend(str(within(folder,(Path(parent)/n).relative_to(folder).as_posix())) for n in files if Path(n).suffix.lower() in IMAGES and not (Path(parent)/n).is_symlink() and not n.endswith('.coverage.fits'))
+                            progress(len(found),max(1,len(found)),'Откриване на файловете за внасяне')
+                        return found,Path(folder).name
+                else:
+                    chosen_paths=self.dialogs.choose('files',title='Внеси кадри',filetypes=[('Астрономически изображения','*.fit *.fits *.fts *.png *.jpg *.jpeg *.tif *.tiff')])
+                    if not chosen_paths:return dict(cancelled=True)
+                    collect=lambda cancel,progress:(list(chosen_paths),Path(chosen_paths[0]).parent.name)
+                def preview(cancel,progress):
+                    found,source=collect(cancel,progress)
+                    if not found:raise ValueError('Няма изображения за внасяне.')
+                    progress(0,1,'Преглед на кадрите');groups=tag_model.preview_groups(found)
+                    return dict(token=previews.add(found,p.get('archiveId')),source=source,count=len(found),groups=groups)
+                return self.task('archive','Преглед на файловете за внасяне',preview,'important')
             if p.get('folder'):
                 from Backend.Fits.images import IMAGES
                 folder=self.choose_folder('Внеси папка с изображения (включително подпапките)')

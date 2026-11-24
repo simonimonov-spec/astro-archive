@@ -92,8 +92,13 @@ def metadata(argument):
         created=str(h.get('DATE',dt.datetime.fromtimestamp(getattr(stat,'st_birthtime',stat.st_mtime),dt.timezone.utc).isoformat())),
         sourceStackCount=int(v) if (v:=finite(h.get('PSSTKCNT'))) is not None and v>=0 else None,telescopes=str(h.get('PSTSCOPS',telescope)).split(';'))
     side=companion_path(path);result['companionMtime']=side.stat().st_mtime_ns if side.exists() else 0
-    for key in ('object','telescope','night','observed','created','filter','sensor','exposure','totalExposure','frames','sourceStackCount','telescopes','sourceFiles','sourceNights','kind','provenanceOverride','sourceStacks','combination','processing'):
+    for key in ('object','telescope','night','observed','created','filter','sensor','exposure','totalExposure','frames','sourceStackCount','telescopes','sourceFiles','sourceNights','kind','provenanceOverride','sourceStacks','combination','processing','tag'):
         if key in extra:result[key]=extra[key]
+    if 'tag' in result:  # Beta 1.3 UI: ignore a malformed hand-edited data tag
+        from Backend.Archive.tags import normalize
+        try:result['tag']=normalize(result['tag'],stack=result.get('kind')=='stack')
+        except (ValueError,TypeError,AttributeError):result['tag']=None
+        if result['tag'] is None:result.pop('tag')
     if 'frames' in extra:result['framesKnown']=True;result['frameCountRecorded']=True
     result['missingFields']=missing_fields(result);return result
 

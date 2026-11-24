@@ -165,8 +165,8 @@
     if(archiveFilter){
       fragment.append(element('strong','filter-results-title',i18n.locale.startsWith('en')?'Filtered results':'Резултати от филтриране'),element('span','filter-results-badge',i18n.locale.startsWith('en')?'FILTER ON':'АКТИВЕН ФИЛТЪР'));
       const clear=element('button','filter-clear',i18n.locale.startsWith('en')?'Turn off':'Изключи');clear.type='button';clear.onclick=()=>$('archive-filter-toggle').click();fragment.append(clear);$('breadcrumbs').replaceChildren(fragment);
-      const labels={archive:'Архив',telescope:'Телескоп',object:'Обект',night:'Нощ',since:'Добавени'},roles={archive:'archive',telescope:'telescope',object:'object',night:'day',since:'day'};
-      for(const[key,value]of Object.entries(archiveFilter)){if(!value)continue;const chip=element('span','archive-filter-chip'),copy=element('span','');chip.append(window.AstroArchiveArchiveIcons.create(roles[key]||'folder'));copy.append(element('small','',labels[key]||key),element('strong','',key==='archive'?archiveName(archive):key==='since'?`Последните ${Math.max(1,Math.round((Date.now()/1000-value)/86400))} дни`:key==='telescope'?window.AstroArchiveCustomization.telescope(value):String(value)));chip.append(copy);filterSummary.append(chip);}
+      const labels={archive:'Архив',telescope:'Телескоп',object:'Обект',night:'Нощ',since:'Добавени',tag:'Етикет'},roles={archive:'archive',telescope:'telescope',object:'object',night:'day',since:'day',tag:'fits'};
+      for(const[key,value]of Object.entries(archiveFilter)){if(!value)continue;const chip=element('span','archive-filter-chip'),copy=element('span','');chip.append(window.AstroArchiveArchiveIcons.create(roles[key]||'folder'));copy.append(element('small','',labels[key]||key),element('strong','',key==='archive'?archiveName(archive):key==='since'?`Последните ${Math.max(1,Math.round((Date.now()/1000-value)/86400))} дни`:key==='telescope'?window.AstroArchiveCustomization.telescope(value):key==='tag'?({astro:'Астрофотография',photometry:'Фотометрия',variable:'Променливи звезди',exoplanet:'Екзопланети',other:'Друго',none:'Без етикет'}[value]||String(value)):String(value)));chip.append(copy);filterSummary.append(chip);}
       return;
     }
     function crumb(label, path) {
@@ -224,6 +224,7 @@
       const icon = window.AstroArchiveArchiveIcons.create(entry.icon||window.AstroArchiveArchiveIcons.role(entry.archiveId || folder.archiveId, entry.relativePath, entry.kind));
       const display = !entry.displayName && entry.kind==='folder' && entry.relativePath.split(/[\\/]/).filter(Boolean).length===1 ? window.AstroArchiveCustomization.telescope(entry.name) : entry.displayName ?? entry.name;
       label.append(icon, element("span", "", display)); label.title = entry.name;
+      { const tag = entry.details?.tag, tags = window.AstroArchiveTags; const mark = tag === 'mixed' ? tags?.mixedBadge() : tags?.badge(tag); if (mark) label.append(mark); } // Beta 1.3 UI: data tag
       name.append(label);
       if(folder.filtered){row.classList.add('archive-filter-result');name.append(element('small','filter-result-origin',entry.relativePath.split(/[\\/]/).slice(0,-1).join(' › ')||archiveName(state.archives.find(a=>a.id===folder.archiveId))));}
       for (const column of columns) {

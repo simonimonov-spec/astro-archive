@@ -55,6 +55,7 @@
         const count=rows.filter(r=>this.selected.has(r.id)).length;check.checked=count===rows.length;check.indeterminate=count>0&&count<rows.length;
         check.onchange=()=>{for(const r of rows)check.checked?this.selected.add(r.id):this.selected.delete(r.id);this.render();};
         const text=node('div'),total=rows.reduce((s,r)=>s+(r.totalExposure||0),0);text.append(node('strong',this.folderMode()?this.folderParts(r).slice(2).join(' / ')||this.folderParts(r).at(-1)||'В основната папка':r.night||'Неизвестна нощ'),node('span',this.folderMode()?this.folderParts(r).slice(0,2).join(' / '):r.object+' · '+(window.AstroArchiveCustomization?.telescope(r.telescope)||r.telescope)),node('small',`${rows.length} файла · ${U.time(total)} експозиция`));
+        {const tags=window.AstroArchiveTags,keys=new Set(rows.map(x=>x.tag?JSON.stringify(x.tag):'')),mark=keys.size>1?tags?.mixedBadge():tags?.badge(rows[0].tag);if(mark)text.children[1]?.append(' ',mark);} // Beta 1.3 UI: data tag
         line.dataset.selected=String(check.checked||check.indeterminate);line.append(check,node('span','▦','flow-day-icon'),text,node('span',rows.length+' ф.','flow-day-files'),node('span',U.time(total),'flow-day-exposure'));host.append(line);
       }
       if(!host.children.length)host.append(node('p',this.scope==='selected'?'Още няма избрани вечери. Отметни ги в „Всички“.':'Няма данни за тези филтри. Провери архивните папки и обнови архива.','function-empty'));

@@ -3,7 +3,7 @@ import datetime as dt, json, threading, time
 from pathlib import Path
 from Backend.Fits.images import finite
 
-def blank():return dict(files=0,frames=0,exposure=0,bytes=0,exposureUnknown=0,framesUnknown=0,metadataIncomplete=0,stacks=0,knownExposureFrames=0,firstObservation=None,lastObservation=None,created=None,info={})
+def blank():return dict(files=0,frames=0,exposure=0,bytes=0,exposureUnknown=0,framesUnknown=0,metadataIncomplete=0,stacks=0,knownExposureFrames=0,firstObservation=None,lastObservation=None,created=None,info={},tagKeys={},tag=None)
 def accumulate(out,row):
     m=row['meta'];frames=max(1,int(finite(m.get('frames'),1)));exp=finite(m.get('totalExposure'))
     out['files']+=1;out['frames']+=frames;out['bytes']+=row['size'];out['stacks']+=m.get('kind')=='stack'
@@ -14,6 +14,8 @@ def accumulate(out,row):
         if stamp:out['firstObservation']=min(out['firstObservation'] or stamp,stamp);out['lastObservation']=max(out['lastObservation'] or stamp,stamp)
     stamp=m.get('created') or dt.datetime.fromtimestamp(row['mtime']/1e9,dt.timezone.utc).isoformat()
     out['created']=max(out['created'] or stamp,stamp)
+    # Beta 1.3 UI: data tag summary (uniform tag, or mixed).
+    tag=m.get('tag');out.setdefault('tagKeys',{})[json.dumps(tag,sort_keys=True) if tag else '']=1;out['tag']=tag
     for key in ('object','telescope','filter','sensor','resolution','telescopes'):
         values=m.get(key,[]);values=values if isinstance(values,list) else [values]
         out['info'].setdefault(key,set()).update(str(v) for v in values if v)
@@ -22,7 +24,13 @@ def group_details(group, kind, meta=None, *, building=False, stale=False):
     return dict(kind=kind,files=group['files'],stacks=group['stacks'],frames=group['frames'] if kind!='frame' else None,exposure=(meta or {}).get('exposure'),
         totalExposure=group['exposure'] if not group['files'] or group['exposureUnknown']<group['files'] else None,
         dateKind='observation' if kind in ('frame','dark','flat','bias','stack','day','night') else 'modified',firstObservation=group['firstObservation'],lastObservation=group['lastObservation'],created=group['created'],
-        minimumExposure=bool(group['exposureUnknown']),minimumFrames=bool(group['framesUnknown']),unknownExposure=group['exposureUnknown'],metadataIncomplete=group['metadataIncomplete'],building=building,stale=stale)
+        minimumExposure=bool(group['exposureUnknown']),minimumFrames=bool(group['framesUnknown']),unknownExposure=group['exposureUnknown'],metadataIncomplete=group['metadataIncomplete'],building=building,stale=stale,
+        tag=_tag_summary(group))
+
+def _tag_summary(group):
+    keys=set(group.get('tagKeys') or ())
+    if not keys or keys=={''}:return None
+    return group.get('tag') if len(keys)==1 else 'mixed'
 
 
 class BrowseIndex:

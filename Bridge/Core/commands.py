@@ -41,6 +41,8 @@ CORE_ROUTES = {
         'archive.summary.stop',
         'archive.read.stop',
         'archive.import',
+        'archive.import.preview',
+        'archive.tag.set',
         'python.archive.query',
         'python.archive.facets',
         'python.archive.rename',

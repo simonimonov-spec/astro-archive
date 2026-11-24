@@ -56,6 +56,62 @@ class Catalog:
         row=dict(row);row['meta']=json.loads(row['meta']);return row
     def path(self,ident):
         row=self.record(ident);return self.resolve(row['archive'],row['relative'])
+    def set_tag(self,ids,tag,progress=None,cancel=None):
+        """Beta 1.3 UI: write the data tag next to each file and mirror it in the catalog.
+        Holds each archive's scan lock so a running scan cannot overwrite the result,
+        and always stores what was already written on disk, even if a later file fails."""
+        from Backend.Archive import tags as tag_model
+        ids=list(dict.fromkeys(str(i) for i in ids))
+        def select(fields):
+            found=[]
+            with self.store.db() as db:
+                for start in range(0,len(ids),500):
+                    part=ids[start:start+500]
+                    found.extend(dict(r) for r in db.execute('SELECT '+fields+' FROM files WHERE deleted=0 AND id IN ('+','.join('?'*len(part))+')',part))
+            return found
+        archives=sorted({r['archive'] for r in select('id,archive')})
+        infos={archive:self.settings.archive(archive) for archive in archives}
+        if any(info.get('sharedSource') for info in infos.values()):raise ValueError('Споделеният архив е само за четене.')
+        updates=[];touched=set();held=[]
+        with self.operation_lock:
+            try:
+                for archive in archives:
+                    lock=self.scan_locks.setdefault(archive,threading.Lock())
+                    if not lock.acquire(timeout=2):raise ValueError('Архивът се обновява. Опитай отново след малко.')
+                    held.append(lock)
+                rows=select('id,archive,relative,meta')
+                if len(rows)!=len(ids):raise FileNotFoundError('Кадърът вече не е в активния архив.')
+                for index,row in enumerate(rows,1):
+                    if cancel is not None and cancel.is_set():raise InterruptedError('Етикетът е спрян.')
+                    archive=row['archive'];info=infos[archive];meta=json.loads(row['meta'])
+                    value=tag_model.normalize(tag,stack=meta.get('kind')=='stack' or info.get('type',archive)=='stacks')
+                    side=companion_path(self.resolve(archive,row['relative']))
+                    try:extra=read_json(side,{}) if side.exists() else {}
+                    except ValueError as error:raise ValueError(f'Повреден придружаващ файл: {side.name}') from error
+                    if not isinstance(extra,dict):raise ValueError(f'Повреден придружаващ файл: {side.name}')
+                    if value is None:extra.pop('tag',None)
+                    else:extra['tag']=value
+                    if extra:atomic_json(side,extra)
+                    else:side.unlink(missing_ok=True)
+                    meta.pop('tag',None)
+                    if value is not None:meta['tag']=value
+                    meta['companionMtime']=side.stat().st_mtime_ns if side.exists() else 0
+                    updates.append((json.dumps(meta,ensure_ascii=False),row['id']));touched.add(archive)
+                    if progress and index%50==0:progress(index,len(rows),'Записване на етикета')
+            finally:
+                if updates:
+                    with self.store.db() as db:db.executemany('UPDATE files SET meta=? WHERE id=?',updates)
+                for lock in held:lock.release()
+                for archive in touched:self.browse.cache.pop(archive,None)
+                if touched:self.events.emit('archive.changed')
+        return dict(updated=len(updates))
+    def tag_ids(self,archive,prefixes):
+        ids=[]
+        for prefix in prefixes:ids.extend(r['id'] for r in self.query(dict(archive=archive,relative=str(prefix))))
+        ids=list(dict.fromkeys(ids))
+        if not ids:raise ValueError('Няма файлове в избраното.')
+        return ids
+    def tag_paths(self,archive,prefixes,tag):return self.set_tag(self.tag_ids(archive,prefixes),tag)
     def put(self,archive,path,meta,added=None,fingerprint=None,*,_scan_db=None):
         meta=dict(meta)
         if self.settings.archive(archive).get('type',archive)=='stacks' and meta.get('kind')=='frame':
@@ -160,12 +216,15 @@ class Catalog:
         with self.store.db() as db:
             rows=db.execute('SELECT '+fields+',d.decision FROM files f LEFT JOIN decisions d ON d.file=f.id WHERE '+' AND '.join(where)+' ORDER BY f.relative',args).fetchall()
         result=[]
+        from Backend.Archive import tags as tag_model
+        wanted=filters.get('tag') or ''
         for row in rows:
-            r=dict(row);r['meta']=json.loads(r['meta']);result.append(r)
+            r=dict(row);r['meta']=json.loads(r['meta'])
+            if tag_model.matches(r['meta'].get('tag'),wanted):result.append(r)
         if self.shared_sources:
             for archive in shared:
                 if not filters.get('archive') or filters['archive']==archive:
-                    result.extend(self.shared_sources.records(archive,filters))
+                    result.extend(r for r in self.shared_sources.records(archive,filters) if tag_model.matches(r.get('meta',{}).get('tag'),wanted))
         return result
     @staticmethod
     def totals(rows):
@@ -214,8 +273,9 @@ class Catalog:
             db.executemany('INSERT OR REPLACE INTO prefixes VALUES(?,?,?,?)',prefixes)
             db.executemany('UPDATE files SET fingerprint=? WHERE id=?',hashes)
         return duplicate
-    def import_files(self,paths,cancel,progress,forced_archive=None,context=None):
-        imported=[];duplicates=[];errors=[];context=context or {};touched=set();shared_touched=set();verified_sources={}
+    def import_files(self,paths,cancel,progress,forced_archive=None,context=None,tags=None):
+        from Backend.Archive import tags as tag_model
+        imported=[];duplicates=[];errors=[];context=context or {};tags={str(Path(k)):v for k,v in (tags or {}).items()};touched=set();shared_touched=set();verified_sources={}
         sources={row['id']:row.get('sharedSource') for row in self.settings.value['archives']}
         for index,source in enumerate(map(Path,paths),1):
             if cancel.is_set():raise InterruptedError()
@@ -238,6 +298,8 @@ class Catalog:
                     for key in ('sourceNights','sourceFiles','kind','provenanceOverride','sourceStackCount','telescopes','sourceStacks','combination','processing'):
                         if context.get(key) is not None:m[key]=context[key]
                     m.update(m.get('provenanceOverride',{}))
+                    file_tag=tag_model.normalize(tags[str(source)],stack=m.get('kind')=='stack' or self.settings.archive(archive).get('type',archive)=='stacks') if tags.get(str(source)) else None
+                    if file_tag:m['tag']=file_tag
                     target=root/destination(self.settings,archive,m,source.name)
                     target.parent.mkdir(parents=True,exist_ok=True)
                     if target.exists():target=target.with_name(target.stem+'-'+fingerprint[:10]+target.suffix)
@@ -260,6 +322,7 @@ class Catalog:
                         extra=read_json(source_side,{}) if source_side.exists() else {}
                         if source.suffix.lower() not in FITS:extra.setdefault('created',m.get('created'))
                         if context:extra.update({k:m[k] for k in ('object','telescope','night','sourceFiles','sourceNights','kind','provenanceOverride','sourceStackCount','telescopes','sourceStacks','combination','processing') if k in m})
+                        if file_tag:extra['tag']=file_tag
                         if extra:
                             side=companion_path(target);atomic_json(side,extra);m['companionMtime']=side.stat().st_mtime_ns
                         imported.append(self.put(archive,target,m,fingerprint=fingerprint))
@@ -442,10 +505,12 @@ class Catalog:
         return dict(archiveId=archive,relativePath=relative,frames=t['frames'],files=t['files'],bytes=t['bytes'],totalExposure=t['exposure'] if not t['files'] or t['exposureUnknown']<t['files'] else None,
             exposureSeconds=t['exposure'] if not t['files'] or t['exposureUnknown']<t['files'] else None,unknownExposure=t['exposureUnknown'],minimumFrames=bool(t['framesUnknown']),minimumExposure=bool(t['exposureUnknown']),knownExposureFrames=t['knownExposureFrames'],partial=state['building'] or not state.get('complete',False),building=state['building'],stale=state['stale'],kind=self.settings.archive(archive).get('type',archive),created=t['created'],fromIndex=True,savedUtc=state.get('savedUtc'),problem=state.get('problem'),totalFiles=state.get('totalFiles',t['files']),scannedFiles=state.get('scannedFiles',0),metadataIncomplete=t['metadataIncomplete'],cacheFile=str(self.store.path))
     def filtered(self,filters,offset=0,search=''):
+        from Backend.Archive import tags as tag_model
         archive=filters.get('archive','frames');rows=self.browse.get(archive)['rows'];matches=[];total=blank()
         for row in rows:
             if any(filters.get(k) and row['meta'].get(k)!=filters[k] for k in ('telescope','object','night','kind')):continue
             if filters.get('since') and row['added']<float(filters['since']):continue
+            if filters.get('tag') and not tag_model.matches(row['meta'].get('tag'),filters['tag']):continue
             if search.casefold() not in row['relative'].casefold():continue
             matches.append(row);accumulate(total,row)
         offset=max(0,int(offset));entries=[self.entry(archive,r['relative']) for r in matches[offset:offset+100]]

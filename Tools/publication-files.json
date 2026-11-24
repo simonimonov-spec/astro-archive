@@ -573,6 +573,22 @@
       {
         "source": "UI/Shared/Web/picker.css",
         "destination": "UI/Shared/Web/picker.css"
+      },
+      {
+        "source": "Backend/Archive/tags.py",
+        "destination": "Backend/Archive/tags.py"
+      },
+      {
+        "source": "UI/Shared/Web/tags.js",
+        "destination": "UI/Shared/Web/tags.js"
+      },
+      {
+        "source": "UI/Shared/Web/tags.css",
+        "destination": "UI/Shared/Web/tags.css"
+      },
+      {
+        "source": "tests/test_tags.py",
+        "destination": "tests/test_tags.py"
       }
     ],
     "astro-archive-plugin-archive-overview": [

@@ -1,0 +1,58 @@
+/* Beta 1.3 UI (в разработка, не е издание) · виж docs/BETA-1.3-UI.md */
+/* Data tag: badges, the underlined choice control and the tag dialogs. */
+:root { --tag-astro: #74c1ff; --tag-variable: #c79bff; --tag-exoplanet: #ffb36b; --tag-other: #8fd3c4; --tag-mixed: #ffcf89; }
+
+.data-tag { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: 10px; font-size: 11px; font-weight: 600; white-space: nowrap; vertical-align: middle; color: var(--tag-color); background: color-mix(in srgb, var(--tag-color) 13%, transparent); }
+.data-tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+.data-tag[data-tag="astro"] { --tag-color: var(--tag-astro); }
+.data-tag[data-tag="variable"] { --tag-color: var(--tag-variable); }
+.data-tag[data-tag="exoplanet"] { --tag-color: var(--tag-exoplanet); }
+.data-tag[data-tag="other"], .data-tag[data-tag="photometry"] { --tag-color: var(--tag-other); }
+.data-tag[data-tag="mixed"] { --tag-color: var(--tag-mixed); }
+
+/* Underlined choice (same look as the app's tabs). */
+.tag-seg { display: inline-flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--border); }
+.tag-seg > button { height: 32px; padding: 0 12px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; border-radius: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12.5px; white-space: nowrap; cursor: pointer; transition: color 200ms ease, border-color 260ms ease; }
+.tag-seg > button:hover { color: var(--text); }
+.tag-seg > button[aria-checked="true"] { color: var(--accent); font-weight: 600; border-bottom-color: var(--accent); }
+.tag-seg > button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tag-seg-compact > button { height: 26px; padding: 0 8px; font-size: 11px; }
+.tag-label { height: 32px; margin-top: 10px; padding: 0 10px; width: min(320px, 100%); border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: var(--text); font: inherit; font-size: 12.5px; }
+
+/* Import dialog */
+.tag-import-dialog { width: min(1040px, calc(100vw - 44px)); }
+.tag-import-sub { color: var(--muted); margin: 0 0 12px !important; line-height: 1.5 !important; }
+.tag-import-all { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 12px; margin-bottom: 12px; border: 1px dashed color-mix(in srgb, var(--accent) 35%, var(--border)); border-radius: 10px; font-size: 12.5px; }
+.tag-import-groups { display: grid; gap: 8px; }
+.tag-group { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.tag-group-head { display: flex; align-items: center; gap: 12px; padding: 7px 12px; flex-wrap: wrap; }
+.tag-chevron { width: 24px; height: 24px; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; flex: none; }
+.tag-chevron[aria-expanded="true"] { color: var(--accent); }
+.tag-group-title { display: flex; align-items: baseline; gap: 12px; flex: 1 1 220px; min-width: 0; }
+.tag-group-title strong { white-space: nowrap; }
+.tag-group-title span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag-mixed { color: var(--tag-mixed); font-size: 11px; }
+.tag-count { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.tag-group > .tag-label { margin: 0 12px 10px 48px; }
+.tag-files { border-top: 1px solid var(--border); background: var(--background); padding: 4px 0; max-height: 260px; overflow: auto; }
+.tag-file { display: grid; grid-template-columns: 18px minmax(0, 1fr) 60px auto; gap: 10px; align-items: center; padding: 3px 12px 3px 48px; font-size: 12px; cursor: default; }
+.tag-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag-file-exposure { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.tag-file-pick { width: 15px; height: 15px; accent-color: var(--accent); }
+.tag-files-hint { margin: 6px 12px 4px 48px !important; font-size: 11px; color: var(--muted); line-height: 1.5 !important; }
+.tag-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 16px; padding: 0; }
+.tag-actions-note { margin-right: auto; color: var(--muted); font-size: 11.5px; }
+.tag-small-dialog { width: min(520px, calc(100vw - 44px)); }
+/* The shared button look (aa-button) must not box these choices. */
+:root .tag-seg > button.aa-button, :root .tag-seg > button { box-shadow: none !important; border-top: 0 !important; border-left: 0 !important; border-right: 0 !important; border-radius: 0 !important; background: transparent !important; translate: none !important; min-height: 0 !important; }
+:root .tag-seg > button.aa-button::before { display: none !important; }
+:root .tag-seg > button[aria-checked="true"] { border-bottom: 2px solid var(--accent) !important; }
+:root .tag-chevron.aa-button { box-shadow: none !important; background: transparent !important; border: 0 !important; translate: none !important; }
+
+/* In the Archive table the badge goes under the name when space is short,
+   instead of squeezing the name into a narrow column. */
+#page-archive .file-name:has(> .data-tag) { flex-wrap: wrap; row-gap: 4px; }
+#page-archive .file-name > span:not(.data-tag):not(.archive-icon) { min-width: min(24ch, 100%); }
+#page-archive .file-name > .data-tag { flex: none; margin-left: 6px; }
+/* Night picker: keep the badge colour (the picker greys its text spans). */
+:root .flow-day .data-tag { color: var(--tag-color) !important; font-size: 10.5px; height: 18px; margin-left: 6px; vertical-align: 1px; }
