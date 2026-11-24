@@ -25,22 +25,26 @@ def settings_screen(options:dict,scope_days:list[dict],ai_available:bool,busy:bo
     children=[]
     if scope_days:children.append(text('scope','Пренастройване. Промените важат само за: '+', '.join(day_name(g) for g in scope_days)+'. Показани са настройките, с които са работили.','warning'))
     else:children.append(text('intro','Настрой обработката и натисни „Стартирай“. Настройките се запазват автоматично.'))
-    children+=[text('h-siril','Siril'),control('input','executable','Siril CLI (siril-cli.exe)',maxLength=1024),button('choose-executable','Избери siril-cli.exe…','choose-executable',busy),
-        text('h-work','Паралелна работа'),
+    def group(ident,label,items):return field('group',ident,label,children=[i for i in items if i])
+    # Sections with a title; an untitled sub-group whose first field is a switch is turned on by that switch.
+    children.append(group('g-siril','Siril',[control('input','executable','Siril CLI (siril-cli.exe)',maxLength=1024),button('choose-executable','Избери siril-cli.exe…','choose-executable',busy)]))
+    children.append(group('g-parallel','Паралелна работа',[
         control('number','parallel','Брой Siril, които работят едновременно',min=1,max=MAX_PARALLEL,step=1),
         control('number','chunkSize',f'Кадри на една част (0 = без разделяне, иначе от {MIN_CHUNK})',min=0,max=MAX_CHUNK,step=10),
         control('number','cpu','CPU нишки · общо за всички Siril',min=1,max=os.cpu_count() or 1,step=1),
-        control('number','memory','Дял от свободната RAM · общо',min=.05,max=.95,step=.05)]
-    if budget_text:children.append(text('budget',budget_text))
-    children+=[text('h-processing','Обработка'),control('checkbox','debayer','Debayer при CFA кадри'),control('checkbox','registration','Подравняване'),control('checkbox','mosaic','Пълно поле / мозайка'),control('checkbox','drizzle','Drizzle'),
-        control('number','scale','Мащаб',min=.5,max=3,step=.1),control('number','pixfrac','Drizzle · дял на пиксела',min=.1,max=1,step=.05),
-        control('select','normalize','Нормализация',options=choices([('addscale','Additive + scale'),('add','Additive'),('mulscale','Multiplicative + scale'),('mul','Multiplicative'),('none','Без нормализация')])),
-        control('checkbox','rejection','Отхвърляне на пикселни отклонения'),control('number','sigmaLow','Долна sigma',min=.1,max=10,step=.1),control('number','sigmaHigh','Горна sigma',min=.1,max=10,step=.1),
+        control('number','memory','Дял от свободната RAM · общо',min=.05,max=.95,step=.05),
+        text('budget',budget_text) if budget_text else None]))
+    children.append(group('g-processing','Обработка',[
+        control('checkbox','debayer','Debayer при CFA кадри'),control('checkbox','registration','Подравняване'),control('checkbox','mosaic','Пълно поле / мозайка'),
         control('checkbox','background','Премахване на градиент · степен 1'),
-        text('h-calibration','Калибрация (по желание)')]
-    for key,label in (('dark','Master Dark'),('flat','Master Flat'),('bias','Master Bias')):children+=[control('input',key,label,maxLength=1024),button('choose-'+key,'Избери '+label+'…','choose-'+key,busy)]
-    if ai_available:children+=[text('h-ai','AI филтър'),control('checkbox','aiFilter','Махни най-лошите кадри според AI оценителя'),control('number','aiPercent','Процент за махане от всеки ден',min=0,max=90,step=1)]
-    if not scope_days:children+=[text('h-after','След оценката'),control('checkbox','combine','Обедини приетите дни в общ стак')]
+        control('select','normalize','Нормализация',options=choices([('addscale','Additive + scale'),('add','Additive'),('mulscale','Multiplicative + scale'),('mul','Multiplicative'),('none','Без нормализация')])),
+        group('g-drizzle','',[control('checkbox','drizzle','Drizzle'),control('number','scale','Мащаб',min=.5,max=3,step=.1),control('number','pixfrac','Дял на пиксела',min=.1,max=1,step=.05)]),
+        group('g-rejection','',[control('checkbox','rejection','Отхвърляне на пикселни отклонения'),control('number','sigmaLow','Долна sigma',min=.1,max=10,step=.1),control('number','sigmaHigh','Горна sigma',min=.1,max=10,step=.1)])]))
+    calibration=[]
+    for key,label in (('dark','Master Dark'),('flat','Master Flat'),('bias','Master Bias')):calibration+=[control('input',key,label,maxLength=1024),button('choose-'+key,'Избери '+label+'…','choose-'+key,busy)]
+    children.append(group('g-calibration','Калибрация (по желание)',calibration))
+    if ai_available:children.append(group('g-ai','AI филтър',[control('checkbox','aiFilter','Махни най-лошите кадри според AI оценителя'),control('number','aiPercent','Процент за махане от всеки ден',min=0,max=90,step=1)]))
+    if not scope_days:children.append(group('g-after','След оценката',[control('checkbox','combine','Обедини приетите дни в общ стак')]))
     if running:children.append(text('running-note','Siril още работи по други дни. Стартирането ще е възможно, когато приключат.','warning'))
     children.append(button('start','Стартирай отново избраните дни' if scope_days else 'Стартирай','start',busy or running,'primary'))
     if has_work:children.append(button('back','Назад към работата','back',busy))

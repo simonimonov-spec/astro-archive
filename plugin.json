@@ -2,7 +2,7 @@
   "apiVersion": 1,
   "id": "siril-auto",
   "name": "Автоматично стакване чрез Siril",
-  "version": "V-2",
+  "version": "V-2.2",
   "description": "Siril CLI плъгин на стъпки: настройки, работа и оценка на всеки ден. Разделя големите дни на части за няколко паралелни Siril и ги слива в един дневен стак; по желание AI филтър чрез AI оценителя.",
   "author": "Astro Archive",
   "entry": "main.py",

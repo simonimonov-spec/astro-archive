@@ -3,6 +3,12 @@ import json,pathlib,shutil,tempfile,threading,time,unittest,uuid
 from tests.support import load
 main=load('main')
 
+def flat(items):
+    # Settings are grouped into sections (V-2.1); look through every level.
+    for item in items:
+        yield item
+        yield from flat(item.get('children',[]))
+
 class FakeEngine:
     reject={}      # folder-name -> set of local numbers Siril "drops"
     fail=set()     # folder names that fail
@@ -109,14 +115,14 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(d['B']['effectiveSettings']['sigmaLow'],2.0)
     def test_ai_filter_removes_per_day(self):
         ctx,c=self.make(ai='ok');self.run_cmd(ctx,'prepare',context=dict(ids=frames('A',10)+frames('B',10)))
-        self.assertIn('aiPercent',{x['id'] for x in ctx.published['automatic-stacking'][0]['children']})
+        self.assertIn('aiPercent',{x['id'] for x in flat(ctx.published['automatic-stacking'][0]['children'])})
         self.run_cmd(ctx,'configure',values=dict(executable='x',aiFilter=True,aiPercent=20));self.run_cmd(ctx,'start')
         for night in 'AB':
             day=self.days(c)[night];self.assertEqual(day['aiRemovedIds'],[night+'-0',night+'-1'])
             self.assertEqual(sum(len(p['sources']) for p in day['parts']),8)
     def test_ai_option_hidden_without_evaluator(self):
         ctx,c=self.make();self.run_cmd(ctx,'prepare',context=dict(ids=frames('A',3)))
-        self.assertNotIn('aiPercent',{x['id'] for x in ctx.published['automatic-stacking'][0]['children']})
+        self.assertNotIn('aiPercent',{x['id'] for x in flat(ctx.published['automatic-stacking'][0]['children'])})
     def test_ai_failure_does_not_stop_batch(self):
         ctx,c=self.make(ai='broken');self.run_cmd(ctx,'prepare',context=dict(ids=frames('A',10)))
         self.run_cmd(ctx,'configure',values=dict(executable='x',aiFilter=True));self.run_cmd(ctx,'start')
@@ -191,7 +197,7 @@ class ControllerTests(unittest.TestCase):
         ctx,c=self.make();self.start(ctx,frames('A',3),sigmaLow=2.5)
         self.run_cmd(ctx,'configure',values=dict(sigmaLow=4.0))
         day=self.days(c)['A'];c.state['selected']=day['id'];self.run_cmd(ctx,'repeat');self.run_cmd(ctx,'reconfigure')
-        sigma=next(x for x in ctx.published['automatic-stacking'][0]['children'] if x['id']=='sigmaLow')
+        sigma=next(x for x in flat(ctx.published['automatic-stacking'][0]['children']) if x['id']=='sigmaLow')
         self.assertEqual(sigma['value'],2.5)
 
     def test_siril_links_do_not_block_cleanup(self):

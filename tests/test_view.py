@@ -5,12 +5,12 @@ engine=load('engine');view=load('view')
 OPTS=engine.settings({})
 def day(ident,state,**extra):return dict(id=ident,object='M31',night='2026-10-0'+ident[-1],ids=list(range(10)),state=state,**extra)
 def slot(number,status):return dict(number=number,status=status,task='',log=['line '+str(number)])
-def find(groups,ident):
-    for g in groups:
-        for c in g.get('children',[]):
-            if c['id']==ident:return c
-    return None
-def ids(groups):return {c['id'] for g in groups for c in g['children']}
+def walk(items):
+    for item in items:
+        yield item
+        yield from walk(item.get('children',[]))
+def find(groups,ident):return next((c for g in groups for c in walk(g.get('children',[])) if c['id']==ident),None)
+def ids(groups):return {c['id'] for g in groups for c in walk(g['children'])}
 
 class SettingsScreenTests(unittest.TestCase):
     def test_settings_screen_is_single_group(self):self.assertEqual(len(view.settings_screen(OPTS,[],False,False,False)),1)
@@ -30,6 +30,20 @@ class SettingsScreenTests(unittest.TestCase):
     def test_back_only_with_work(self):
         self.assertIsNone(find(view.settings_screen(OPTS,[],False,False,False),'back'))
         self.assertIsNotNone(find(view.settings_screen(OPTS,[],False,False,False,has_work=True),'back'))
+
+    def test_settings_are_grouped_into_sections(self):
+        top=view.settings_screen(OPTS,[],True,False,False)[0]['children']
+        sections=[c['id'] for c in top if c['type']=='group']
+        self.assertEqual(sections,['g-siril','g-parallel','g-processing','g-calibration','g-ai','g-after'])
+        self.assertTrue(all(c['label'] for c in top if c['type']=='group'))
+    def test_switch_titled_subgroups(self):
+        g=view.settings_screen(OPTS,[],False,False,False)
+        for group,switch,fields in (('g-drizzle','drizzle',['scale','pixfrac']),('g-rejection','rejection',['sigmaLow','sigmaHigh'])):
+            sub=find(g,group);self.assertEqual(sub['label'],'');self.assertEqual(sub['children'][0]['id'],switch);self.assertEqual(sub['children'][0]['type'],'checkbox')
+            self.assertEqual([c['id'] for c in sub['children'][1:]],fields)
+    def test_actions_stay_on_top_level(self):
+        top=[c['id'] for c in view.settings_screen(OPTS,[],False,False,False,has_work=True)[0]['children']]
+        self.assertTrue({'intro','start','back','abandon'}<=set(top))
 
 class WorkScreenTests(unittest.TestCase):
     def state(self,*groups,selected=''):return dict(groups=list(groups),selected=selected)
