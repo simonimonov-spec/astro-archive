@@ -4,8 +4,9 @@
 (() => {
   const words = {
     title:['Преглед на изображение','Image viewer'], close:['Назад към работата · Esc','Back to workspace · Esc'],
-    compare:['Сравни','Compare'],compareTitle:['Сравнение на кадри','Frame comparison'],
+    compare:['Раздвои','Split'],compareTitle:['Сравнение на кадри','Frame comparison'],
     compareLeft:['Ляв кадър','Left frame'],compareRight:['Десен кадър','Right frame'],
+    sync:['Синхронизирай','Sync'],syncHint:['Синхронизирай увеличението и позицията','Sync zoom and position'],
     previous:['Предишен кадър · ←','Previous image · ←'],next:['Следващ кадър · →','Next image · →'],
     fit:['Напасни · F','Fit · F'],one:['Мащаб 1:1 · 1','Scale 1:1 · 1'],rotate:['Завърти 90°','Rotate 90°'],
     flipX:['Огледално по хоризонтала','Flip horizontally'],flipY:['Огледално по вертикала','Flip vertically'],
@@ -37,7 +38,7 @@
   const en = () => !(window.AstroArchiveI18n?.locale || 'bg').toLowerCase().startsWith('bg');
   const t = key => {const full='viewer.'+key,translated=window.AstroArchiveI18n?.t(full);return translated&&translated!==full?translated:words[key]?.[en()?1:0]||key;};
   let paneNumber = 0;
-  function createViewer(host = null, paneLabel = '') {
+  function createViewer(host = null, paneLabel = '', {viewChanged, ready} = {}) {
   const isolated = Boolean(host), prefix = isolated ? `vc-${++paneNumber}-` : 'v-';
   let call,dialog,canvas,ctx,overview,histogram,stage,frame=null,picture=null,id='',serial=0,renderSerial=0,comparisonSource;
   let zoom=1,pan={x:0,y:0},rotation=0,flipX=false,flipY=false,fitting=true,drag=null,animation=0;
@@ -101,14 +102,17 @@
     $('header').onclick=async()=>{const requestId=id;try{const result=await request('viewer.header',{id});if(id!==requestId)return;$('cards').textContent=result.cards.join('\n');$('cards').hidden=false;}catch(e){if(id===requestId)error(e.message);}};
     stage.addEventListener('wheel',e=>{if(!picture)return;e.preventDefault();const r=stage.getBoundingClientRect();setZoom(zoom*Math.exp(-Math.max(-150,Math.min(150,e.deltaY))*.0025),{x:e.clientX-r.left,y:e.clientY-r.top});},{passive:false});
     stage.addEventListener('pointerdown',e=>{if(!picture||e.button>2)return;e.preventDefault();stage.focus();stage.setPointerCapture(e.pointerId);drag={id:e.pointerId,x:e.clientX,y:e.clientY,pan:{...pan}};stage.classList.add('dragging');});
-    stage.addEventListener('pointermove',e=>{if(drag){pan={x:drag.pan.x+e.clientX-drag.x,y:drag.pan.y+e.clientY-drag.y};fitting=false;schedule();}hover(e);});
+    stage.addEventListener('pointermove',e=>{if(drag){pan={x:drag.pan.x+e.clientX-drag.x,y:drag.pan.y+e.clientY-drag.y};fitting=false;schedule();if(isolated)commitViewport();}hover(e);});
     const up=()=>{const changed=!!drag;drag=null;stage.classList.remove('dragging');if(changed)commitViewport();};stage.addEventListener('pointerup',up);stage.addEventListener('pointercancel',up);stage.addEventListener('lostpointercapture',up);
     stage.addEventListener('contextmenu',e=>e.preventDefault());stage.addEventListener('dblclick',()=>{fit();commitViewport();});
     overview.addEventListener('pointerdown',e=>{if(!picture)return;e.preventDefault();overview.setPointerCapture(e.pointerId);locate(e);});overview.addEventListener('pointermove',e=>{if(overview.hasPointerCapture(e.pointerId))locate(e);});
     dialog.addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey||/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;const actions={f:()=>{fit();commitViewport();},'1':()=>$('one').click(),'+':()=>$('plus').click(),'-':()=>$('minus').click(),ArrowLeft:()=>neighbor(-1),ArrowRight:()=>neighbor(1)};if(actions[e.key]){e.preventDefault();actions[e.key]();}});
     resize=new ResizeObserver(()=>{
       if(!stage.clientWidth||!stage.clientHeight)return;
-      if(fitting)fit();else if(keptTransform)restoreTransform(keptTransform);else schedule();
+      if(fitting){
+        fit();
+        if(picture)viewChanged?.(false);
+      }else if(keptTransform)restoreTransform(keptTransform);else schedule();
       drawHistogram();
     });
     resize.observe(stage);resize.observe(histogram);
@@ -168,6 +172,7 @@
     $('badge').textContent=data.fits?(data.debayer?'Debayer · '+data.bayerPattern:data.color?'RGB':'Mono'):'RGB';
     if(keptTransform)restoreTransform(keptTransform);else if(old&&old.previewWidth!==data.previewWidth)zoom*=old.previewWidth/data.previewWidth;
     $('retry').hidden=true;$('retry').onclick=null;busy(false);enableControls();if(fitting)fit();else schedule();drawHistogram();
+    ready?.();
     if(!isolated){
       call('viewer.presented',{id:data.id,shown:true,width:image.naturalWidth,height:image.naturalHeight}).catch(()=>{});
       window.AstroArchiveRemote?.viewerReady(dialog,data);
@@ -261,7 +266,11 @@
     }else pan={x:(value.panX||0)*stage.clientWidth,y:(value.panY||0)*stage.clientHeight};
     keptTransform=transformState();schedule(false);
   }
-  function commitViewport(){if(!isolated&&frame&&picture)window.AstroArchiveSession.edit('viewer',{transform:transformState(),panel:!dialog.classList.contains('viewer-wide')});}
+  function commitViewport(){
+    if(!frame||!picture)return;
+    if(isolated)viewChanged?.(true);
+    else window.AstroArchiveSession.edit('viewer',{transform:transformState(),panel:!dialog.classList.contains('viewer-wide')});
+  }
   function snapshot(){
     if(!dialog?.open||!frame||!picture)return null;
     let display=pendingDisplay||displaySettings();
@@ -312,6 +321,10 @@
   }
   return {state:snapshot, next(viewerId){if(id!==viewerId||!dialog?.open||loading)return;const next=$('next');if(!next.disabled)next.click();else error(t('noNext'));},connect(options){call=options.call;},languageChanged:translate,event(message){if(message.name==='viewer.closed'){close(true);return;}if(message.name==='viewer.loading')opening(message);else if(message.name==='viewer.loaded')accept(message.document,true);else if(message.name==='viewer.problem'&&id===message.id){busy(false);error(message.error);}},
     openComparisonFrame,
+    viewport:transformState,
+    syncViewport({zoom,centerX,centerY}){
+      restoreTransform({zoom,centerX,centerY,rotation,flipX,flipY,fitting:false});
+    },
     destroy(){close();resize?.disconnect();dialog?.remove();}
   };
   }
@@ -320,13 +333,38 @@
     const dialog=document.createElement('dialog');
     dialog.className='image-viewer image-compare';
     dialog.setAttribute('aria-labelledby','viewer-compare-title');
-    dialog.innerHTML=`<header class="viewer-heading"><h2 id="viewer-compare-title"></h2><button type="button" class="quiet-button viewer-icon-button"></button></header>
+    dialog.innerHTML=`<header class="viewer-heading"><h2 id="viewer-compare-title"></h2>
+      <div class="viewer-heading-actions"><button id="viewer-sync-zoom" type="button" class="quiet-button" aria-pressed="false"></button>
+      <button type="button" class="quiet-button viewer-icon-button viewer-compare-close"></button></div></header>
       <div class="viewer-compare-grid"><div class="viewer-compare-pane"></div><div class="viewer-compare-pane"></div></div>`;
     dialog.querySelector('h2').textContent=t('compareTitle');
-    const close=dialog.querySelector('button');
+    const sync=dialog.querySelector('#viewer-sync-zoom');
+    sync.textContent=t('sync');sync.title=t('syncHint');sync.setAttribute('aria-label',t('syncHint'));
+    const close=dialog.querySelector('.viewer-compare-close');
     window.AstroArchiveIcons.mount(close,'close',t('close'));
     close.onclick=()=>dialog.close();
-    const panes=[...dialog.querySelectorAll('.viewer-compare-pane')].map((host,index)=>createViewer(host,index?'compareRight':'compareLeft'));
+    let active=0,linked=false;
+    function align(){
+      if(!linked)return;
+      const source=panes[active].viewport()?active:1-active;
+      const view=panes[source].viewport();
+      if(view)panes[1-source].syncViewport(view);
+    }
+    const panes=[...dialog.querySelectorAll('.viewer-compare-pane')].map((host,index)=>{
+      host.addEventListener('focusin',()=>{active=index;});
+      return createViewer(host,index?'compareRight':'compareLeft',{
+        viewChanged(userMoved){
+          if(userMoved)active=index;
+          if(index===active)align();
+        },
+        ready:align
+      });
+    });
+    sync.onclick=()=>{
+      linked=!linked;
+      sync.setAttribute('aria-pressed',String(linked));
+      align();
+    };
     dialog.addEventListener('close',()=>{
       for(const pane of panes)pane.destroy();
       dialog.remove();

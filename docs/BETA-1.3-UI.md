@@ -125,6 +125,7 @@
 | 2026-11-24 | Затваряне на отделен прибран преглед с „×“ в долната лента и правоъгълни, слети бутони за управление на прозореца. `UI/Analysis/Web/viewer-workbench.{js,css}`. | `Beta 1.3 UI: add close buttons to the viewer shelf` |
 | 2026-11-24 | Меню на Архива при курсора с именуване, етикет, подготовка и информация. Долният ред съдържа „Изрежи“, „Постави“ и „Изтрий“. `UI/Archive/Web/context-menu.{js,css}`, `Backend/Archive/editing.py`. | `Beta 1.3 UI: add archive file context actions` |
 | 2026-11-24 | Върнат е обикновеният преглед. „Сравни“ отваря текущия и следващия кадър с отделни стрелки. Премахнати са долната лента и отделянето на прозорци за преглед. `UI/Analysis/Web/viewer.{js,css}`. | `Beta 1.3 UI: restore the viewer and simplify comparison` |
+| 2026-11-24 | „Раздвои“ и превключвател за синхронизиране на увеличението и центъра между двата кадъра. `UI/Analysis/Web/viewer.js`. | `Beta 1.3 UI: synchronize split viewer zoom and position` |
 
 ## Следващи стъпки (план)
 
