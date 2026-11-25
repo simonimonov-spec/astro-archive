@@ -113,7 +113,9 @@
 .q-frame-value{font-variant-numeric:tabular-nums}.q-frame-warning{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--warning)}
 @media(max-width:750px){#q-workspace.flow-analysis-workspace{grid-template-columns:1fr;grid-template-areas:'plot' 'tools'}#q-plot-panel,#q-tools-panel{position:relative;top:auto;max-width:none}#q-tools-panel{max-height:none}#q-tools-panel .chart-scope-bar{grid-template-columns:1fr}#q-plot-panel #q-chart{width:min(100%,max(160px,calc(100dvh - 350px)))}}
 
-.q-frame-items:not(.q-frame-thumbs) .q-frame-row,.q-frame-table-header{grid-template-columns:44px minmax(190px,2fr) repeat(11,minmax(70px,.65fr)) repeat(2,minmax(220px,1.8fr)) 95px;min-width:1660px}
+.q-frame-items:not(.q-frame-thumbs) .q-frame-row,.q-frame-table-header{grid-template-columns:44px minmax(190px,2fr) repeat(11,minmax(70px,.65fr)) repeat(2,minmax(220px,1.8fr)) minmax(90px,.7fr) 95px;min-width:1760px}
+/* Beta 1.3 UI: the old "by AI" button is replaced by the plugin's own mark buttons. */
+#q-ai-panel:has(.analysis-plugin-tool [data-element="mark-all"]) #q-ai-worst{display:none}
 #q-classic-quality #q-notice{font-size:11px;margin:0}
 #q-worst{display:none!important}
 

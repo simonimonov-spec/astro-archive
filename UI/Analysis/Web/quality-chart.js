@@ -5,6 +5,12 @@
  const bounded=(lo,hi)=>{const span=clamp(hi-lo,minimum,1);lo=clamp(lo,0,1-span);return[lo,lo+span];};
  const visibleWarnings=row=>(row.warnings||[]).filter(w=>w.origin==='ai'||row.standardEvaluated===true);
  const warningKinds=row=>({ai:visibleWarnings(row).some(w=>w.origin==='ai'),normal:row.standardEvaluated===true&&(!!row.error||visibleWarnings(row).some(w=>w.origin!=='ai'&&w.type!=='registration'))});
+ // Beta 1.3 UI: problem icons (AI plugin and the standard check share one set).
+ const problemIcons={cloud:'☁',satellite:'⟋',elongation:'↔',focus:'◎',flare:'✦',gradient:'▤',obstruction:'⌂',quality:'▼'};
+ const problemLabels={cloud:'Облак',satellite:'Следа',elongation:'Издължени звезди / разклащане',focus:'Разфокус',flare:'Отблясък / лъч',gradient:'Неравномерен фон',obstruction:'Препятствие',quality:'Под прага на AI индекса'};
+ const problemAlias={light:'flare',glare:'flare','bright-track':'satellite','absolute-focus':'focus'};
+ const problemKind=w=>{const t=problemAlias[w.type]||w.type;return Object.hasOwn(problemIcons,t)?t:null;};
+ const problemTypes=row=>{const found=new Set(visibleWarnings(row).map(problemKind).filter(Boolean));return Object.keys(problemIcons).filter(k=>found.has(k));};
  const inspection=row=>{const values=Object.values(row.inspectionMetrics||{});return values.find(v=>v&&Number.isFinite(v.quality)&&'coverage'in v)||values.find(v=>v&&'coverage'in v)||values.find(v=>v&&Number.isFinite(v.quality))||{};};
  const comparisonText=row=>{const v=inspection(row);return 'coverage'in v?`Сравнена област: ${Number.isFinite(v.coverage)?v.coverage.toFixed(1)+'%':'няма данни'} · ${v.references??0} референции · ${v.matchedStars??0} общи звезди (мин.)\n${v.reason||'Покритието не е увереност или оценка за качество.'}`:'Няма записано AI покритие. Изпълни AI проверката.';};
  function create(canvas,callbacks){
@@ -115,8 +121,7 @@
    // The numeric Y maximum stays exact; its badge is not clipped by the plot.
    for(const p of hits){if(p.row.decision==='excluded')continue;const q=p;if(q.x<left-.01||q.x>left+width+.01||q.y<top-.01||q.y>top+height+.01)continue;
     if(spec.warnings){const flags=warningKinds(p.row);c.strokeStyle=css('warning');c.fillStyle=css('warning');c.lineWidth=1.5;if(flags.ai){c.strokeRect(q.x-4,q.y-15,8,8);if(flags.normal)c.fillRect(q.x-4,q.y-15,8,8);}else if(flags.normal){c.beginPath();c.moveTo(q.x,q.y-15);c.lineTo(q.x-4,q.y-7);c.lineTo(q.x+4,q.y-7);c.closePath();c.stroke();}}
-    if(spec.warnings&&(p.row.warnings||[]).some(w=>w.origin==='ai'&&w.type==='cloud')){c.font='13px Segoe UI Symbol';c.fillStyle=css('warning');c.textAlign='left';c.fillText('☁',q.x+6,q.y-7);}
-    if(spec.warnings&&(p.row.warnings||[]).some(w=>w.origin==='ai'&&w.type==='light')){c.font='12px Segoe UI Symbol';c.fillStyle=css('warning');c.textAlign='left';c.fillText('✦',q.x+18,q.y-7);}
+    if(spec.warnings){const kinds=problemTypes(p.row);if(kinds.length){c.font='12px Segoe UI Symbol';c.fillStyle=css('warning');c.textAlign='left';kinds.slice(0,2).forEach((k,i)=>c.fillText(problemIcons[k],q.x+6+i*13,q.y-7));if(kinds.length>2)c.fillText('+',q.x+6+26,q.y-7);}}
    }
    if(r){c.fillStyle=day()?css('text'):'#d4d7dc';c.textAlign='left';c.font='11px Segoe UI';c.fillText(`Бр.: ${spec.selected.size} · ${spec.xLabel}: [${number(selection.x0)} , ${number(selection.x1)}] · ${spec.yLabel}: [${number(selection.y0)} , ${number(selection.y1)}]`,clamp(r.x,left,left+width-10),Math.max(11,r.y-5));}
    // The two red handles constrain each axis to its own 100–6400% window.
@@ -127,7 +132,7 @@
   function nearest(p){let best=null;for(const item of hits){const d=Math.hypot(item.x-p.x,item.y-p.y);if(d<9&&(!best||d<best.d))best={...item,d};}return best;}
   function tooltipAt(p){
    const hit=nearest(p);if(!hit){tooltip.hidden=true;return;}
-   const flags=warningKinds(hit.row),quality=inspection(hit.row).quality;tooltip.textContent=`№ ${hit.row.frameIndex} · ${hit.row.name}\n${hit.row.meta?.night||''}\n${hit.row.decision==='excluded'?'Изключен от подбора':'В подбора'}\n${spec.xLabel}: ${number(spec.xValue(hit.row))}\n${spec.yLabel}: ${number(spec.yValue(hit.row))}\nСтандартна оценка: ${Number.isFinite(hit.row.classicQuality)?number(hit.row.classicQuality,1)+'%':'не е измерена'}\nAI индекс: ${Number.isFinite(quality)?number(quality,1)+'%':'не е измерен'}\n${comparisonText(hit.row)}\n${flags.ai?(flags.normal?'■ Стандартна проверка и AI':'□ AI предупреждение'):flags.normal?'△ Стандартна проверка':''}\n${visibleWarnings(hit.row).filter(w=>w.type!=='registration').map(w=>w.message).join('\n')}`;
+   const flags=warningKinds(hit.row),quality=inspection(hit.row).quality;tooltip.textContent=`№ ${hit.row.frameIndex} · ${hit.row.name}\n${hit.row.meta?.night||''}\n${hit.row.decision==='excluded'?'Изключен от подбора':'В подбора'}\n${spec.xLabel}: ${number(spec.xValue(hit.row))}\n${spec.yLabel}: ${number(spec.yValue(hit.row))}\nСтандартна оценка: ${Number.isFinite(hit.row.classicQuality)?number(hit.row.classicQuality,1)+'%':'не е измерена'}\nAI индекс: ${Number.isFinite(quality)?number(quality,1)+'%':'не е измерен'}\n${comparisonText(hit.row)}\n${flags.ai?(flags.normal?'■ Стандартна проверка и AI':'□ AI предупреждение'):flags.normal?'△ Стандартна проверка':''}\n${visibleWarnings(hit.row).filter(w=>w.type!=='registration').map(w=>{const k=problemKind(w);return `${k?problemIcons[k]+' '+problemLabels[k]+' · ':''}${w.origin==='ai'?'□':'△'} ${w.message}${w.scope==='series'?' (серия)':''}`;}).join('\n')}`;
    tooltip.hidden=false;tooltip.style.left=(canvas.offsetLeft+clamp(p.x+14,10,Math.max(10,canvas.clientWidth-tooltip.offsetWidth-10)))+'px';tooltip.style.top=(canvas.offsetTop+Math.max(0,p.y-tooltip.offsetHeight-12))+'px';
   }
   canvas.addEventListener('wheel',event=>{event.preventDefault();if(!surface)return;const f=fractions(point(event)),factor=Math.exp(event.deltaY*.0015),win=spec.window||[0,1,0,1],out=[];for(const[i,key]of[[0,'x'],[2,'y']]){const span=clamp((win[i+1]-win[i])*factor,minimum,1),ratio=clamp((f[key]-win[i])/(win[i+1]-win[i]),0,1),lo=f[key]-ratio*span;out.push(...bounded(lo,lo+span));}windowChanged(out);},{passive:false});
@@ -181,5 +186,5 @@
    legend(){return{data:seriesColor(),sorted:sortedColor()};}
   };
  }
- window.AstroArchiveQualityPlot={create,warningKinds,visibleWarnings,inspection,comparisonText};
+ window.AstroArchiveQualityPlot={create,warningKinds,visibleWarnings,problemIcons,problemLabels,problemTypes,inspection,comparisonText};
 })();
