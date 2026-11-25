@@ -8,7 +8,7 @@ import tempfile
 import threading
 import types
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 import zipfile
 
 from Backend.Foundation.runtime import Events, Jobs, Settings, Store
@@ -38,6 +38,8 @@ class DownloadTests(unittest.TestCase):
         store=Store(self.root/'data');events=Events();settings=Settings(store)
         m=PluginManager.__new__(PluginManager)
         m.service=types.SimpleNamespace(store=store,settings=settings,events=events,host_services=types.SimpleNamespace(owners=set()),jobs=types.SimpleNamespace(cancel=lambda _:None))
+        m.service.workflow = Mock()
+        m.service.workflow.open_sessions.return_value = []
         m.settings=settings;m.events=events;m.folder=self.root/'Plugins';m.gateway=PluginGateway(settings,events)
         m.records={};m.live={};m.problems=[];m.lock=threading.RLock();self.manager=m
         self.downloads=Downloads(m)
@@ -181,6 +183,81 @@ class DownloadTests(unittest.TestCase):
                 service.jobs.leave_call()
             with self.assertRaises(OSError):
                 restart_for_plugin_update(service, params)
+        self.assertFalse(service.jobs.restarting)
+        self.assertFalse(list(self.manager.folder.glob('.update-*')))
+
+    def test_confirmed_update_waits_for_task_cleanup_before_restart(self):
+        from Bridge.Desktop.host import restart_for_plugin_update
+
+        data = self.install_and_offer_update()
+        service = self.manager.service
+        service.downloads = self.downloads
+        service.jobs = Jobs(self.manager.events)
+        self.addCleanup(service.jobs.pool.shutdown)
+        working_copy = self.root/'temporary.fit'
+        working_copy.touch()
+        baseline = self.root/'existing.fit'
+        baseline.touch()
+        started = threading.Event()
+        stopped = threading.Event()
+
+        def work(cancel, progress):
+            started.set()
+            if not cancel.wait(5):
+                raise RuntimeError('Task was not cancelled')
+            stopped.set()
+            raise InterruptedError()
+
+        def clean():
+            self.assertTrue(stopped.is_set())
+            working_copy.unlink()
+
+        def prepare():
+            self.assertTrue(stopped.is_set())
+            self.assertFalse(working_copy.exists())
+            self.assertTrue(baseline.exists())
+            service.workflow.cancel.assert_called_once_with('open', clean=True, confirmed=True)
+
+        service.workflow.open_sessions.return_value = ['open']
+        service.jobs.submit('preparation', 'Test', work, on_update_cancel=clean)
+        self.assertTrue(started.wait(5))
+        params = dict(id='sample', commit=self.entry['commit'])
+        with patch('Bridge.Plugins.downloads.fetch', return_value=data), patch('Bridge.Desktop.host.prepare_restart', side_effect=prepare) as restart:
+            with self.assertRaises(LocalizedError) as busy:
+                restart_for_plugin_update(service, params)
+            self.assertEqual(busy.exception.key, 'diagnostics.restartBusy')
+            self.assertFalse(stopped.is_set())
+            self.assertTrue(working_copy.exists())
+            restart.assert_not_called()
+            restart_for_plugin_update(service, dict(params, cancelWork=True))
+            restart.assert_called_once()
+        self.assertEqual(self.downloads.apply_pending(), [])
+        self.assertEqual(self.manager.manifest(self.manager.folder/'sample')['version'], 'V-2')
+
+    def test_changed_plugin_and_failed_cleanup_block_confirmed_restart(self):
+        from Bridge.Desktop.host import restart_for_plugin_update
+
+        data = self.install_and_offer_update()
+        service = self.manager.service
+        service.downloads = self.downloads
+        service.jobs = Jobs(self.manager.events)
+        self.addCleanup(service.jobs.pool.shutdown)
+        service.workflow.open_sessions.return_value = ['open']
+        service.workflow.cancel.side_effect = OSError('Workspace is locked')
+        params = dict(id='sample', commit=self.entry['commit'], cancelWork=True)
+        main = self.manager.folder/'sample'/'main.py'
+        original = main.read_bytes()
+        main.write_text('# Local changes')
+        with patch('Bridge.Plugins.downloads.fetch', return_value=data), patch('Bridge.Desktop.host.prepare_restart') as restart:
+            with self.assertRaises(LocalizedError) as changed:
+                restart_for_plugin_update(service, params)
+            self.assertEqual(changed.exception.key, 'plugins.installedChanged')
+            service.workflow.cancel.assert_not_called()
+            main.write_bytes(original)
+            with self.assertRaises(LocalizedError) as locked:
+                restart_for_plugin_update(service, params)
+            self.assertEqual(locked.exception.key, 'plugins.updateCleanupFailed')
+            restart.assert_not_called()
         self.assertFalse(service.jobs.restarting)
         self.assertFalse(list(self.manager.folder.glob('.update-*')))
 

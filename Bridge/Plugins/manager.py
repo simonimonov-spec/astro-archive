@@ -66,10 +66,19 @@ class PluginContext:
         if 'analysis.inspect' not in record['permissions']:raise PermissionError('Липсва разрешение за инспекционния SDK.')
         return self.manager.inspection_services.invoke(self.id,action,parameters or {},cancel,progress)
     def task(self,title,work,section='analysis',tier='important'):
+        return self._submit_task(title,work,section,tier)
+    def task_with_update_cleanup(self,title,work,cleanup,section='analysis',tier='important'):
+        if not callable(cleanup):raise ValueError('Липсва функция за почистване на задачата.')
+        def guarded_cleanup():
+            self._check()
+            cleanup()
+        return self._submit_task(title,work,section,tier,guarded_cleanup)
+    def _submit_task(self,title,work,section,tier,cleanup=None):
         record=self._check()
         if section not in ('archive','analysis','preparation'):raise ValueError('Невалиден раздел за задача.')
         def guarded(cancel,progress):self._check();return work(cancel,progress)
-        result=self.manager.service.task(section,str(title)[:160],guarded,tier);record['tasks'].add(result['taskId']);return result
+        options = {'on_update_cancel': cleanup} if cleanup is not None else {}
+        result=self.manager.service.task(section,str(title)[:160],guarded,tier,**options);record['tasks'].add(result['taskId']);return result
 
 class PluginManager:
     def __init__(self,service,folder=None):

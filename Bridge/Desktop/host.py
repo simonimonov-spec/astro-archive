@@ -39,15 +39,31 @@ def prepare_restart(root=ROOT):
     process.stdout.close();return process
 
 
-def schedule_restart(service, update=None):
+def schedule_restart(service, update=None, *, cancel_work=False):
     try:
-        service.jobs.begin_restart()
+        service.jobs.begin_restart(cancel_work=cancel_work)
     except ValueError as error:
         raise LocalizedError('diagnostics.restartBusy', str(error)) from error
     except RuntimeError as error:
         raise LocalizedError('diagnostics.restartPending', str(error)) from error
     helper = None
     try:
+        if update is not None:
+            if not cancel_work and service.workflow.open_sessions():
+                raise LocalizedError('diagnostics.restartBusy', 'Има незавършени задачи по подготовката.')
+            if cancel_work:
+                # Verify the old package before cancelling anything. Queueing
+                # repeats the check after the jobs and their cleanup finish.
+                with service.downloads.manager.lock:
+                    service.downloads.check_update_target(*update)
+                try:
+                    service.jobs.cancel_for_update()
+                    for ident in service.workflow.open_sessions():
+                        service.workflow.cancel(ident, clean=True, confirmed=True)
+                except TimeoutError as error:
+                    raise LocalizedError('plugins.updateStopTimeout', str(error)) from error
+                except (OSError, ValueError) as error:
+                    raise LocalizedError('plugins.updateCleanupFailed', str(error)) from error
         helper = prepare_restart()
         if update is not None:
             service.downloads.queue_update(*update)
@@ -67,7 +83,7 @@ def restart_for_plugin_update(service, parameters):
     # Keep normal requests available during the download. Reserve the restart
     # only when the verified package is ready and the app has no active work.
     with service.downloads.stage_update(ident, commit) as staged:
-        schedule_restart(service, (ident, staged))
+        schedule_restart(service, (ident, staged), cancel_work=parameters.get('cancelWork') is True)
 
 
 class Handler(BaseHTTPRequestHandler):

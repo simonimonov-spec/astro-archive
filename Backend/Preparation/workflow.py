@@ -29,6 +29,9 @@ class Workflow:
         job=next((j for j in self.list() if j['id']==ident),None)
         if not job:raise ValueError('Непозната задача.')
         return job
+    def open_sessions(self):
+        return [job['id'] for job in self.list()
+                if job['state'] in ('copying', 'waiting', 'returning', 'cleanup-required')]
     def validate_folder(self,folder,archives=None,create=True):
         folder=Path(folder).resolve()
         if folder==Path(folder.anchor) or folder.is_relative_to(ROOT) or ROOT.is_relative_to(folder):raise ValueError('Избери отделна работна папка извън програмата.')
@@ -38,7 +41,7 @@ class Workflow:
             if folder.is_relative_to(root) or root.is_relative_to(folder):raise ValueError('Работната папка не може да съвпада с архив или негов родител.')
         if create:folder.mkdir(parents=True,exist_ok=True)
         return folder
-    def export(self,ids,folder,cancel,progress,format='original'):
+    def export(self,ids,folder,cancel,progress,format='original',*,owned_copies=None):
         import numpy as np
         from astropy.io import fits
         from PIL import Image
@@ -80,6 +83,8 @@ class Workflow:
                         data,header,_=pixels(source,dtype=None);np.savez_compressed(output,image=data,header=json.dumps(header,default=str))
                     else:raise ValueError('Неподдържан формат за изображения.')
                 if format=='original' and digest(target)!=digest(source):raise OSError('Копието не съвпада.')
+                if owned_copies is not None:
+                    owned_copies[target] = target.stat()
                 copied.append(str(target))
             except BaseException:
                 # Only this export's newly created target can be removed.
@@ -87,6 +92,17 @@ class Workflow:
                 raise
             progress(n,len(ids),'Изнасяне на работни копия')
         self.store.history('export',ids=ids,files=copied,format=format);return dict(files=copied)
+    def cleanup_export(self, owned_copies):
+        for target, created in owned_copies.items():
+            if not target.exists():
+                continue
+            if target.parent.resolve() != target.parent:
+                raise OSError('Работната папка е преместена и копието е запазено.')
+            path = within(self.validate_folder(target.parent, create=False), target.name)
+            current = path.stat()
+            if not os.path.samestat(created, current) or (created.st_size, created.st_mtime_ns) != (current.st_size, current.st_mtime_ns):
+                raise OSError('Изнесеното копие е променено и е запазено.')
+            path.unlink()
     def enqueue(self,ids,options):
         groups={}
         for ident in dict.fromkeys(ids):

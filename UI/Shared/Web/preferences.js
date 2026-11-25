@@ -254,11 +254,31 @@
       if (busy) return;
       updating = true;
       setBusy(true);
-      const status = ui.node('p', t('plugins.updateDownloading'));
-      status.setAttribute('role', 'status');
-      const dialog = ui.modal(t('plugins.update'), body => body.append(status));
+      let status, dialog;
+      const showProgress = (key, stopping = false) => {
+        status = ui.node('p', t(key));
+        status.setAttribute('role', 'status');
+        dialog = ui.modal(t('plugins.update'), (body, box) => {
+          body.append(status);
+          if (stopping) {
+            box.querySelector('.panel-heading button').disabled = true;
+            box.addEventListener('cancel', event => event.preventDefault());
+          }
+        });
+      };
+      showProgress('plugins.updateDownloading');
       try {
-        const result = await bindings.call('ui.plugins.update', { id: plugin.id, commit: plugin.commit, confirmed: true });
+        const params = { id: plugin.id, commit: plugin.commit, confirmed: true };
+        let result;
+        try {
+          result = await bindings.call('ui.plugins.update', params);
+        } catch (error) {
+          if (error.errorKey !== 'diagnostics.restartBusy') throw error;
+          dialog.close();
+          if (!await confirmStoppingTasks(ui)) return;
+          showProgress('plugins.updateStoppingTasks', true);
+          result = await bindings.call('ui.plugins.update', { ...params, cancelWork: true });
+        }
         if (result?.accepted !== true) throw Object.assign(new Error(), { errorKey: 'diagnostics.restartFailed' });
         accepted = true;
         status.textContent = t('diagnostics.restarting');
@@ -274,6 +294,25 @@
         if (updating) setBusy(false);
       }
     }
+  }
+
+  function confirmStoppingTasks(ui) {
+    return new Promise(resolve => {
+      let stop = false;
+      const dialog = ui.modal(t('plugins.updateActiveTasks'), (body, box) => {
+        body.append(ui.node('p', t('plugins.updateActiveTasksDetail')));
+        const actions = ui.node('div', null, 'function-actions');
+        const skip = ui.node('button', t('plugins.updateSkipNow'), 'quiet-button');
+        const proceed = ui.node('button', t('plugins.updateStopTasks'), 'primary-button');
+        skip.type = proceed.type = 'button';
+        skip.autofocus = true;
+        skip.onclick = () => box.close();
+        proceed.onclick = () => { stop = true; box.close(); };
+        actions.append(skip, proceed);
+        body.append(actions);
+      });
+      dialog.addEventListener('close', () => resolve(stop), { once: true });
+    });
   }
 
   async function checkPluginUpdates() {

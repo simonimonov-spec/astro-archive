@@ -66,6 +66,12 @@
     "plugins.updateAvailable": "Налична е версия {version}", "plugins.updateNotice": "{name} · нова версия {version}",
     "plugins.updateConfirm": "Приложението ще изтегли {name} {version} и ще се рестартира. Настройките се запазват. След рестарта прегледай и включи новата версия, за да я използваш.",
     "plugins.updateDownloading": "Изтегляне и проверка на плъгина…", "plugins.updateFailed": "Обновяването на плъгина не завърши",
+    "plugins.updateActiveTasks": "Има отворени задачи",
+    "plugins.updateActiveTasksDetail": "За обновяването Astro Archive трябва да се рестартира. Можеш да пропуснеш обновяването засега или да прекратиш задачите. Временните файлове, които програмата може безопасно да почисти, ще бъдат изтрити преди рестарта.",
+    "plugins.updateSkipNow": "Пропусни засега", "plugins.updateStopTasks": "Прекрати задачите и обнови",
+    "plugins.updateStoppingTasks": "Спиране на задачите и почистване на работните файлове…",
+    "plugins.updateStopTimeout": "Някои задачи още приключват. Опитай обновяването отново.",
+    "plugins.updateCleanupFailed": "Почистването не завърши. Провери задачите и затвори заключените работни файлове, преди да опиташ отново.",
     "plugins.catalogChecked": "Каталогът в GitHub е проверен."
   });
   Object.assign(en, {
@@ -80,6 +86,12 @@
     "plugins.updateAvailable": "Version {version} available", "plugins.updateNotice": "{name} · new version {version}",
     "plugins.updateConfirm": "The app will download {name} {version} and restart. Your settings are kept. Review and enable the new version after restart to use it.",
     "plugins.updateDownloading": "Downloading and verifying the plugin…", "plugins.updateFailed": "Plugin update could not finish",
+    "plugins.updateActiveTasks": "There are open tasks",
+    "plugins.updateActiveTasksDetail": "Astro Archive needs to restart to update. You can skip the update for now or end the tasks. Temporary files that the app can safely remove will be cleaned up before the restart.",
+    "plugins.updateSkipNow": "Skip for now", "plugins.updateStopTasks": "End tasks and update",
+    "plugins.updateStoppingTasks": "Stopping tasks and cleaning up working files…",
+    "plugins.updateStopTimeout": "Some tasks are still stopping. Try the update again.",
+    "plugins.updateCleanupFailed": "Cleanup could not finish. Check the tasks and close any locked working files before retrying.",
     "plugins.catalogChecked": "The GitHub catalogue has been checked."
   });
   Object.assign(bg, {

@@ -107,13 +107,12 @@ class Events:
 class Jobs:
     def __init__(self,events):
         self.events=events;self.pool=ThreadPoolExecutor(max_workers=4,thread_name_prefix='AstroArchive-task');self.tasks={};self.lock=threading.RLock();self.notification=None;self.restarting=False;self.inflight=0
-    def submit(self,section,title,work,tier='normal'):
+        self.idle = threading.Condition(self.lock)
+        self.update_cleanups = {}
+    def submit(self,section,title,work,tier='normal',*,on_update_cancel=None):
         ident=uuid.uuid4().hex;cancel=threading.Event()
         if tier not in ('important','normal','ambient'):tier='normal'
         task=dict(id=ident,section=section,title=title,tier=tier,state='running',progress=0,stepProgress=0,phase='Подготовка',step=1,steps=1,started=time.time(),cancel=cancel,canStop=True)
-        with self.lock:
-            if self.restarting:raise RuntimeError('Програмата се рестартира. Нова задача не може да бъде започната.')
-            self.tasks[ident]=task
         def progress(done,total,step):
             if cancel.is_set():raise InterruptedError('Задачата е отменена.')
             with self.lock:task.update(progress=done/max(1,total),stepProgress=done/max(1,total),phase=step,done=done,total=total)
@@ -135,25 +134,61 @@ class Jobs:
             except Exception as error:
                 with self.lock:task.update(state='blocked',problem=str(error),finished=time.time(),canStop=True)
                 self.events.emit('action.problem',section=section,message=str(error))
+            finally:
+                with self.idle:
+                    task.pop('updateCleanup', None)
+                    self.idle.notify_all()
             self.publish()
-        self.pool.submit(execute);self.publish();return dict(taskId=ident)
+        with self.lock:
+            if self.restarting:
+                raise RuntimeError('Програмата се рестартира. Нова задача не може да бъде започната.')
+            if on_update_cancel is not None:
+                task['updateCleanup'] = on_update_cancel
+            self.tasks[ident] = task
+            try:
+                self.pool.submit(execute)
+            except RuntimeError:
+                del self.tasks[ident]
+                raise
+        self.publish();return dict(taskId=ident)
     def publish(self):self.events.emit('activity.changed',snapshot=self.snapshot())
     def enter_call(self):
         with self.lock:
             if self.restarting:raise RuntimeError('Програмата се рестартира.')
             self.inflight+=1
     def leave_call(self):
-        with self.lock:self.inflight-=1
-    def begin_restart(self):
+        with self.idle:
+            self.inflight -= 1
+            self.idle.notify_all()
+    def has_running_work(self):
+        return self.inflight or any(t['state']=='running' for t in self.tasks.values())
+    def begin_restart(self, *, cancel_work=False):
         with self.lock:
             if self.restarting:raise RuntimeError('Вече се изпълнява рестартиране.')
-            if self.inflight or any(t['state']=='running' for t in self.tasks.values()):raise ValueError('Има активни задачи или операции. Изчакай приключването им.')
+            if not cancel_work and (self.has_running_work() or self.update_cleanups):
+                raise ValueError('Има активни задачи или операции. Изчакай приключването им.')
             self.restarting=True
+    def cancel_for_update(self, timeout=60):
+        with self.idle:
+            running = [task for task in self.tasks.values() if task['state'] == 'running']
+            for task in running:
+                cleanup = task.get('updateCleanup')
+                if cleanup is not None:
+                    self.update_cleanups[task['id']] = cleanup
+                task['cancel'].set()
+            if not self.idle.wait_for(lambda: not self.has_running_work(), timeout):
+                raise TimeoutError('Задачите още приключват. Опитай обновяването отново.')
+        for ident, cleanup in list(self.update_cleanups.items()):
+            if self.tasks[ident]['state'] != 'completed':
+                cleanup()
+            del self.update_cleanups[ident]
+        if any(task['state'] == 'blocked' for task in running):
+            raise OSError('Поне една задача завърши с грешка при спирането. Провери списъка със задачи.')
     def abort_restart(self):
         with self.lock:self.restarting=False
     def snapshot(self):
         with self.lock:
-            tasks=[dict({k:v for k,v in t.items() if k not in ('cancel','result')},percent=round(t['progress']*100),overallPercent=round(t['progress']*100),elapsedSeconds=int(time.time()-t['started']),detail=f"{t.get('done',0)} / {t.get('total',0)}") for t in self.tasks.values()]
+            tasks=[dict({k:v for k,v in t.items() if k not in ('cancel','result','updateCleanup')},percent=round(t['progress']*100),overallPercent=round(t['progress']*100),elapsedSeconds=int(time.time()-t['started']),detail=f"{t.get('done',0)} / {t.get('total',0)}") for t in self.tasks.values()]
         return dict(tasks=tasks[-80:],notification=self.notification,state='running' if any(t['state']=='running' for t in tasks) else 'idle')
     def cancel(self,ident=None):
         with self.lock:

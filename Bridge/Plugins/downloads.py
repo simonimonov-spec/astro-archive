@@ -190,11 +190,14 @@ class Downloads:
             atomic_json(staged/'revisions.json', dict(old=current['uiRevision'], new=manifest['uiRevision']))
             yield staged
 
+    def check_update_target(self, ident, staged):
+        current = self.manager.manifest(within(self.manager.folder, ident))
+        if current['uiRevision'] != read_json(staged/'revisions.json')['old']:
+            raise LocalizedError('plugins.installedChanged', 'Инсталираният плъгин е променен. Провери папката и опитай отново.')
+
     def queue_update(self, ident, staged):
         with self.manager.lock:
-            current = self.manager.manifest(within(self.manager.folder, ident))
-            if current['uiRevision'] != read_json(staged/'revisions.json')['old']:
-                raise LocalizedError('plugins.installedChanged', 'Инсталираният плъгин е променен. Провери папката и опитай отново.')
+            self.check_update_target(ident, staged)
             staged.rename(self.manager.folder/('.update-'+ident))
 
     def apply_pending(self):

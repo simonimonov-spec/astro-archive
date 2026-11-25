@@ -234,7 +234,8 @@ class Service:
             if row['id'] in ids or m.get('night') in nights and m.get('object')==source.get('object') and m.get('telescope') in (source.get('telescopes') or [source.get('telescope')]):
                 relative=str(Path(row['relative']).parent).replace('\\','/');result[relative]=dict(archiveId='frames',relativePath=relative,name=relative)
         return list(result.values())
-    def task(self,section,title,work,tier='normal'):return self.jobs.submit(section,title,work,tier)
+    def task(self,section,title,work,tier='normal',*,on_update_cancel=None):
+        return self.jobs.submit(section,title,work,tier,on_update_cancel=on_update_cancel)
     def wait_task(self,started):
         while True:
             with self.jobs.lock:task=dict(self.jobs.tasks[started['taskId']])
@@ -592,7 +593,10 @@ class Service:
             if not folder:
                 folder=self.dialogs.choose('folder',title='Избери папка за копията')
                 if not folder:return dict(cancelled=True)
-            return self.task('preparation','Изнасяне на копия',lambda c,r:self.workflow.export(p['ids'],folder,c,r,p.get('format','original')),'important')
+            owned_copies = {}
+            return self.task('preparation','Изнасяне на копия',
+                             lambda c,r:self.workflow.export(p['ids'],folder,c,r,p.get('format','original'),owned_copies=owned_copies),
+                             'important',on_update_cancel=lambda:self.workflow.cleanup_export(owned_copies))
         if method=='python.preparation.outputs':return self.workflow.outputs(p['id'])
         if method=='python.preparation.finish':return self.task('preparation','Прибиране на резултати',lambda c,r:self.workflow.finish(p['id'],p['outputs'],c,r,p.get('confirmed',False)),'important')
         if method=='python.preparation.complete':return self.workflow.complete(p['id'],p.get('confirmed',False))

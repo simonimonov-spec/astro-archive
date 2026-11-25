@@ -40,6 +40,7 @@ Astro Archive търси превод за избрания език, после
 | `context.host(command, parameters)` | Извиква именувана основна услуга само ако разрешението я допуска. |
 | `context.capability(id, parameters)` | Използва декларирана възможност на друг включен плъгин. Изисква `capabilities.invoke`. |
 | `context.task(title, work, section)` | Пуска собствена фонова задача. `work(cancel, progress)` следи `cancel.is_set()` и извиква `progress(done, total, description)`. |
+| `context.task_with_update_cleanup(title, work, cleanup, section)` | Пуска задача с `cleanup()` за работните ѝ файлове. Astro Archive извиква почистването след спирането на задачата, когато потребителят потвърди прекратяване за обновяване. Използвай само файлове, които задачата управлява. При грешка обновяването спира и почистването може да се извика отново. За съвместимост с по-стари версии провери дали методът е наличен. |
 | `context.processing(action, parameters, cancel, progress)` | Разрешен достъп до управлявани работни копия и външни програми. Изисква `processing.manage`. |
 | `context.remote(action, parameters)` | Хост адаптер за мрежов плъгин: именувани команди, UI ресурси и трансфери по ID. Изисква `remote.host`. Удостоверяването и мрежовата политика са в самия плъгин. |
 

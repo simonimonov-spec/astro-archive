@@ -29,11 +29,12 @@
     if(['function.image','image.open','viewer.neighbor','viewer.close'].includes(method)&&!params.viewState){const view=window.AstroArchiveViewer?.state?.();if(view)params={...params,viewState:view};}
     if (!webview) return Promise.reject(new Error(t("offline.description")));
     const id = String(++requestNumber);
+    const stoppingForPluginUpdate = method === 'ui.plugins.update' && params.cancelWork === true;
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         pending.delete(id);
         reject(new Error(t("error.timeout")));
-      }, ['plugin.call','archive.summary','archive.summary.refresh','archive.audit','image.open','function.image','viewer.render','viewer.neighbor','viewer.compare'].includes(method) ? 86_400_000 : /^(analysis\.(run|stack\.run|noise|photometry|coverage)|preparation\.(start|finish|auto|add|cancel)|analysis\.(trash\.|toqueue|redo))/.test(method) ? 86_400_000 : 60_000);
+      }, stoppingForPluginUpdate || ['plugin.call','archive.summary','archive.summary.refresh','archive.audit','image.open','function.image','viewer.render','viewer.neighbor','viewer.compare'].includes(method) ? 86_400_000 : /^(analysis\.(run|stack\.run|noise|photometry|coverage)|preparation\.(start|finish|auto|add|cancel)|analysis\.(trash\.|toqueue|redo))/.test(method) ? 86_400_000 : 60_000);
       pending.set(id, { resolve, reject, timeout });
       try { webview.postMessage({ version: 1, id, method, params }); }
       catch (error) { clearTimeout(timeout); pending.delete(id); reject(error); }
