@@ -467,6 +467,10 @@
         "destination": "tests/test_publication.py"
       },
       {
+        "source": "tests/test_inspection_sdk.py",
+        "destination": "tests/test_inspection_sdk.py"
+      },
+      {
         "source": "tests/test_language_preferences.py",
         "destination": "tests/test_language_preferences.py"
       },

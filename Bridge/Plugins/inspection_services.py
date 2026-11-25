@@ -4,6 +4,9 @@ import collections,copy, math, re, threading
 from pathlib import Path
 from Backend.Foundation.runtime import atomic_json
 
+WARNING_TYPES=('cloud','satellite','elongation','focus','flare','gradient','obstruction','quality','light')
+WARNING_SCOPES=('frame','series')
+
 class InspectionServices:
     def __init__(self,service):self.service=service;self.lock=threading.RLock();self.owned_reports={};self.alignments=collections.OrderedDict()
 
@@ -154,7 +157,21 @@ class InspectionServices:
             if matrix.shape!=(3,3) or not np.isfinite(matrix).all() or abs(np.linalg.det(matrix))<1e-12:raise ValueError('Невалидна проекция.')
             return warp(p['image'],p['matrix'],p['shape'],order=p.get('order',1),cval=p.get('cval',0))
         if action=='annotate':return self.annotate(owner,p)
+        if action=='capabilities':return dict(warningTypes=list(WARNING_TYPES),scopes=list(WARNING_SCOPES),mark=True)
+        if action=='mark':return self.mark(p)
         raise ValueError('Непозната операция на инспекционния SDK.')
+
+    def mark(self,p):
+        # Selection only: never changes warnings, recommendations or decisions.
+        report_id=p.get('reportId');ids=self.identifiers(p.get('ids'))
+        if not isinstance(report_id,str) or not re.fullmatch('[a-f0-9]{32}',report_id):raise ValueError('Невалиден отчет.')
+        with self.lock:
+            report=self.service.quality.results.get(report_id)
+            if not report:raise ValueError('Отчетът вече не е в текущата сесия. Пусни инспекцията отново.')
+            known={r['id'] for r in report.get('frames',[])}
+        if any(i not in known for i in ids):raise ValueError('Маркиране извън анализираните кадри.')
+        if not self.service.session.inspection_result(report_id,ids,highlight=True):raise ValueError('Изчакай текущия анализ, преди да маркираш кадри.')
+        return dict(marked=len(ids))
 
     def annotate(self,owner,p):
         if p.get('present') is True and self.service.session.active:raise ValueError('Изчакай текущия анализ, преди да покажеш инспекционния отчет.')
@@ -173,12 +190,13 @@ class InspectionServices:
                 if (stat.st_size,stat.st_mtime_ns)!=(row.get('sourceSize'),row.get('sourceMtime')):raise ValueError('Кадърът е променен след анализа; преизчисли го.')
                 clean=[]
                 for warning in warnings:
-                    if not isinstance(warning,dict) or set(warning)-{'type','score','message','severity','origin'}:raise ValueError('Невалидно предупреждение.')
+                    if not isinstance(warning,dict) or set(warning)-{'type','score','message','severity','origin','scope'}:raise ValueError('Невалидно предупреждение.')
                     if warning.get('origin','algorithm') not in ('algorithm','ai'):raise ValueError('Невалиден източник на предупреждение.')
-                    if warning.get('type') not in ('cloud','satellite','obstruction','light','quality') or warning.get('severity','medium') not in ('low','medium','high'):raise ValueError('Непознат вид предупреждение.')
+                    if warning.get('type') not in WARNING_TYPES or warning.get('severity','medium') not in ('low','medium','high'):raise ValueError('Непознат вид предупреждение.')
+                    if warning.get('scope','frame') not in WARNING_SCOPES:raise ValueError('Невалиден обхват на предупреждение.')
                     score=warning.get('score');message=warning.get('message')
                     if type(score) not in (int,float) or not math.isfinite(score) or not 0<=score<=1 or not isinstance(message,str) or not message or len(message)>400:raise ValueError('Невалидна оценка или обяснение.')
-                    clean.append(dict(warning,source=source,confidence='candidate'))
+                    clean.append(dict(warning,scope=warning.get('scope','frame'),source=source,confidence='candidate'))
                 row['warnings']=[w for w in row.get('warnings',[]) if w.get('source')!=source]+clean
                 if 'quality' in item:
                     value=item['quality']
