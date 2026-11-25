@@ -31,6 +31,10 @@
         "destination": "Backend/Analysis/psf.py"
       },
       {
+        "source": "Backend/Analysis/grading.py",
+        "destination": "Backend/Analysis/grading.py"
+      },
+      {
         "source": "Backend/Analysis/quality.py",
         "destination": "Backend/Analysis/quality.py"
       },
@@ -613,6 +617,10 @@
       {
         "source": "UI/Shared/Web/tags.css",
         "destination": "UI/Shared/Web/tags.css"
+      },
+      {
+        "source": "tests/test_standard_grading.py",
+        "destination": "tests/test_standard_grading.py"
       },
       {
         "source": "tests/test_tags.py",

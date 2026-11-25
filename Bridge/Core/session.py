@@ -99,8 +99,10 @@ class SharedSession:
                 if 'frameList' in value:
                     listing=value['frameList']
                     if not isinstance(listing,dict) or set(listing)!={'open','view','filter','sort','direction','query','page'} or type(listing['open']) is not bool:raise ValueError('Невалиден списък с кадри.')
-                    choice(listing['view'],('list','thumbs'));choice(listing['filter'],('all','included','excluded','ai'))
-                    choice(listing['sort'],('name','night','fwhm','fwhmY','roundness','weightedFwhm','shiftX','shiftY','stars','background','classic','ai'));choice(listing['direction'],('asc','desc'))
+                    choice(listing['view'],('standard','list','thumbs'))
+                    problems=('cloud','satellite','elongation','focus','flare','gradient','noise','obstruction','quality')
+                    choice(listing['filter'],('all','review','included','excluded','ai',*(f'problem:{kind}' for kind in problems)))
+                    choice(listing['sort'],('frameIndex','name','night','fwhm','fwhmY','roundness','weightedFwhm','shiftX','shiftY','stars','background','classic','ai','aiCoverage'));choice(listing['direction'],('asc','desc'))
                     text(listing['query'],200);number(listing['page'],0,20000)
                     if type(listing['page']) is not int:raise ValueError('Невалидна страница с кадри.')
                 if 'plotWindow' in value:

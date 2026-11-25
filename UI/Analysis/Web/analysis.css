@@ -120,3 +120,10 @@
 #q-worst{display:none!important}
 
 .flow-result-heading .chart-warning-toggle{font-size:11px;line-height:1.4;white-space:normal;max-width:250px;margin:0}
+
+.q-frame-items.q-frame-standard{display:grid;overflow-x:visible}
+.q-frame-items.q-frame-standard .q-frame-row{grid-template-columns:auto minmax(110px,1fr) minmax(0,2fr) auto;min-width:0;gap:10px}
+.q-standard-result{min-width:0;display:grid;gap:3px;overflow-wrap:anywhere}
+.q-standard-result span{color:var(--muted)}
+.q-standard-result[data-review='true'] strong{color:var(--warning)}
+@media(max-width:600px){.q-frame-items.q-frame-standard .q-frame-row{grid-template-columns:auto minmax(0,1fr) auto}.q-standard-result{grid-column:2/-1;grid-row:2}}

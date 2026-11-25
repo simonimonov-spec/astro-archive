@@ -6,8 +6,8 @@
  const visibleWarnings=row=>(row.warnings||[]).filter(w=>w.origin==='ai'||row.standardEvaluated===true);
  const warningKinds=row=>({ai:visibleWarnings(row).some(w=>w.origin==='ai'),normal:row.standardEvaluated===true&&(!!row.error||visibleWarnings(row).some(w=>w.origin!=='ai'&&w.type!=='registration'))});
  // Beta 1.3 UI: problem icons (AI plugin and the standard check share one set).
- const problemIcons={cloud:'☁',satellite:'⟋',elongation:'↔',focus:'◎',flare:'✦',gradient:'▤',obstruction:'⌂',quality:'▼'};
- const problemLabels={cloud:'Облак',satellite:'Следа',elongation:'Издължени звезди / разклащане',focus:'Разфокус',flare:'Отблясък / лъч',gradient:'Неравномерен фон',obstruction:'Препятствие',quality:'Под прага на AI индекса'};
+ const problemIcons={cloud:'☁',satellite:'⟋',elongation:'↔',focus:'◎',flare:'✦',gradient:'▤',noise:'≈',obstruction:'⌂',quality:'▼'};
+ const problemLabels={cloud:'Облак',satellite:'Следа',elongation:'Издължени звезди / разклащане',focus:'Разфокус',flare:'Отблясък / лъч',gradient:'Неравномерен фон',noise:'Силен шум',obstruction:'Препятствие',quality:'Под прага на AI индекса'};
  const problemAlias={light:'flare',glare:'flare','bright-track':'satellite','absolute-focus':'focus'};
  const problemKind=w=>{const t=problemAlias[w.type]||w.type;return Object.hasOwn(problemIcons,t)?t:null;};
  const problemTypes=row=>{const found=new Set(visibleWarnings(row).map(problemKind).filter(Boolean));return Object.keys(problemIcons).filter(k=>found.has(k));};

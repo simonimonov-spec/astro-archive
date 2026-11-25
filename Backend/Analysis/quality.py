@@ -4,8 +4,9 @@ import json, math, re, threading, time, uuid
 from pathlib import Path
 from Backend.Foundation.runtime import parallel, atomic_json, read_json
 from Backend.Fits.images import pixels, gray,metadata
+from Backend.Analysis.grading import VERSION as STANDARD_VERSION, standard_review
 
-VERSION='quality-4-gaussian-green-1'
+VERSION='quality-5-gaussian-green-1'
 
 def noise_grid(image):
     import numpy as np
@@ -42,11 +43,16 @@ def measure(argument):
     unsaturated=[star for star in stars if not star.get('saturated')]
     metric=lambda key:float(np.mean([star[key] for star in unsaturated])) if unsaturated else None
     fwhm,fwhmy=metric('fwhm'),metric('fwhmY')
+    # The detector orders stars by the Gaussian integral, up to a constant.
+    bright_stars = unsaturated[:12]
+    bright_signal = float(np.median([star['amplitude'] * star['fwhm'] * star['fwhmY']
+                                    for star in bright_stars])) if len(bright_stars) == 12 else None
     result=dict(id=ident,width=shape[1],height=shape[0],stars=len(stars),fittedStars=len(stars),
         measuredStars=len(unsaturated),saturatedStars=len(stars)-len(unsaturated),candidates=candidates,starList=stars[:256],
         fwhm=fwhm,fwhmY=fwhmy,hfr=metric('hfr'),roundness=fwhmy/fwhm if fwhm and fwhmy else None,
         eccentricity=metric('eccentricity'),weightedFwhm=None,peakSnr=metric('peakSnr'),
         background=metric('background') if unsaturated else background,skyMedian=background,noise=noise,
+        brightStarSignal=bright_signal,
         mean=float(np.mean(values)),stdDev=float(np.std(values)),minimum=float(values.min()),maximum=float(values.max()),
         validPixels=int(valid.sum()),invalidPixels=int(image.size-valid.sum()),measurementChannel=channel,
         measurementModel='Gaussian',detectionSettings=settings,pixelScale=angular_scale(header),
@@ -56,16 +62,21 @@ def measure(argument):
     small=clean[::max(1,image.shape[0]//512),::max(1,image.shape[1]//512)]
     blurred=gaussian_filter(small,3);spread=float(np.percentile(blurred,95)-np.percentile(blurred,5))
     result['backgroundVariation']=spread;result['darkFraction']=float(np.mean(small < -4*noise))
-    mask=small>max(15*noise,float(np.percentile(small,99.7)))
-    labels,count=label(mask)
-    streak=False
-    for region in find_objects(labels):
-        if region is None:continue
-        h,w=region[0].stop-region[0].start,region[1].stop-region[1].start
-        if max(h,w)>max(small.shape)*.2 and max(h,w)/max(1,min(h,w))>10:streak=True;break
-    if streak:result['warnings'].append(dict(type='bright-track',severity='high',confidence='candidate',message='Възможна ярка следа или дифракционен лъч. Провери кадъра.'))
+    # Subtract the local background so bright stars and broad sky structure do
+    # not set the cutoff for a narrow trail. Measure elongation in its own axes.
+    residual = small - gaussian_filter(small, 8)
+    labels, _ = label(residual > 15 * noise, structure=np.ones((3, 3)))
+    for ident, region in enumerate(find_objects(labels), 1):
+        if region is None or max(part.stop - part.start for part in region) < .14 * max(small.shape):
+            continue
+        coordinates = np.column_stack(np.nonzero(labels[region] == ident))
+        eigenvalues, axes = np.linalg.eigh(np.cov(coordinates, rowvar=False))
+        if eigenvalues[1] <= 100 * max(eigenvalues[0], 1) or np.ptp(coordinates @ axes[:, 1]) < .2 * max(small.shape):
+            continue
+        result['warnings'].append(dict(type='bright-track', severity='high', confidence='candidate',
+                                       message='Възможна ярка линейна следа. Провери кадъра.'))
+        break
     if result['darkFraction']>.15:result['warnings'].append(dict(type='obstruction',severity='high',confidence='candidate',message='Голяма тъмна област: възможно препятствие или реална структура.'))
-    if spread>12*noise:result['warnings'].append(dict(type='gradient',severity='medium',confidence='candidate',message='Силен градиент: възможна лампа, отражение, облак или обект.'))
     if kind=='stacks':result['noiseMap']=noise_grid(image)
     return result
 
@@ -127,6 +138,11 @@ class Quality:
         def values(key):return sorted({(row.get('meta') or {}).get(key) for row in frames if (row.get('meta') or {}).get(key)})
         return dict(id=result['id'],name=str(name).strip()[:160],auto=bool(auto),created=float(result.get('created') or time.time()),
             kind=result.get('kind','frames'),mode='quality',objects=values('object'),nights=values('night'),frames=len(frames),algorithm=result.get('algorithm',''))
+    def _standard_review(self, result):
+        settings = self.catalog.settings.value.get('preferences', {}).get('customization', {}).get('analysis', {})
+        standard_review(result['frames'], settings)
+        result['standardAlgorithm'] = STANDARD_VERSION
+
     def load(self,ident,compact=False):
         ident=self._ident(ident);result=self.results.get(ident)
         if result is None:
@@ -138,6 +154,8 @@ class Quality:
             for index,row in enumerate(result['frames'],1):
                 row.setdefault('frameIndex',index)
                 row['decision']=decisions.get(row.get('id'),row.get('decision') or 'approved')
+            if result.get('standardAlgorithm') != STANDARD_VERSION:
+                self._standard_review(result)
             self.results[ident]=result
         if compact:return dict(result,frames=[{k:v for k,v in row.items() if k not in ('starList','noiseMap')} for row in result['frames']])
         return result
@@ -176,11 +194,6 @@ class Quality:
         import numpy as np
         from Backend.Analysis.psf import detection_settings
         detector=detection_settings(detector);detector_key=json.dumps(detector,sort_keys=True,separators=(',',':'))
-        norms=self.catalog.settings.value.get('preferences',{}).get('customization',{}).get('analysis',{})
-        def norm(key,default):
-            try:
-                value=float(norms.get(key,default));return value if math.isfinite(value) and value>=0 else default
-            except (ValueError,TypeError):return default
         records=sorted([self.catalog.record(i) for i in dict.fromkeys(ids)],key=lambda row:(row['meta'].get('observed',''),row['relative'],row['id']))
         needed=[];results={};signatures={}
         for row in records:
@@ -205,12 +218,11 @@ class Quality:
         good=[r for r in ordered if not r.get('error')]
         groups={}
         for r in good:groups.setdefault((r['meta']['object'],r['meta']['telescope'],r['meta']['filter'],r['width'],r['height']),[]).append(r)
+        aligned_count = len(ordered) - len(good)
         for group in groups.values():
             maximum_stars=max(r['stars'] for r in group)
             eligible=[r for r in group if r.get('fwhm') and r['stars']>=maximum_stars/2 and len(r['starList'])>=6]
             reference=min(eligible,key=lambda r:(r['fwhm']*(3-2*r['stars']/max(1,maximum_stars)),r['frameIndex'])) if eligible else max(group,key=lambda r:r['stars'])
-            median_stars=float(np.median([r['stars'] for r in group]));median_bg=float(np.median([r['background'] for r in group]))
-            widths=[r['fwhm'] for r in group if r.get('fwhm')];median_width=float(np.median(widths)) if widths else None
             try:own_wcs=wcs_alignment(reference['meta'],reference['meta'])
             except (ValueError,ArithmeticError):own_wcs=None
             alignment_by_id={reference['id']:(np.eye(3),0,len(reference['starList']),'stars' if len(reference['starList'])>=10 else 'WCS')} if len(reference['starList'])>=10 or own_wcs else {}
@@ -225,24 +237,11 @@ class Quality:
                     matrix,rms,matched,method=alignment;r.update(transform=matrix.tolist(),registrationRms=rms,matchedStars=matched,alignmentMethod=method,
                         **displayed_transform(matrix,r['width'],r['height']))
                 else:r['alignmentNote']='Няма общо координатно решение. Възможен отделен панел на мозайка; качеството се оценява независимо. Не участва в общото покритие.'
-                if alignment and norms.get('checkStars',True) and median_stars>12 and r['stars']<median_stars*norm('starsPercent',65)/100:
-                    r['warnings'].append(dict(type='cloud',severity='low',confidence='uncertain',message='Възможна облачност: по-малко звезди. Възможни са различен обект, фокус или експозиция.'))
-                if norms.get('checkBackground',True) and r['background']>median_bg+max(abs(median_bg)*(norm('backgroundRatio',1.25)-1),15*r['noise']):
-                    r['warnings'].append(dict(type='glare',severity='high',confidence='candidate',message='Необичайно светъл фон: възможна лампа или светлинно замърсяване.'))
-                if r['stars']<6:r['warnings'].append(dict(type='few-stars',severity='medium',confidence='measured',message='Под 6 измерени звезди; провери фокуса, полето и прага за откриване.'))
-                if norms.get('checkFwhm',True) and median_width and r.get('fwhm') and r['fwhm']>median_width*norm('fwhmRatio',1.5):
-                    r['warnings'].append(dict(type='focus',severity='high',confidence='candidate',message='FWHM превишава избраното отношение към медианата; провери фокуса и воденето.'))
-                if norms.get('checkRoundness',True) and r.get('roundness') and r['roundness']<norm('roundness',.6):
-                    r['warnings'].append(dict(type='elongation',severity='high',confidence='candidate',message='Силно удължени измерени звезди; възможен проблем с воденето или оптиката.'))
-                if norms.get('checkAbsolute',True) and norm('absoluteFwhm',0)>0 and r.get('fwhm') and r['fwhm']>norm('absoluteFwhm',0):
-                    r['warnings'].append(dict(type='absolute-focus',severity='high',confidence='measured',message='FWHM е над зададения абсолютен праг.'))
-                r['recommended']='exclude' if any(w['severity']=='high' for w in r['warnings']) else 'review' if r['warnings'] else 'approved'
-                r['statusText']='Предложен за изключване — провери' if r['recommended']=='exclude' else 'За преглед' if r['warnings'] else 'Без отклонения'
-            progress(len(records)+sum('recommended' in r for r in ordered),2*len(records),'Подравняване и обобщаване на качеството')
-        for r in ordered:
-            if r.get('error'):r.update(recommended='exclude',statusText='Не може да се измери — провери')
+            aligned_count += len(group)
+            progress(len(records)+aligned_count,2*len(records),'Подравняване и обобщаване на качеството')
         token=uuid.uuid4().hex;result=dict(id=token,kind=kind,frames=ordered,created=time.time(),algorithm=VERSION,detector=detector,
             limitations=['Облаци, следи, препятствия и отражения са евристични предложения, а не сигурна физична класификация.','Независим Gaussian PSF: съпоставяй еднакви входни пиксели, канал, прагове и единици. Отделни фитове и открити звезди могат да се различават.'])
+        self._standard_review(result)
         self.results[token]=result;atomic_json(self.store.folder/'Reports'/(token+'.json'),result);self.autosave(result)
         return result
     def coverage(self,result_id,cancel,progress,ids=None):
