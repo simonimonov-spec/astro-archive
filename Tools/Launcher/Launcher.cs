@@ -194,7 +194,7 @@ internal sealed class Launcher : Form
 
     Launcher(bool isPreview, bool rendering, bool skipUpdate)
     {
-        preview = isPreview; skipUpdateOnce = skipUpdate; ClientSize = new Size(600, 590); Text = T("windowTitle");
+        preview = isPreview; skipUpdateOnce = skipUpdate; ClientSize = new Size(600, 590);
         FormBorderStyle = FormBorderStyle.FixedSingle; MaximizeBox = false;
         StartPosition = FormStartPosition.CenterScreen; BackColor = Color.FromArgb(10, 16, 29);
         DoubleBuffered = true; Font = new Font("Segoe UI", 10);
@@ -202,6 +202,7 @@ internal sealed class Launcher : Form
             if (stream != null) { logo = new Icon(stream); Icon = logo; }
         using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("manifest.json"))
         using (var reader = new StreamReader(stream)) manifest = Json.Deserialize<Dictionary<string, object>>(reader.ReadToEnd());
+        Text = T("windowTitle") + " · " + DisplayVersion(Str(manifest, "release_tag"));
         timer.Tick += delegate { Invalidate(new Rectangle(0, 0, Width, 460)); }; timer.Start();
         Shown += async delegate
         {
@@ -224,6 +225,13 @@ internal sealed class Launcher : Form
     static Dictionary<string, object> Dict(object value) { return (Dictionary<string, object>)value; }
     static object[] ArrayValue(object value) { return ((IEnumerable)value).Cast<object>().ToArray(); }
     static string Str(Dictionary<string, object> d, string key) { return d.ContainsKey(key) ? Convert.ToString(d[key]) : ""; }
+    static string DisplayVersion(string tag)
+    {
+        bool preview = tag.EndsWith("-preview", StringComparison.OrdinalIgnoreCase);
+        Version version = BetaVersion(preview ? tag.Substring(0, tag.Length - "-preview".Length) : tag);
+        if (version == null) return string.IsNullOrWhiteSpace(tag) ? "Beta 1.2.4" : tag;
+        return "Beta " + version + (preview ? " Preview" : "");
+    }
     void Update(string text, string sub, float value)
     { status = text; detail = sub; progress = value; Invalidate(); }
     void ClearButtons()
@@ -853,7 +861,7 @@ internal sealed class Launcher : Form
             using (var star = new SolidBrush(Color.FromArgb(random.Next(35, 110), 177, 214, 235))) g.FillEllipse(star, x, y, i % 6 == 0 ? 2 : 1, i % 6 == 0 ? 2 : 1);
         }
         if (logo != null) g.DrawIcon(logo, new Rectangle(270, 32, 60, 60));
-        DrawText(g, "Astro Archive", 108, 23, Color.FromArgb(231, 243, 250), FontStyle.Bold);
+        DrawText(g, "Astro Archive · " + DisplayVersion(Str(manifest, "release_tag")), 108, 23, Color.FromArgb(231, 243, 250), FontStyle.Bold);
         DrawText(g, T("tagline"), 146, 8, Color.FromArgb(123, 160, 183), FontStyle.Regular);
         if (updateTitle != null)
         {

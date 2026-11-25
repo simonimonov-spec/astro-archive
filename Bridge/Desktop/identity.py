@@ -2,6 +2,7 @@
 import hashlib
 import os
 from pathlib import Path
+from Backend.Foundation.branding import APP_VERSION
 
 
 def installation_id(root):
@@ -10,7 +11,7 @@ def installation_id(root):
 
 
 def window_title(root):
-    return 'Astro Archive · ' + installation_id(root)[:8]
+    return f'Astro Archive · {APP_VERSION} · {installation_id(root)[:8]}'
 
 
 def matches(hello, root):

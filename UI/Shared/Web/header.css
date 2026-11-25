@@ -9,6 +9,7 @@ body .header-shell > .topbar {
 }
 body .header-shell .brand { grid-area: brand; flex: none; min-width: 0; gap: 10px; }
 body .header-shell .brand strong { font-size: 20px; }
+body .header-shell .brand-version { margin-left: 7px; color: var(--muted); font-size: 10px; font-weight: 500; letter-spacing: 0; white-space: nowrap; vertical-align: 2px; }
 body .header-shell .brand small { display: block; font-size: 11px; max-width: 270px; }
 body .header-shell .brand-logo { width: 34px; height: 34px; }
 .header-activity-home { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex: 0 0 44px; }

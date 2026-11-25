@@ -1,11 +1,11 @@
 """Loopback-only browser host, strict named RPC and local event polling."""
 from __future__ import annotations
-import json, mimetypes, os, secrets, subprocess, sys, threading, time, traceback
+import html, json, mimetypes, os, secrets, subprocess, sys, threading, time, traceback
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer as StandardHTTPServer
 from urllib.parse import urlsplit,unquote,parse_qs
 from urllib.request import urlopen
 from pathlib import Path
-from Backend.Foundation.branding import APP_NAME, KEY_HEADER, LEGACY_KEY_HEADER
+from Backend.Foundation.branding import APP_NAME, APP_VERSION, KEY_HEADER, LEGACY_KEY_HEADER
 from Backend.Foundation.runtime import ROOT,CACHE,within,atomic_json,read_json
 from Bridge.Core.service import Service
 from Bridge.Core.protocol import LocalizedError, error_payload
@@ -124,7 +124,10 @@ class Handler(BaseHTTPRequestHandler):
             mime=mimetypes.guess_type(path.name)[0] or 'application/octet-stream'
             if path.suffix=='.js':mime='text/javascript'
             body=path.read_bytes()
-            if route=='index.html':body=body.replace(b'<title>Astro Archive</title>',('<title>'+window_title(ROOT)+'</title>').encode('utf-8'))
+            if route=='index.html':
+                body=body.replace(b'<title>Astro Archive</title>',('<title>'+html.escape(window_title(ROOT))+'</title>').encode('utf-8'))
+                version=html.escape(APP_VERSION).encode('utf-8')
+                body=body.replace(b'<strong>Astro Archive</strong><small id="activity-caption">',b'<strong>Astro Archive <span class="brand-version">'+version+b'</span></strong><small id="activity-caption">')
             self.send(200,body,mime+('; charset=utf-8' if mime.startswith('text/') else ''))
         except (BrokenPipeError,ConnectionResetError,ConnectionAbortedError):pass
         except Exception as error:self.send(400,dict(error=str(error)))
