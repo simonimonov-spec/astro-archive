@@ -42,8 +42,8 @@
 .viewer-sidebar details.viewer-section[open] > summary { margin-bottom: 10px; }
 .viewer-sidebar .viewer-subsection { margin-top: 12px; padding-top: 12px; border-top: 1px dashed color-mix(in srgb, var(--text) 10%, transparent); }
 /* The missing-plugin notice: a small warning chip (two lines at most). */
-.viewer-sidebar #v-plugin-tools:not([hidden]),
-.viewer-sidebar [id$="-plugin-tools"]:not([hidden]) { padding-top: 10px; }
+.viewer-sidebar #v-plugin-tools:not([hidden]):not(:empty),
+.viewer-sidebar [id$="-plugin-tools"]:not([hidden]):not(:empty) { padding-top: 10px; }
 .viewer-sidebar .viewer-plugin-tool > p.settings-note,
 .viewer-sidebar .viewer-plugin-tool .extension-control p:only-child {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;

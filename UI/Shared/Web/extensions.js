@@ -322,10 +322,17 @@
     viewerHost.replaceChildren();
     for(const{p,c}of approved('viewer-tools')){
       const section=node('section',null,'viewer-plugin-tool');viewerHost.append(section);mount(section,p,c);
-      if(notify&&c.activate&&viewerContext?.viewerId)U.call('plugin.ui.activate',{pluginId:p.id,contributionId:c.id,context:{...viewerContext}}).catch(error=>{section.replaceChildren(node('p',error.message,'settings-note'));});
+      if(notify&&c.activate&&viewerContext?.viewerId)U.call('plugin.ui.activate',{pluginId:p.id,contributionId:c.id,context:{...viewerContext}}).catch(error=>{
+        // Beta 1.3 UI: a missing helper plugin is only worth a notice when it is installed but switched off.
+        const needed=/PLUGINS\.md/.test(error.message)&&/[„“"«「]([a-z][a-z0-9_.-]{0,119})[“”"»」]/.exec(error.message)?.[1];
+        const providers=needed?plugins.filter(x=>(x.capabilities||[]).some(entry=>entry.id===needed)):null;
+        if(providers&&!providers.length){section.remove();return;}
+        section.replaceChildren(node('p',providers?t('plugins.capabilityMissing',{capability:needed}):error.message,'settings-note'));
+      });
     }
-    if(loaded&&!approved('viewer-tools').some(({p,c})=>p.id==='ai-training'&&c.id==='rating')){
-      const plugin=plugins.find(p=>p.id==='ai-training'),section=node('section',null,'viewer-plugin-tool');
+    const ratingPlugin=plugins.find(p=>p.id==='ai-training');
+    if(loaded&&ratingPlugin&&!approved('viewer-tools').some(({p,c})=>p.id==='ai-training'&&c.id==='rating')){
+      const plugin=ratingPlugin,section=node('section',null,'viewer-plugin-tool');
       section.append(localized('h3','plugins.manualRating'));
       const reason=!plugin?'plugins.ratingMissing':!plugin.enabled?'plugins.ratingDisabled':!plugin.uiAllowed?'plugins.ratingPermission':'plugins.ratingUnavailable';
       section.append(plugin?.problem?pluginLabel('p',()=>pluginText(plugin,plugin.problem),'extension-tone-warning'):localized('p',reason,'extension-tone-warning'));
