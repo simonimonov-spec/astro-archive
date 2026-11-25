@@ -2,32 +2,53 @@
 from __future__ import annotations
 import csv,io,json,math,subprocess,sys,threading,time,uuid
 from pathlib import Path
-from . import engine,model,quality
+from . import engine,model,quality,problems
+from .ai_host import rebuild_row,merge_series
 from .pipeline import Pipeline,atomic,status_for
 
 def field(kind,ident,**kwargs):return dict(type=kind,id=ident,**kwargs)
 def option(value,label):return dict(value=value,label=label)
-def annotation(row):
-    warnings=sorted(row.get('warnings',[]),key=lambda w:w.get('severity')!='high')[:8]
+OLD_SUPPORTED=frozenset({'cloud','satellite','obstruction','light','quality'})
+OLD_SDK_NOTE='Обнови Astro Archive за точни иконки на проблемите.'
+SEVERITY_RANK=dict(high=0,medium=1,low=2)
+def annotation(row,supported=None,scopes=None):
+    supported=OLD_SUPPORTED if supported is None else supported
+    keep_scope=scopes is not None and 'series' in scopes
+    ordered=sorted(row.get('warnings',[]),key=lambda w:(SEVERITY_RANK.get(w.get('severity'),3),-(w.get('score') or 0)))[:8];warnings=[]
+    for w in ordered:
+        w=dict(w)
+        if w.get('type') not in supported:
+            w['type']=problems.LEGACY.get(w.get('type'),'quality');w.pop('scope',None)
+        if not keep_scope:w.pop('scope',None)
+        warnings.append(w)
     return dict(id=row['id'],warnings=warnings,quality=row.get('aiQuality'),comparison=dict(coverage=row.get('comparisonCoverage'),references=int(row.get('referenceFrames',0)),matchedStars=int(row.get('matchedStars',0)),reason=str(row.get('qualityReason') or row.get('uncertainty') or row.get('error') or '')[:400]))
 LABELS=dict(cloud='Облачност',satellite='Следа',obstruction='Препятствие')
 
 class Inspector:
     def __init__(self,ctx):
         self.ctx=ctx;self.folder=Path(ctx.storage());self.options={**dict(threshold=.72,qualityCutoff=35,edge=768,workers=2,archive='frames',telescope='',object='',night='',view='all'),**ctx.settings()}
-        self.ctx.save_settings(self.options);self.ids=[];self.source_report=None;self.result=None;self.selected=None;self.busy=False;self.problem='';self.image=None;self.closed=False;self.generation=0
+        self.ctx.save_settings(self.options);self.ids=[];self.source_report=None;self.result=None;self.selected=None;self.busy=False;self.problem='';self.image=None;self.closed=False;self.generation=0;self._supported=None;self._scopes=set();self._mark=False;self.chart_ids=None;self.capability_note=''
         self.starter=dict(version='heuristic-v1',digest='heuristic-v1',provenance='transparent analyzer rules');self.pipeline=Pipeline(ctx,self.folder)
         self.training_lock=threading.RLock();self.training_jobs={}
         from .ai_host import AIHost
         self.ai=AIHost(self)
         self.trainer=Path(__file__).resolve().parent/'Trainer'/'trainer.pyw'
         self.archives=ctx.inspection('archives')['archives'];self.facets={k:[] for k in ('telescope','object','night')}
-        for name,callback in [('refresh',self.refresh),('save',self.save),('adopt',self.adopt),('choose',self.choose),('run',self.run),('chart_run',self.chart_run),('chart_cutoff',self.chart_cutoff),('row',self.row),('diagnostic',self.diagnostic),('original',self.original),('apply',self.apply),('label',self.label),('export',self.export),('training',self.training),('training_preview',self.training_preview),('training_api',self.training_api)]:ctx.command(name,callback)
+        for name,callback in [('refresh',self.refresh),('save',self.save),('adopt',self.adopt),('choose',self.choose),('run',self.run),('chart_run',self.chart_run),('chart_cutoff',self.chart_cutoff),('mark_all',self.mark_all),('mark_cutoff',self.mark_cutoff),('mark_type',self.mark_type),('row',self.row),('diagnostic',self.diagnostic),('original',self.original),('apply',self.apply),('label',self.label),('export',self.export),('training',self.training),('training_preview',self.training_preview),('training_api',self.training_api)]:ctx.command(name,callback)
+        for kind in problems.TYPES:ctx.command('mark_type_'+kind,lambda p,kind=kind:self.mark_type(dict(p,problemType=kind)))
         ctx.command('ai_api',self.ai.service.call)
         ctx.command('quality_api',self.quality_api)
         self.publish()
 
     def values(self,p):return p.get('values',p)
+    def supported(self):
+        """Warning types the host understands; asked once (older hosts have no 'capabilities')."""
+        if self._supported is None:
+            try:
+                caps=self.ctx.inspection('capabilities',{});self._supported=set(caps.get('warningTypes') or OLD_SUPPORTED);self._scopes=set(caps.get('scopes') or ());self._mark=bool(caps.get('mark'))
+            except ValueError:
+                self._supported=set(OLD_SUPPORTED);self._scopes=set();self._mark=False;self.capability_note=self.problem=OLD_SDK_NOTE
+        return self._supported
     def save(self,p):
         v=self.values(p);o=dict(self.options)
         for key in ('threshold','qualityCutoff','edge','workers','archive','telescope','object','night','view'):
@@ -61,7 +82,12 @@ class Inspector:
         if not self.ids:raise ValueError('Няма кадри за този избор.')
         self.source_report=None;self.result=None;self.image=None;self.selected=None;self.publish();return dict(message=f'Избрани са {len(self.ids)} кадъра.')
 
+    def remember(self,p):
+        context=p.get('context') if isinstance(p,dict) else None
+        if isinstance(context,dict) and isinstance(context.get('ids'),list):self.chart_ids=[i for i in context['ids'] if isinstance(i,str)]
+
     def chart_run(self,p):
+        self.remember(p)
         if self.busy:raise ValueError('AI инспекцията вече работи.')
         selection=self.ctx.inspection('selection',dict(scope='report'));context=p.get('context',{})
         if not selection.get('reportId') or context.get('stage')!='result':raise ValueError('Първо отвори готовата диаграма от анализа.')
@@ -72,36 +98,34 @@ class Inspector:
         return self.run({},chart=True)
 
     def chart_cutoff(self,p):
+        self.remember(p)
         if self.busy:raise ValueError('Изчакай текущата AI проверка.')
         self.save(p)
         if self.result:
             current=self.ctx.inspection('selection',dict(scope='report'))
             if current.get('reportId')!=self.result['reportId']:
                 self.publish();return dict(saved=True,message='Прагът е запазен. Изпълни AI проверка за текущия анализ.')
-            for row in self.result['rows']:
-                if row.get('error'):continue
-                row['warnings']=[w for w in row.get('warnings',[]) if not w.get('message','').startswith(('Индексът е под','Напълно проблемен според AI'))]
-                value=row.get('aiQuality');row['qualityProblem']=value is not None and value<=self.options['qualityCutoff']
-                if row['qualityProblem']:row['warnings'].append(dict(type='quality',origin='ai',score=round(1-value/100,4),severity='high',message=f'Напълно проблемен според AI: индекс {value:.1f}% е под зададения праг. Провери ръчно.'))
-                row['status']=status_for(row)
-            annotations=[annotation(r) for r in self.result['rows']]
-            self.ctx.inspection('annotate',dict(reportId=self.result['reportId'],annotations=annotations,highlight=True))
+            for row in self.result['rows']:rebuild_row(row,self.options)
+            supported=self.supported()
+            annotations=[annotation(r,supported,self._scopes) for r in self.result['rows']]
+            self.ctx.inspection('annotate',dict(reportId=self.result['reportId'],annotations=annotations))  # selection untouched; only mark commands mark
         self.publish();return dict(saved=True)
 
     def run(self,p,chart=False):
         self.save(p)
         if self.busy:raise ValueError('AI инспекцията вече работи.')
         if not self.ids:raise ValueError('Избери кадри за инспекция.')
-        self.busy=True;self.problem='';self.image=None;self.generation+=1;generation=self.generation
+        supported=self.supported();self.busy=True;self.problem=self.capability_note;self.image=None;self.generation+=1;generation=self.generation
         user_model=None
         force=bool(self.values(p).get('force',False));options=dict(self.options,force=force,model=self.starter,qualityModel=user_model);ids=list(self.ids);report_id=self.source_report;self.publish()
         def work(cancel,progress):
             try:
                 result=self.pipeline.run(ids,report_id,options,cancel,lambda done,total,label:progress(.75*done/max(1,total),1,label))
                 self.ai.attach(result,cancel=cancel,progress=lambda done,total:progress(.75+.25*done/max(1,total),1,f'ResNet / евристична оценка · {done}/{total}'))
+                merge_series(result,options)
                 if generation==self.generation and not self.closed:
                     self.result=result;self.source_report=result['reportId'];self.selected=None
-                    if chart and not cancel.is_set():self.ctx.inspection('annotate',dict(reportId=result['reportId'],annotations=[annotation(r) for r in result['rows']],highlight=True))
+                    if chart and not cancel.is_set():self.ctx.inspection('annotate',dict(reportId=result['reportId'],annotations=[annotation(r,supported,self._scopes) for r in result['rows']]))  # no pre-marking
                 return dict(frames=len(result['rows']),suspect=sum(bool(r.get('warnings')) for r in result['rows']),cached=result['cached'])
             except Exception as error:self.problem=str(error);raise
             finally:
@@ -136,7 +160,7 @@ class Inspector:
 
     def apply(self,p):
         if not self.result:raise ValueError('Първо изпълни инспекцията.')
-        annotations=[annotation(r) for r in self.result['rows']]
+        annotations=[annotation(r,self.supported(),self._scopes) for r in self.result['rows']]
         result=self.ctx.inspection('annotate',dict(reportId=self.result['reportId'],annotations=annotations,present=True))
         return dict(**result,message='AI предупрежденията са добавени към диаграмата. Подборът и оригиналите не са променени.')
 
@@ -191,6 +215,70 @@ class Inspector:
         if not row or row.get('error') or not row.get('shape'):raise ValueError('Прегледът е достъпен само за измерен кадър от текущия AI отчет.')
         return dict(image=self.pipeline.preview(row))
 
+    def shown_rows(self):
+        rows=(self.result or {}).get('rows',[])
+        if self.chart_ids is None:return rows
+        shown=set(self.chart_ids);return [r for r in rows if r['id'] in shown]
+    def has_problem(self,row,kind=None):
+        for item in row.get('problems',[]):
+            name=item.get('type')
+            if item.get('severity')=='low':continue  # under-threshold frame of a series event: not a problem
+            if kind is None:
+                if SEVERITY_RANK.get(item.get('severity'),3)<=SEVERITY_RANK['medium']:return True
+            elif name==kind or (kind=='flare' and name=='light'):return True
+        return False
+    def below_cutoff(self,row):
+        quality=row.get('aiQuality');return quality is not None and quality<=self.options['qualityCutoff']
+    def mark_rows(self,rows,kind=None,cutoff=False):
+        return [r for r in rows if (self.below_cutoff(r) if cutoff else self.has_problem(r,kind))]
+
+    def mark(self,p,kind=None,cutoff=False):
+        self.remember(p);self.problem=self.capability_note
+        try:
+            if self.busy:raise ValueError('Изчакай текущата AI проверка.')
+            if not self.result:raise ValueError('Изпълни AI проверка за текущия анализ.')
+            if self.ctx.inspection('selection',dict(scope='report')).get('reportId')!=self.result['reportId']:raise ValueError('Изпълни AI проверка за текущия анализ.')
+            picked=self.mark_rows(self.shown_rows(),kind,cutoff)
+            if not picked:raise ValueError('Няма такива кадри в показаните.')
+            supported=self.supported()
+            if self._mark:
+                done=self.ctx.inspection('mark',dict(reportId=self.result['reportId'],ids=[r['id'] for r in picked]))
+                count=done.get('marked',len(picked)) if isinstance(done,dict) else len(picked)
+            else:
+                self.ctx.inspection('annotate',dict(reportId=self.result['reportId'],annotations=[annotation(r,supported,self._scopes) for r in picked],highlight=True));count=len(picked)
+            self.publish();return dict(marked=count,message=f'Маркирани кадри: {count}.')
+        except ValueError as error:
+            self.problem=str(error);self.publish();return dict(marked=0,message=self.problem)
+    def mark_all(self,p):return self.mark(p)
+    def mark_cutoff(self,p):return self.mark(p,cutoff=True)
+    def mark_type(self,p):
+        kind=self.values(p).get('problemType') or p.get('problemType')
+        if kind not in problems.TYPES:
+            self.problem='Избери вид проблем.';self.publish();return dict(marked=0,message=self.problem)
+        return self.mark(p,kind)
+
+    def series_summary(self):
+        series=(self.result or {}).get('series') or {}
+        events=series.get('events',[])
+        parts=[f"{problems.ICONS.get(e['type'],'')} {problems.LABELS.get(e['type'],e['type']).lower()} {e.get('range') or (e['start']+'–'+e['end'])}".strip() for e in events[:4]]
+        if len(events)>4:parts.append('…')
+        if parts:return 'Серия: '+' · '.join(parts)
+        notes=' '.join(series.get('notes',[]))
+        return 'Серия: '+(notes or 'не са забелязани бавни проблеми.')
+
+    def chart_fields(self):
+        o=self.options;rows=self.shown_rows();off=self.busy or not self.result
+        everything=self.mark_rows(rows);cut=self.mark_rows(rows,cutoff=True)
+        chart_state='Проверяват се показаните кадри. Напредъкът е горе вляво.' if self.busy else f"Проверени: {len(self.result['rows'])} · с AI индекс: {sum(r.get('aiQuality') is not None for r in self.result['rows'])} · под прага: {sum(bool(r.get('qualityProblem')) for r in self.result['rows'])} · облаци: {sum(any(w['type']=='cloud' and w.get('severity')!='low' for w in r.get('warnings',[])) for r in self.result['rows'])} · светлинни смущения/градиент: {sum(any(w['type'] in ('gradient','flare','light') and w.get('severity')!='low' for w in r.get('warnings',[])) for r in self.result['rows'])} · без надежден индекс: {sum(r.get('aiQuality') is None for r in self.result['rows'])}. Прегледай преди изключване." if self.result else 'Проверява показания обект и вечер без предварително маркиране. Шумът и постоянният небесен фон се сравняват с референции.'
+        doc=[field('number','qualityCutoff',label='AI качество до [%] · за бутона „Под прага“',value=o['qualityCutoff'],min=0,max=100,step=1,command='chart_cutoff',disabled=self.busy),field('button','chart-run',label='AI проверка на кадрите',command='chart_run',tone='primary',disabled=self.busy),field('text','chart-state',value=self.problem or chart_state,tone=('warning' if self.problem==OLD_SDK_NOTE else 'error') if self.problem else 'normal'),field('text','chart-limit',value='AI индексът е качество, а сравнена област [%] показва колко от конкретния кадър има поне 3 референции. Това не е увереност на модела. Различни части на мозайка не се наказват за липса на съвпадение. Без достатъчно данни няма процент или автоматично изключване.',tone='warning')]
+        if self.result:doc.append(field('text','series-summary',value=self.series_summary(),span=2))
+        shown=bool(self.result)  # mark buttons appear only once a result exists
+        doc.append(field('button','mark-all',label=f'Всички с проблем ({len(everything)})',command='mark_all',disabled=off or not everything,visible=shown))
+        doc.append(field('button','mark-cutoff',label=f'Под прага ({len(cut)})',command='mark_cutoff',disabled=off or not cut,visible=shown))
+        for kind in problems.TYPES:
+            n=len(self.mark_rows(rows,kind));doc.append(field('button','mark-'+kind,label=f'{problems.ICONS[kind]} {problems.LABELS[kind]} ({n})',command='mark_type_'+kind,disabled=off or not n,visible=shown))
+        return doc
+
     def publish(self):
         if self.closed:return
         o=self.options;rows=self.visible();current=next((r for r in (self.result or {}).get('rows',[]) if r['id']==self.selected),None)
@@ -220,7 +308,7 @@ class Inspector:
             doc.append(field('text','limitations',span=2,value=' · '.join(outcome['limitations'])))
             doc.append(field('table','measurements',label='Числови измервания и производни оценки',span=2,columns=[dict(key=k,label=t) for k,t in [('factor','Фактор'),('name','Показател'),('value','Стойност'),('unit','Единица'),('measured','Измерен'),('method','Метод')]],rows=[dict(factor=f['id'],**{k:m.get(k) for k in ('name','value','unit','measured','method')}) for f in outcome['factors'] for m in f['metrics']]))
             doc.append(field('table','evidence',label='Локализация · области кандидати',span=2,columns=[dict(key=k,label=t) for k,t in [('factor','Фактор'),('bbox','x, y, ширина, височина'),('space','Координати'),('note','Метод / ограничения')]],rows=[dict(factor=f['id'],bbox=str(e.get('bbox')),space=e.get('coordinateSpace','analysis_sample'),note=e.get('note','')) for f in outcome['factors'] for e in f['evidence'] if e.get('bbox')]))
-        if self.problem:doc.insert(2,field('text','problem',value=self.problem,tone='error',span=2))
+        if self.problem:doc.insert(2,field('text','problem',value=self.problem,tone='warning' if self.problem==OLD_SDK_NOTE else 'error',span=2))
         if current:
             doc.append(field('group','details',label=current['name'],span=2,children=[
                 field('text','frame-status',span=2,value=current['status']+((' · '+current['error']) if current.get('error') else '')),
@@ -232,8 +320,7 @@ class Inspector:
             doc.extend([field('select','human-label',label='Моята проверка на този кадър',value='uncertain',options=[option('clear','Няма такъв проблем'),option('cloud','Има облачност'),option('satellite','Има следа'),option('obstruction','Има препятствие'),option('uncertain','Не мога да определя')]),field('button','label',label='Запази моята оценка за бъдещо обучение',command='label')])
         if self.image:doc.append(field('image','diagnostic-image',label='Подравнен диагностичен преглед · зарежда се само при поискване',value=self.image,span=2))
         self.ctx.publish('inspect',doc)
-        chart_state='Проверяват се показаните кадри. Напредъкът е горе вляво.' if self.busy else f"Проверени: {len(self.result['rows'])} · с AI индекс: {sum(r.get('aiQuality') is not None for r in self.result['rows'])} · под прага: {sum(bool(r.get('qualityProblem')) for r in self.result['rows'])} · облаци: {sum(any(w['type']=='cloud' for w in r.get('warnings',[])) for r in self.result['rows'])} · светлинни смущения/градиент: {sum(any(w['type']=='light' for w in r.get('warnings',[])) for r in self.result['rows'])} · без надежден индекс: {sum(r.get('aiQuality') is None for r in self.result['rows'])}. Прегледай преди изключване." if self.result else 'Проверява показания обект и вечер без предварително маркиране. Шумът и постоянният небесен фон се сравняват с референции.'
-        self.ctx.publish('chart',[field('number','qualityCutoff',label='AI качество до [%] · предложи за изключване',value=o['qualityCutoff'],min=0,max=100,step=1,command='chart_cutoff',disabled=self.busy),field('button','chart-run',label='AI проверка на кадрите',command='chart_run',tone='primary',disabled=self.busy),field('text','chart-state',value=self.problem or chart_state,tone='error' if self.problem else 'normal'),field('text','chart-limit',value='AI индексът е качество, а сравнена област [%] показва колко от конкретния кадър има поне 3 референции. Това не е увереност на модела. Различни части на мозайка не се наказват за липса на съвпадение. Без достатъчно данни няма процент или автоматично изключване.',tone='warning')])
+        self.ctx.publish('chart',self.chart_fields())
         self.ctx.publish('options',[field('text','model-note',span=2,value='Локален AI индекс: ориентировъчен, не калибрирана вероятност. Кадрите без надеждно измерване нямат процент. Обучен модел се прилага от следващата проверка.'),field('number','qualityCutoff',label='Напълно проблемен при AI индекс до [%]',value=o['qualityCutoff'],min=0,max=100,step=1,command='save'),field('number','threshold',label='Праг за сигнал за облак / следа',value=o['threshold'],min=.55,max=.98,step=.01,command='save'),field('number','edge',label='Максимална работна дълга страна [px]',value=o['edge'],min=256,max=1536,step=128,command='save'),field('number','workers',label='Паралелни работници',value=o['workers'],min=1,max=4,step=1,command='save')])
 
     def close(self):

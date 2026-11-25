@@ -5,9 +5,92 @@ import threading
 import uuid
 import collections
 from pathlib import Path
-from . import evaluator
+from .pipeline import grouping
+from . import evaluator,frame_checks,problems,score_formula,series
 from .analyzers.storage import utc_now, atomic_write_json, read_json
 from .ai_service import AIService, APIError, require
+
+
+REASON_TYPE={'light':'gradient','trails':'satellite','artifacts':'flare'}
+
+
+def reason_problems(outcome):
+    """Problems from evaluator reasons: only factors that map to a problem type, by the score thresholds of
+    frame_checks (high >= .85, medium >= .6). 'overall', noise, defects and stars never become problems."""
+    out=[];stack=outcome['recommendation']['stack']
+    for reason in outcome['recommendation']['reasons']:
+        kind=REASON_TYPE.get(reason.get('factor'))
+        if kind is None or reason.get('risk') is None:continue
+        score=_clamp(reason['risk'])
+        severity='high' if score>=.85 else 'medium' if score>=.6 else None
+        if severity is None:continue
+        if stack=='do_not_stack':severity='high'
+        out.append(problems.problem(kind,score,severity,('AI оценител · '+reason['message'])[:400],dict(factor=reason['factor'])))
+    return out
+
+
+def row_view(row):
+    """Row with its stored measurements flattened in, as the frame and series checks expect."""
+    view={k:v for k,v in (row.get('measurements') or {}).items() if v is not None}
+    view.update(row)
+    return view
+
+
+def _clamp(value):
+    return min(1.,max(0.,float(value)))
+
+
+def _add(found,problem):
+    old=found.get(problem['type'])
+    if old is None or problem['score']>old['score']:found[problem['type']]=problem
+
+
+def _is_cutoff(problem):
+    return problem.get('type')=='quality' and (problem.get('measures') or {}).get('cutoff') is True
+
+
+def rebuild_row(row,options):
+    """Recompute index, problems and warnings from the stored frame/series problems and factor risks.
+
+    A frame without a reliable evaluator quality (or with an error) never gets an index; its problems
+    are still listed and warned about. 'low' problems (frames of a series event that are under the threshold
+    by themselves) stay in row['problems'] for details but are no risk and no warning. A frame-check 'quality' problem (severe degradation) is the
+    'severe' risk; the cutoff 'quality' problem made here (measures.cutoff) is never fed back."""
+    base=[p for p in list(row.get('frameProblems') or [])+list(row.get('seriesProblems') or []) if not _is_cutoff(p)]
+    outcome=row.get('aiResult')
+    quality=((outcome or {}).get('overall') or {}).get('quality') if outcome else None
+    value=None
+    if quality is not None and not row.get('error'):
+        risks={}
+        for p in base:
+            if p.get('severity')=='low':continue
+            key='severe' if p['type']=='quality' else p['type']
+            risks[key]=max(risks.get(key,0.),p['score'])
+        for factor in outcome.get('factors',[]):
+            key=score_formula.FACTOR_TO_RISK.get(factor.get('id'))
+            if key and factor.get('risk') is not None:risks[key]=max(risks.get(key,0.),_clamp(factor['risk']))
+        value=score_formula.index(risks)
+    row['aiQuality']=value
+    row['qualityProblem']=value is not None and value<=options.get('qualityCutoff',35)
+    found=[p for p in base if not (row['qualityProblem'] and p['type']=='quality')]
+    if row['qualityProblem']:
+        found.append(problems.problem('quality',round(1-value/100,4),'high',f'Напълно проблемен според AI: индекс {value:.1f}% е под зададения праг. Провери ръчно.',dict(aiQuality=round(value,1),cutoff=True)))
+    row['problems']=found
+    row['warnings']=[dict(message=p['message'][:400],type=p['type'],score=p['score'],severity=p['severity'],origin='ai',scope=p.get('scope','frame')) for p in found if p.get('severity')!='low']  # low: details only
+    if outcome and not row.get('error'):
+        from .pipeline import status_for
+        row['status']=status_for(row)
+    return row
+
+
+def merge_series(result,options):
+    """Whole-series check over the rows; its problems join each frame's own and the index is recomputed."""
+    analysis=series.analyze([row_view(r) for r in result['rows']],options)
+    result['series']=analysis
+    for row in result['rows']:
+        row['seriesProblems']=analysis['perFrame'].get(row['id'],[])
+        rebuild_row(row,options)
+    return result
 
 
 class AIHost:
@@ -133,10 +216,15 @@ class AIHost:
             return 'евристична оценка; няма използваем обучен и активен ResNet'
 
     def attach(self,result, request_id=None,cancel=None,progress=None):
-        model=self.active_model()
+        model=self.active_model();options=self.inspector.options
+        views={r['id']:row_view(r) for r in result['rows']};groups={}
+        for row in result['rows']:
+            try:groups.setdefault(grouping(row),[]).append(views[row['id']])
+            except (KeyError,AttributeError,TypeError):pass
         for index,row in enumerate(result['rows']):
             if cancel is not None and cancel.is_set():raise InterruptedError('ResNet оценката е отменена.')
             if progress:progress(index,len(result['rows']))
+            row.update(objectClass=None,frameProblems=[],seriesProblems=[],problems=[])
             if row.get('error'): continue
             try:
                 frame=self.resolve(dict(frameId=row['id']))
@@ -148,22 +236,22 @@ class AIHost:
                 saved={k:row.get(k) for k in ('id','sourceSize','sourceMtime','width','height','meta','analyzerData','referenceFrames','measurements')}
                 atomic_write_json(self.service.root/'measurements'/(frame['hash'][7:]+'.json'),saved)
                 row['aiResult']=outcome
-                value=outcome['overall']['quality'];row['aiQuality']=100*value if value is not None else None
+                value=outcome['overall']['quality']
                 row['scores']=outcome['events']
                 row['engineKind']=outcome['engine']['kind']
                 row['qualityReason']='Невронна мрежа' if row['engineKind']=='neural' else 'Евристична оценка'
-                row['qualityProblem']=value is not None and 100*value<=self.inspector.options['qualityCutoff']
-                row['warnings']=[dict(type='light' if reason['factor']=='light' else 'satellite' if reason['factor']=='trails' else 'quality',origin='ai',score=reason.get('risk') if reason.get('risk') is not None else 1-value if value is not None else 0.,severity='high' if outcome['recommendation']['stack']=='do_not_stack' else 'medium',message=('AI оценител · '+reason['message'])[:400]) for reason in outcome['recommendation']['reasons'] if reason['code']!='within_review_threshold']
+                try:key=grouping(row)
+                except (KeyError,AttributeError,TypeError):key=None
+                found={p['type']:p for p in frame_checks.check(views[row['id']],groups.get(key,[views[row['id']]]),options)}
+                for reason_problem in reason_problems(outcome):_add(found,reason_problem)
                 for event,probability in outcome['events'].items():
-                    if probability is not None and probability>=self.inspector.options.get('threshold',.72):
-                        row['warnings'].append(dict(type=event,origin='ai',score=probability,severity='medium',message='ResNet кандидат за '+event+'; провери ръчно.'))
-                if row['qualityProblem'] and not row['warnings']:
-                    row['warnings'].append(dict(type='quality',origin='ai',score=1-value,severity='high',message='Индексът е под избрания праг; провери ръчно.'))
-                from .pipeline import status_for
-                row['status']=status_for(row)
+                    if probability is not None and probability>=options.get('threshold',.72) and event in problems.TYPES:
+                        _add(found,problems.problem(event,_clamp(probability),'medium','ResNet кандидат за '+event+'; провери ръчно.',dict(probability=round(float(probability),4))))
+                row['frameProblems']=list(found.values())
+                rebuild_row(row,options)
             except (APIError, OSError, ValueError, KeyError):
                 row.pop('aiResult',None)
-                row.update(aiQuality=None,qualityProblem=False,warnings=[],scores={},status='Няма валидна AI оценка; преизчисли кадъра.')
+                row.update(aiQuality=None,qualityProblem=False,warnings=[],problems=[],frameProblems=[],scores={},status='Няма валидна AI оценка; преизчисли кадъра.')
         if progress:progress(len(result['rows']),len(result['rows']))
         return result
 

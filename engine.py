@@ -6,7 +6,7 @@ from scipy import ndimage as ndi
 from scipy.spatial import cKDTree
 
 FEATURES=('transparency_loss','flux_scatter','star_loss','positive_area','negative_area','diffuse_peak','dark_area','dark_edge','edge_contact','line_length','line_snr','line_fill','reference_count','overlap','noise_ratio')
-VERSION='sky-relative-3-local'
+VERSION='sky-relative-4-problems'
 
 def robust_noise(image):
     values=np.asarray(image,np.float32)

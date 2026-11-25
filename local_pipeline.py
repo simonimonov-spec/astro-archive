@@ -33,6 +33,15 @@ def base(row):
                 decision=row.get('decision','approved'),sourceSize=row.get('sourceSize'),sourceMtime=row.get('sourceMtime'),comparisonCoverage=0.,referenceFrames=0,matchedStars=0,referenceIds=[],comparisonMethod='local-frame',qualityFeatures=None)
 
 
+def compact_stars(stars):
+    """Shape/position of the first stars only; frame and series checks read these from the cached rows."""
+    out=[]
+    for star in (stars or [])[:128]:
+        item={k:round(float(star[k]),3) for k in ('x','y','angle','roundness') if isinstance(star.get(k),(int,float)) and not isinstance(star.get(k),bool) and math.isfinite(star[k])}
+        if 'x' in item and 'y' in item:out.append(item)
+    return out
+
+
 def run(pipeline,ids,report_id,options,cancel,progress):
     from .pipeline import grouping,atomic,assess
     def prepare(done,total,label):progress(done*.28/max(1,total),1,'Звездни измервания и подравняване · '+label)
@@ -133,6 +142,7 @@ def run(pipeline,ids,report_id,options,cancel,progress):
         from .analyzers.base import number
         meta.update(pixelScale=number(original.get('pixelScale')),gain=number(headers.get('GAIN')),bayer=int(bool(headers.get('BAYERPAT'))))
         item.update(width=original.get('width'),height=original.get('height'),meta=meta)
+        item['starList']=compact_stars(original.get('starList'))
         from .resnet_model import MEASUREMENTS
         item['measurements']={k:original.get(k) for k in MEASUREMENTS}
         if not item.get('error') and 'analyzerData' not in item:

@@ -1,7 +1,8 @@
 """inspector.quality.v1 — the same AI index as the visual check, for other plugins.
 
-Runs the existing pipeline and AI scoring on given frame IDs. No chart, no annotations,
-and the visible inspection result is not replaced. One job at a time, ticket based."""
+Runs the existing pipeline, AI scoring and the whole-series check (as the chart does) on the given
+frame IDs, so a frame inside a series event gets the same index here as on the chart. No chart,
+no annotations, and the visible inspection result is not replaced. One job at a time, ticket based."""
 import threading,time,uuid
 
 MAX_IDS=5000
@@ -41,6 +42,8 @@ def invoke(inspector,p):
             options=dict(inspector.options,force=False,model=inspector.starter,qualityModel=None)
             result=inspector.pipeline.run(ids,None,options,Stop(),lambda d,t,m:update(.75*d/max(1,t),1,m))
             inspector.ai.attach(result,cancel=Stop(),progress=lambda d,t:update(.75+.25*d/max(1,t),1,f'AI индекс · {d}/{t}'))
+            from .ai_host import merge_series
+            merge_series(result,options)
             wanted=set(ids)
             scores={r['id']:(float(r['aiQuality']) if r.get('aiQuality') is not None else None) for r in result['rows'] if r['id'] in wanted}
             with inspector.training_lock:job.update(state='completed',fraction=1.,result=dict(scores=scores),message='AI индексът е готов.',updated=time.time())
