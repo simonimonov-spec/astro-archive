@@ -32,8 +32,6 @@ h2 { font-size: 16px; font-weight: 600; }
 .text-button { background: transparent; padding: 3px 0; color: var(--accent); font-size: 12px; }
 .text-button:hover { text-decoration: underline; }
 main { padding: 8px 32px 22px; flex: 1; min-width: 0; }
-.page { animation: appear var(--motion-duration) var(--motion-easing); }
-@keyframes appear { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 .page-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 8px 0 23px; }
 .eyebrow { font-size: 10px; letter-spacing: 1.7px; color: var(--accent); font-weight: 600; margin-bottom: 5px; }
 .subtitle { color: var(--muted); margin-top: 5px; }
@@ -93,6 +91,8 @@ dialog p { margin-bottom: 20px; }
 .settings-tabs { display: flex; flex-shrink: 0; gap: 6px; padding: 12px 24px 0; border-bottom: 1px solid var(--border); }
 .settings-tabs button { padding: 12px 18px; border-radius: 7px 7px 0 0; background: transparent; color: var(--muted); border-bottom: 3px solid transparent; }
 .settings-tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); background: var(--accent-surface); }
+#settings-dialog[open]::backdrop, .image-viewer[open]::backdrop { animation: modal-backdrop-in 220ms ease-out; }
+@keyframes modal-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
 .settings-body { min-height: 0; overflow: auto; padding: 0 24px 20px; scrollbar-gutter: stable; }
 .settings-section { padding: 22px 0; border-bottom: 1px solid var(--border); }
 .settings-section:last-of-type { margin-bottom: 16px; }
@@ -194,3 +194,26 @@ dialog p { margin-bottom: 20px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
 .app-icon{display:block;width:21px;height:21px;flex:none;pointer-events:none}.app-icon-button{display:inline-flex;align-items:center;justify-content:center}.icon-button.app-icon-button{width:36px;height:36px;padding:0;border-radius:10px;flex:none}.app-icon-button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+/* Only the work area moves. The header stays live while the snapshots slide. */
+:root[data-route-motion] { view-transition-name: none; }
+:root[data-route-motion] #main { view-transition-name: workspace; }
+:root[data-route-motion="forward"] { --workspace-enter: 100vw; --workspace-exit: -100vw; }
+:root[data-route-motion="back"] { --workspace-enter: -100vw; --workspace-exit: 100vw; }
+::view-transition { pointer-events: none; }
+::view-transition-group(workspace) { animation: none; }
+::view-transition-old(workspace), ::view-transition-new(workspace) {
+  animation-duration: 290ms;
+  animation-timing-function: cubic-bezier(.22, 1, .36, 1);
+  animation-fill-mode: both;
+  mix-blend-mode: normal;
+}
+::view-transition-old(workspace) { animation-name: workspace-exit; }
+::view-transition-new(workspace) { animation-name: workspace-enter; }
+@keyframes workspace-exit { to { transform: translateX(var(--workspace-exit)); } }
+@keyframes workspace-enter { from { transform: translateX(var(--workspace-enter)); } }
+:root[data-animations="off"]::view-transition-old(workspace),
+:root[data-animations="off"]::view-transition-new(workspace) { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(workspace), ::view-transition-new(workspace) { animation: none; }
+}

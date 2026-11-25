@@ -2,6 +2,8 @@
 // Adapter for the preserved frontend contract. No filesystem access in JavaScript.
 (() => {
   const listeners=new Set(),base=new URL('.',location.href);let after=0,stopped=false,key='',keyHeader='X-AstroArchive-Key',bootstrapExpired=false;
+  const viewerNavigation = new Set(['function.image', 'image.open', 'viewer.neighbor', 'viewer.close']);
+  let pollTimer, polling = false, pollAgain = false;
   async function connect(){
     let delay=1000;
     while(!stopped){
@@ -36,20 +38,29 @@
       emit({type:'response',id:message.id,ok:false,error:'Връзката още не е готова. Опитай отново.'});return;
     }
     ready.then(()=>fetch(new URL('api/rpc',base),{method:'POST',headers:{'Content-Type':'application/json',[keyHeader]:key},body:JSON.stringify(message)})).then(r=>r.json()).then(result=>{
-      emit(result);if(message.method==='ui.storage')window.dispatchEvent(new Event('astroarchive-python-settings'));
+      emit(result);
+      if (viewerNavigation.has(message.method)) poll();
+      if(message.method==='ui.storage')window.dispatchEvent(new Event('astroarchive-python-settings'));
     }).catch(error=>emit({type:'response',id:message.id,ok:false,error:error.message}));
   }};
   async function poll(){
     if(stopped)return;
+    if(polling){pollAgain=true;return;}
+    clearTimeout(pollTimer);
+    polling=true;
     try{await ready;const response=await fetch(new URL('api/events?after='+after,base));if(response.ok){const data=await response.json();for(const event of data.events){after=Math.max(after,event.sequence);emit(event);window.dispatchEvent(new CustomEvent('astroarchive-python-event',{detail:event}));}}}
     catch(error){window.dispatchEvent(new CustomEvent('astroarchive-python-offline',{detail:error.message}));}
-    setTimeout(poll,700);
+    finally {
+      polling=false;
+      pollTimer=setTimeout(poll,pollAgain ? 0 : 700);
+      pollAgain=false;
+    }
   }
   poll();window.addEventListener('beforeunload',()=>{stopped=true;});
-  window.AstroArchivePython={call:(method,params={})=>window.AstroArchiveFunctions.call(method,params),
+  window.AstroArchivePython={call:(method,params={},source)=>window.AstroArchiveFunctions.call(method,params,source),
     async task(method,params={},progress){const started=await this.call(method,params);if(!started?.taskId)return started;
       for(;;){const snapshot=await this.call('python.task',{id:started.taskId});progress?.(snapshot);
         if(snapshot.state==='completed')return snapshot.result;if(snapshot.state==='blocked')throw Error(snapshot.problem||'Задачата е спряна.');if(snapshot.state==='cancelled')throw Error('Задачата е отменена.');await new Promise(resolve=>setTimeout(resolve,500));}},
-    image:id=>window.AstroArchiveFunctions.call('function.image',{id}),
+    image:(id,source,nearby)=>window.AstroArchiveFunctions.call('function.image',{id,...(nearby && {nearby})},source),
     navigate:section=>window.AstroArchiveFunctions.navigate(section)};
 })();

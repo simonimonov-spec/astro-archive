@@ -185,8 +185,14 @@
   function showTab(tab, scan = false) {
     if (appearanceOnly()) tab = 'appearance';
     if (!["appearance", "customization", "language", "plugins", "diagnostics"].includes(tab)) return;
-    selectedSettingsTab = tab;
-    $("settings-dialog").dataset.settingsTab = tab;
+    const dialog = $("settings-dialog");
+    window.AstroArchiveMotion.measure(dialog, () => {
+      selectedSettingsTab = tab;
+      showTabContent(dialog, tab, scan);
+    });
+  }
+  function showTabContent(dialog, tab, scan) {
+    dialog.dataset.settingsTab = tab;
     for (const button of document.querySelectorAll("[data-settings-tab]")) {
       const selected = button.dataset.settingsTab === tab;
       button.setAttribute("aria-selected", String(selected)); button.tabIndex = selected ? 0 : -1;
@@ -389,14 +395,21 @@
   }
   async function open(tab) {
     if (busy) return;
+    if ($("settings-dialog").open) {
+      if (typeof tab === "string") showTab(tab);
+      return;
+    }
     if (typeof tab === "string") selectedSettingsTab = tab;
     $("settings-dialog").classList.toggle('settings-appearance-only', appearanceOnly());
     if (appearanceOnly()) selectedSettingsTab = 'appearance';
     window.AstroArchiveActivity.close(false);
-    $("settings-dialog").showModal();
-    window.dispatchEvent(new Event("astroarchive-overlay-changed"));
+    const dialog = $("settings-dialog");
+    const source = $("settings-open").getBoundingClientRect();
     showTab(selectedSettingsTab);
+    dialog.showModal();
+    window.dispatchEvent(new Event("astroarchive-overlay-changed"));
     messageKey = ""; message(""); setBusy(true);
+    window.AstroArchiveMotion.expand(dialog, source);
     try { await window.AstroArchiveIslands?.flush(); if (bindings.desktop) {const saved=await bindings.call("ui.load");if(appearanceOnly())acceptAppearance(saved);else accept(saved);} else fillControls(); }
     catch (error) { report(error); }
     finally { setBusy(false); }
@@ -418,6 +431,7 @@
   $("settings-open").addEventListener("click", open);
   $("settings-close").addEventListener("click", close);
   $("ui-cancel").addEventListener("click", close);
+  $("settings-dialog").addEventListener("close", () => window.AstroArchiveMotion.stop($("settings-dialog")));
   $("settings-dialog").addEventListener("cancel", event => { event.preventDefault(); close(); });
   $("ui-save").addEventListener("click", save);
   $("ui-reset").addEventListener("click", () => { const values=defaults(); draft = appearanceOnly() ? {...draft,...Object.fromEntries(appearanceFields.map(k=>[k,values[k]]))} : {...values, islands:window.AstroArchiveIslands?.snapshot() || draft.islands}; imagePreview = null; apply(draft, null); fillControls(); notice("settings.previewing"); });

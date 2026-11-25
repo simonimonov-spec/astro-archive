@@ -82,7 +82,7 @@
   }
   window.AstroArchiveFunctions = {
     $, tr, number, time, node, options, table, read, run, error, modal, confirm,
-    call: (method, parameters) => api.call(method, parameters),
+    call: (method, parameters, source) => api.call(method, parameters, source),
     connect(value) { api = value; },
     async show(section) { if(window.AstroArchiveExtensions?.isActive(section))return; if (section === 'analysis') await window.AstroArchiveAnalysis.show(); if (section === 'preparation') await window.AstroArchivePreparation.show(); },
     navigate: route => api.navigate(route),

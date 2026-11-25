@@ -544,7 +544,20 @@ class Service:
         if not p.get('id') and self.shared_sources.get(p.get('archiveId')):
             return self.shared_sources.open(p['archiveId'],p['relativePath'],comparison=comparison)
         path=self.catalog.path(p['id']) if p.get('id') else self.catalog.resolve(p['archiveId'],p['relativePath'])
-        return self.viewer.open(path,p.get('id'),comparison=comparison)
+        nearby = None
+        if not comparison and 'nearby' in p:
+            ids = p['nearby']
+            if not isinstance(ids, list) or len(ids) > 10 or any(not isinstance(i, str) or not 0 < len(i) <= 128 for i in ids):
+                raise ValueError('Невалиден списък със съседни кадри.')
+            nearby = []
+            for ident in ids:
+                if ident.startswith('shared-'):
+                    continue
+                try:
+                    nearby.append(self.catalog.path(ident))
+                except (OSError, ValueError):
+                    pass
+        return self.viewer.open(path,p.get('id'),comparison=comparison,nearby=nearby)
 
     def compare_viewer(self, p):
         action = p.get('action')

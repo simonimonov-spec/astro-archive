@@ -1,14 +1,69 @@
 # Beta 1.3 UI
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 from astropy.io import fits
 from PIL import Image
 
-from Backend.Foundation.runtime import Store
+from Backend.Foundation.runtime import Events, Store
+from Backend.Imaging.viewer import Viewer
 from Bridge.Core.service import Service
+
+
+class ViewerBufferTests(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.files = [Path(folder.name) / f'frame-{i:02}.png' for i in range(17)]
+        for i, path in enumerate(self.files):
+            Image.new('RGB', (256, 256), (i, 36, 64)).save(path)
+        catalog = SimpleNamespace(settings=SimpleNamespace(value={'memoryMb': 32}))
+        self.viewer = Viewer(catalog, Events())
+        self.addCleanup(self.finish_prefetch)
+
+    def finish_prefetch(self):
+        worker = self.viewer.worker
+        if worker:
+            worker.join(timeout=10)
+            self.assertFalse(worker.is_alive())
+
+    def test_sliding_window_reuses_rendered_frames_and_releases_them(self):
+        viewer = self.viewer
+        active = viewer.open(self.files[7])['viewerDocument']
+        self.finish_prefetch()
+        self.assertEqual(set(viewer.buffer), set(self.files[2:7] + self.files[8:13]))
+        with patch.object(viewer, '_prepare', wraps=viewer._prepare) as prepare:
+            following = viewer.neighbor(active['id'], 1)['viewerDocument']
+            self.finish_prefetch()
+            self.assertEqual([call.args[0]['path'] for call in prepare.call_args_list], [self.files[13]])
+        self.assertEqual(set(viewer.buffer), set(self.files[3:8] + self.files[9:14]))
+        self.assertEqual(set(viewer.frames), {following['id']})
+        self.assertEqual(set(viewer.assets), {following['id']})
+
+        first = viewer.open(self.files[0])['viewerDocument']
+        self.finish_prefetch()
+        self.assertEqual(set(viewer.buffer), set(self.files[1:6]))
+        viewer.close(first['id'])
+        self.assertFalse(viewer.buffer or viewer.frames or viewer.assets)
+
+    def test_explicit_neighbours_and_memory_limit(self):
+        viewer = self.viewer
+        candidates = [self.files[11], self.files[3]]
+        current = viewer.open(self.files[7], nearby=candidates)['viewerDocument']
+        self.finish_prefetch()
+        self.assertEqual(set(viewer.buffer), set(candidates))
+        viewer.close(current['id'])
+
+        viewer.catalog.settings.value['memoryMb'] = 1
+        current = viewer.open(self.files[7], nearby=candidates)['viewerDocument']
+        self.finish_prefetch()
+        self.assertFalse(viewer.buffer)
+        self.assertLessEqual(viewer._memory_used(), 1024**2)
+        self.assertIn(current['id'], viewer.frames)
 
 
 class ViewerComparisonTests(unittest.TestCase):

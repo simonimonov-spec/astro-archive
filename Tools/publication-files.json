@@ -307,6 +307,10 @@
         "destination": "UI/Shared/Web/controls.css"
       },
       {
+        "source": "UI/Shared/Web/motion.js",
+        "destination": "UI/Shared/Web/motion.js"
+      },
+      {
         "source": "UI/Shared/Web/controls.js",
         "destination": "UI/Shared/Web/controls.js"
       },

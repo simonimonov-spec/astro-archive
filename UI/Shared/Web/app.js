@@ -17,6 +17,8 @@
   let date = new Intl.DateTimeFormat("bg", { dateStyle: "short", timeStyle: "short" });
   let requestNumber = 0;
   let searchTimer;
+  const routes = ["archive", "analysis", "preparation"];
+  let routeTransition, routeRequest = 0;
 
   function element(tag, className, content) {
     const node = document.createElement(tag);
@@ -25,9 +27,10 @@
     return node;
   }
 
-  function call(method, params = {}) {
+  function call(method, params = {}, source) {
     if(['function.image','image.open','viewer.neighbor','viewer.close'].includes(method)&&!params.viewState){const view=window.AstroArchiveViewer?.state?.();if(view)params={...params,viewState:view};}
     if (!webview) return Promise.reject(new Error(t("offline.description")));
+    const cancelOrigin = source && window.AstroArchiveViewer.from(source);
     const id = String(++requestNumber);
     const stoppingForPluginUpdate = method === 'ui.plugins.update' && params.cancelWork === true;
     return new Promise((resolve, reject) => {
@@ -38,7 +41,7 @@
       pending.set(id, { resolve, reject, timeout });
       try { webview.postMessage({ version: 1, id, method, params }); }
       catch (error) { clearTimeout(timeout); pending.delete(id); reject(error); }
-    });
+    }).catch(error => { cancelOrigin?.(); throw error; });
   }
 
   webview?.addEventListener("message", event => {
@@ -98,13 +101,39 @@
   }
 
   function showRoute(route) {
-    if (!["archive", "analysis", "preparation"].includes(route) || route === state.route) return;
+    if (!routes.includes(route)) return;
+    const request = ++routeRequest;
+    routeTransition?.skipTransition();
+    let showing;
+    const update = () => {
+      if (request !== routeRequest || route === state.route) return;
+      showing = showPage(route);
+    };
+    if (route === state.route || !window.AstroArchiveMotion.enabled() || !document.startViewTransition || document.querySelector("dialog[open]")) {
+      update();
+      return showing;
+    }
+    const root = document.documentElement;
+    root.dataset.routeMotion = routes.indexOf(route) > routes.indexOf(state.route) ? "forward" : "back";
+    const transition = routeTransition = document.startViewTransition(update);
+    transition.ready.catch(() => {});
+    transition.finished.finally(() => {
+      if (routeTransition !== transition) return;
+      routeTransition = null;
+      delete root.dataset.routeMotion;
+    }).catch(problem);
+    return transition.updateCallbackDone.then(() => showing).catch(problem);
+  }
+
+  function showPage(route) {
+    const moveFocus = $("page-" + state.route).contains(document.activeElement);
     state.route = route;
     for (const page of document.querySelectorAll(".page")) page.hidden = page.id !== "page-" + route;
     for (const button of document.querySelectorAll("[data-route]")) {
       if (button.dataset.route === route) button.setAttribute("aria-current", "page");
       else button.removeAttribute("aria-current");
     }
+    if (moveFocus) $("main").focus({ preventScroll: true });
     const name = t(route + ".title");
     $("announcements").textContent = name;
     log(t("route.selected", { name }));
@@ -202,13 +231,13 @@
     return sizeNumber.format(value) + " " + units[index];
   }
 
-  async function activateEntry(archiveId, entry) {
+  async function activateEntry(archiveId, entry, icon) {
     if (entry.kind === "archive") { navigateFolder(entry.archiveId, ""); return; }
     if (entry.isLink) { problem(new Error(t("file.linkBlocked"))); return; }
     if (entry.kind === "folder") { navigateFolder(archiveId, entry.relativePath); return; }
     if (!["fits", "image"].includes(entry.kind)) return;
     try {
-      await call("image.open", { archiveId: entry.archiveId || archiveId, relativePath: entry.relativePath });
+      await call("image.open", { archiveId: entry.archiveId || archiveId, relativePath: entry.relativePath }, icon);
       log(t("file.opened", { name: entry.name }));
     } catch (error) { problem(error); }
   }
@@ -255,7 +284,7 @@
         const action = element("button", "row-action", t(openFolder ? "file.open" : "file.preview"));
         action.type = "button";
         action.setAttribute("aria-label", t(openFolder ? "file.openName" : "file.previewName", { name: entry.name }));
-        action.addEventListener("click", event => { event.stopPropagation(); activateEntry(folder.archiveId, entry); });
+        action.addEventListener("click", event => { event.stopPropagation(); activateEntry(folder.archiveId, entry, name.querySelector(".archive-icon")); });
         actionCell.append(action);
         if(folder.filtered){const location=element('button','row-action filter-folder-action',t('archive.toFolder'));location.type='button';location.onclick=event=>{event.stopPropagation();navigateFolder(entry.archiveId||folder.archiveId,entry.relativePath.split(/[\\/]/).slice(0,-1).join('/'));};actionCell.append(location);}
         if(entry.details?.kind==='stack'&&entry.id){const source=element('button','row-action',t('archive.sourceNights'));source.type='button';source.onclick=event=>{event.stopPropagation();window.AstroArchiveArchiveSchema.sourceNights(entry.id).catch(problem);};actionCell.append(source);}
@@ -263,9 +292,9 @@
       row.append(actionCell);
       attachArchiveMenu(row,entry.archiveId||folder.archiveId,entry);
       window.AstroArchiveRemote?.decorateEntry(actionCell,folder,entry);
-      row.addEventListener("dblclick", () => activateEntry(folder.archiveId, entry));
+      row.addEventListener("dblclick", () => activateEntry(folder.archiveId, entry, name.querySelector(".archive-icon")));
       row.addEventListener("keydown", event => {
-        if (event.target === row && event.key === "Enter") { event.preventDefault(); activateEntry(folder.archiveId, entry); }
+        if (event.target === row && event.key === "Enter") { event.preventDefault(); activateEntry(folder.archiveId, entry, name.querySelector(".archive-icon")); }
       });
       fragment.append(row);
     }

@@ -119,7 +119,7 @@
     P.navigate('preparation');
   }
 
-  async function information(archiveId,entry,shared) {
+  async function information(archiveId,entry,shared,source) {
     const data=directory(entry)||image(entry)?await P.call('archive.metadata.describe',scope(archiveId,entry)):null;
     U.modal(t('archive.context.infoTitle',{name:entry.name}),(body,dialog)=>{
       body.append(U.node('p',entry.relativePath||entry.name,'archive-context-path'));
@@ -143,7 +143,7 @@
       }
       if(image(entry)&&!entry.isLink){
         body.append(modalAction(t('archive.context.preview'),()=>{
-          dialog.close();return entry.id?P.image(entry.id):P.call('image.open',scope(archiveId,entry));
+          dialog.close();return entry.id?P.image(entry.id,source):P.call('image.open',scope(archiveId,entry),source);
         }));
       }
       if(entry.id&&(entry.details?.sourceFiles?.length||entry.details?.kind==='stack')){
@@ -193,6 +193,7 @@
     dismiss();
     ensureMenu();
     anchor=event.currentTarget;
+    const source=anchor.querySelector(".file-name > :first-child");
     const keyboard=event.type==='keydown'||event.clientX===0&&event.clientY===0;
     const valid=!entry.isLink;
     const shared=Boolean(archive?.sharedSource||window.AstroArchiveRemote);
@@ -213,7 +214,7 @@
         ()=>folder?window.AstroArchiveArchiveSchema.renameBatch(archiveId,entry):renameFile(archiveId,entry),'rename',writable),
       command(t('archive.context.tag'),()=>tag(archiveId,entry,archive),'tag',writable),
       command(t('nav.preparation'),()=>prepare(archiveId,entry),'prepare',enabled),
-      command(t('archive.context.info'),()=>information(archiveId,entry,shared),'info',valid),
+      command(t('archive.context.info'),()=>information(archiveId,entry,shared,source),'info',valid),
       actions
     );
     menu.style.left=menu.style.top='0px';

@@ -120,19 +120,28 @@
     if(!isolated)$('compare').disabled=!frame.canNavigate||loading;
   }
   function error(message){$('error').textContent=message;$('error').hidden=false;}
+  let origin;
+  function from(source) {
+    const bounds = source.getBoundingClientRect();
+    origin = bounds;
+    return () => { if (origin === bounds) origin = null; };
+  }
   function opening(message){
+    const source = origin;
+    origin = null;
     if(!dialog)create();if(dialog.open&&id===message.id)return;
     const previous=transformState();if(previous)keptTransform=previous;
+    const keepCanvas = !!picture;
     clearTimeout(debounce);clearTimeout(pixelTimer);serial++;renderSerial++;id=message.id;frame=null;picture=null;pendingDisplay=null;
     if(!dialog.open){
       if(isolated)dialog.show();
-      else{restoreFocus=document.activeElement;document.documentElement.classList.add('viewer-open');dialog.showModal();}
+      else{restoreFocus=document.activeElement;document.documentElement.classList.add('viewer-open');dialog.showModal();window.AstroArchiveMotion?.expand(dialog,source);}
     }
     $('name').textContent=message.fileName;stage.setAttribute('aria-label',message.fileName);
     $('meta').textContent='';$('path').textContent='';$('pixel').textContent=t('sampled');$('cards').hidden=true;$('cards').textContent='';$('error').hidden=true;$('badge').textContent='';
     $('retry').hidden=true;$('retry').onclick=null;
     for(const k of ['resolution','stats','low','high'])$(k).textContent='';for(const k of ['flipX','flipY'])$(k).setAttribute('aria-pressed',String(k==='flipX'?flipX:flipY));
-    for(const c of [canvas,overview,histogram])c.getContext('2d').clearRect(0,0,c.width,c.height);
+    for(const c of keepCanvas ? [overview,histogram] : [canvas,overview,histogram])c.getContext('2d').clearRect(0,0,c.width,c.height);
     for(const input of dialog.querySelectorAll('.viewer-sidebar input,.viewer-sidebar select,.viewer-sidebar button'))input.disabled=true;
     for(const k of ['previous','next','fit','one','plus','minus','rotate','flipX','flipY'])$(k).disabled=true;
     if(!isolated)$('compare').disabled=true;
@@ -172,7 +181,7 @@
     const closing=id,viewState=snapshot();
     if(viewState)keptTransform=viewState.transform;
     if(!isolated){window.AstroArchiveExtensions?.viewerClosed();document.documentElement.classList.remove('viewer-open');}
-    id='';serial++;renderSerial++;clearTimeout(debounce);clearTimeout(pixelTimer);dialog.close();
+    id='';serial++;renderSerial++;clearTimeout(debounce);clearTimeout(pixelTimer);window.AstroArchiveMotion?.stop(dialog);dialog.close();
     frame=picture=null;cancelAnimationFrame(animation);animation=0;
     for(const c of [canvas,overview,histogram]){c.width=1;c.height=1;}
     restoreFocus?.focus?.();
@@ -307,7 +316,7 @@
       if(dialog.open&&serial===version){busy(false);error(e.message);$('previous').disabled=$('next').disabled=false;}
     }
   }
-  return {state:snapshot, next(viewerId){if(id!==viewerId||!dialog?.open||loading)return;const next=$('next');if(!next.disabled)next.click();else error(t('noNext'));},connect(options){call=options.call;},languageChanged:translate,event(message){if(message.name==='viewer.closed'){close(true);return;}if(message.name==='viewer.loading')opening(message);else if(message.name==='viewer.loaded')accept(message.document,true);else if(message.name==='viewer.problem'&&id===message.id){busy(false);error(message.error);}},
+  return {state:snapshot, from, next(viewerId){if(id!==viewerId||!dialog?.open||loading)return;const next=$('next');if(!next.disabled)next.click();else error(t('noNext'));},connect(options){call=options.call;},languageChanged:translate,event(message){if(message.name==='viewer.closed'){close(true);return;}if(message.name==='viewer.loading')opening(message);else if(message.name==='viewer.loaded')accept(message.document,true);else if(message.name==='viewer.problem'&&id===message.id){busy(false);error(message.error);}},
     openComparisonFrame,
     viewport:transformState,
     syncViewport({zoom,centerX,centerY}){
