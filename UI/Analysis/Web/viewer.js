@@ -10,7 +10,7 @@
   let call,dialog,canvas,ctx,overview,histogram,stage,frame=null,picture=null,id='',serial=0,renderSerial=0,comparisonSource;
   let zoom=1,pan={x:0,y:0},rotation=0,flipX=false,flipY=false,fitting=true,drag=null,animation=0;
   let debounce,pixelTimer,pixelBusy=false,restoreFocus,resize,loading=false,keptTransform=null,pendingDisplay=null;
-  const $ = key => dialog.querySelector('#'+prefix+key);
+  const $ = key => dialog.querySelector('#'+prefix+key) || document.getElementById(prefix+key);
   const request = (method, params) => isolated ? call('viewer.compare', {...params, action:method.slice(7)}) : call(method, params);
   const fmt = x => Number.isFinite(x)?x.toLocaleString(i18n.locale,{maximumSignificantDigits:7}):'—';
   const icons={close:'close',previous:'previous',next:'next',fit:'fit',one:'actual',minus:'zoomOut',plus:'zoomIn',rotate:'rotate',flipX:'flipX',flipY:'flipY',panel:'panel',reset:'reset',header:'header',retry:'reset'};
@@ -22,16 +22,16 @@
     dialog.innerHTML=`<header class="viewer-heading"><div><p class="eyebrow" id="v-title" data-text="title"></p><h2 id="v-name"></h2><p id="v-meta"></p></div>${isolated?'':`<div class="viewer-heading-actions"><button type="button" id="v-compare" class="quiet-button" data-label="compare" data-text="compare" disabled></button>${button('close')}</div>`}</header>
       <div class="viewer-toolbar" role="toolbar"><div class="viewer-tool-group">${button('previous','←')}${button('next','→')}</div><div class="viewer-tool-group">${button('fit')}${button('one','1:1')}${button('minus','−')}<label class="viewer-zoom"><input id="v-zoom" type="number" min="1" max="6400" step="10" value="100"> %</label>${button('plus','+')}</div><div class="viewer-tool-group">${button('rotate','↻')}${button('flipX','↔')}${button('flipY','↕')}</div>${button('panel','☷')}</div>
       <div class="viewer-workspace"><div id="v-stage" class="viewer-stage" tabindex="0"><canvas id="v-canvas"></canvas><div id="v-loading" class="viewer-loading"><span class="viewer-spinner"></span><span id="v-load-label"></span></div><p id="v-error" class="viewer-error" role="alert" hidden></p>${button('retry')}<div id="v-badge" class="viewer-badge"></div></div>
-      <aside id="v-sidebar" class="viewer-sidebar"><div id="v-plugin-tools" hidden></div><section><h3 data-text="orientation"></h3><canvas id="v-overview" class="viewer-overview" role="img" data-text-aria="orientation"></canvas><p class="viewer-muted" id="v-resolution"></p></section>
-      <section><h3 data-text="histogram"></h3><canvas id="v-histogram" class="viewer-histogram" role="img" data-text-aria="histogram"></canvas><div class="viewer-hist-range"><span id="v-low">—</span><span id="v-high">—</span></div><p class="viewer-muted" id="v-stats"></p></section>
-      <section><h3 data-text="display"></h3><label class="viewer-select"><span data-text="mode"></span><select id="v-mode"><option value="0" data-text="auto"></option><option value="1" data-text="linear"></option><option value="2" data-text="manual"></option><option value="3">Asinh</option><option value="4">Log</option><option value="5">√</option><option value="6">x²</option></select></label>
+      <aside id="v-sidebar" class="viewer-sidebar"><div id="v-plugin-tools" hidden></div><details class="viewer-section" data-section="orientation"><summary data-text="orientation"></summary><canvas id="v-overview" class="viewer-overview" role="img" data-text-aria="orientation"></canvas><p class="viewer-muted" id="v-resolution"></p></details>
+      <details class="viewer-section" data-section="histogram"><summary data-text="histogram"></summary><canvas id="v-histogram" class="viewer-histogram" role="img" data-text-aria="histogram"></canvas><div class="viewer-hist-range"><span id="v-low">—</span><span id="v-high">—</span></div><p class="viewer-muted" id="v-stats"></p></details>
+      <details class="viewer-section" data-section="display"><summary data-text="display"></summary><label class="viewer-select"><span data-text="mode"></span><select id="v-mode"><option value="0" data-text="auto"></option><option value="1" data-text="linear"></option><option value="2" data-text="manual"></option><option value="3">Asinh</option><option value="4">Log</option><option value="5">√</option><option value="6">x²</option></select></label>
       <label class="viewer-select"><span data-text="channel"></span><select id="v-channel"><option value="0">RGB</option><option value="1" data-text="mono"></option><option value="2" data-text="red"></option><option value="3" data-text="green"></option><option value="4" data-text="blue"></option></select></label>
       <label class="viewer-check"><input id="v-separate" type="checkbox"><span data-text="separate"></span></label>
       ${control('black',0,0,99.999,.001)}${control('white',100,.001,100,.001)}${control('midtone',.5,.001,.999,.001)}${control('gamma',1,.1,10,.01)}
       <label class="viewer-select"><span data-text="palette"></span><select id="v-palette"><option value="0" data-text="gray"></option><option value="1" data-text="heat"></option><option value="2" data-text="blueGold"></option></select></label>
-      <label class="viewer-check"><input id="v-negative" type="checkbox"><span data-text="negative"></span></label>${button('reset')}</section>
-      <section><label class="viewer-select"><span data-text="quality"></span><select id="v-quality"><option value="1600" data-text="fast"></option><option value="3200" data-text="detail"></option><option value="0" data-text="original"></option></select></label><div class="viewer-bayer"><label class="viewer-check"><input id="v-debayer" type="checkbox"><span data-text="debayer"></span></label><select id="v-pattern" aria-label="Bayer"><option value="auto" data-text="bayerAuto"></option><option>RGGB</option><option>BGGR</option><option>GRBG</option><option>GBRG</option></select></div><p class="viewer-muted" data-text="bayerNote"></p></section>
-      <section class="viewer-local-options"><label class="viewer-check"><input id="v-smooth" type="checkbox" checked><span data-text="smooth"></span></label><label class="viewer-check"><input id="v-grid" type="checkbox"><span data-text="grid"></span></label><label class="viewer-check"><input id="v-cross" type="checkbox"><span data-text="cross"></span></label></section>
+      <label class="viewer-check"><input id="v-negative" type="checkbox"><span data-text="negative"></span></label>${button('reset')}
+      <div class="viewer-subsection"><label class="viewer-select"><span data-text="quality"></span><select id="v-quality"><option value="1600" data-text="fast"></option><option value="3200" data-text="detail"></option><option value="0" data-text="original"></option></select></label><div class="viewer-bayer"><label class="viewer-check"><input id="v-debayer" type="checkbox"><span data-text="debayer"></span></label><select id="v-pattern" aria-label="Bayer"><option value="auto" data-text="bayerAuto"></option><option>RGGB</option><option>BGGR</option><option>GRBG</option><option>GBRG</option></select></div><p class="viewer-muted" data-text="bayerNote"></p></div>
+      <div class="viewer-local-options viewer-subsection"><label class="viewer-check"><input id="v-smooth" type="checkbox" checked><span data-text="smooth"></span></label><label class="viewer-check"><input id="v-grid" type="checkbox"><span data-text="grid"></span></label><label class="viewer-check"><input id="v-cross" type="checkbox"><span data-text="cross"></span></label></div></details>
       <details class="viewer-file"><summary data-text="details"></summary><p id="v-path"></p>${button('header')}<pre id="v-cards" hidden></pre></details><p class="viewer-muted viewer-note" data-text="note"></p></aside></div>
       <footer class="viewer-footer"><span id="v-pixel"></span><span data-text="hint"></span></footer>`;
     if(isolated)for(const node of dialog.querySelectorAll('[id^="v-"]'))node.id=prefix+node.id.slice(2);
@@ -41,12 +41,22 @@
       $('title').dataset.text=paneLabel;
       dialog.querySelector('.viewer-heading').append(dialog.querySelector('.viewer-tool-group'));
       host.append(dialog);
+      // Beta 1.3 UI (Р1): the comparison shows one shared toolbar, for the chosen frame.
+      {const shared=host.closest('.image-compare')?.querySelector('.viewer-compare-tools'),toolbar=dialog.querySelector('.viewer-toolbar');if(shared&&toolbar){toolbar.dataset.pane=host.dataset.pane||'0';toolbar.hidden=toolbar.dataset.pane!==shared.dataset.active;shared.append(toolbar);}}
     } else {
       document.body.append(dialog);
       if(window.matchMedia('(max-width:720px)').matches)dialog.classList.add('viewer-wide');
+      // Beta 1.3 UI (Б1): one top row with the name, the tools, then compare, panel and close.
+      dialog.classList.add('viewer-main');
+      {const heading=dialog.querySelector('.viewer-heading'),actions=heading.querySelector('.viewer-heading-actions');heading.insertBefore(dialog.querySelector('.viewer-toolbar'),actions);actions.insertBefore(dialog.querySelector('#v-panel'),actions.querySelector('#v-close'));}
     }
     canvas=$('canvas');ctx=canvas.getContext('2d');overview=$('overview');histogram=$('histogram');stage=$('stage');
     $('retry').hidden=true;panelState();translate();
+    // Beta 1.3 UI (П1): side sections fold with an arrow and line; their open state is remembered.
+    {let saved={};try{saved=JSON.parse(localStorage.getItem('astroarchive.viewer.sections')||'{}')||{};}catch{}
+      const defaults={orientation:false,histogram:true,display:true};
+      for(const section of dialog.querySelectorAll('details.viewer-section')){const key=section.dataset.section;section.open=key in saved?!!saved[key]:defaults[key]!==false;
+        section.addEventListener('toggle',()=>{saved[key]=section.open;try{localStorage.setItem('astroarchive.viewer.sections',JSON.stringify(saved));}catch{}if(section.open){drawOverview();drawHistogram();}});}}
     if(!isolated){
       $('compare').hidden=Boolean(window.AstroArchiveRemote);
       $('compare').onclick=()=>{if(frame?.canNavigate&&!loading)showComparison(frame,snapshot(),call);};
@@ -311,17 +321,22 @@
     const dialog=document.createElement('dialog');
     dialog.className='image-viewer image-compare';
     dialog.setAttribute('aria-labelledby','viewer-compare-title');
-    dialog.innerHTML=`<header class="viewer-heading"><h2 id="viewer-compare-title"></h2>
-      <div class="viewer-heading-actions"><button id="viewer-sync-zoom" type="button" class="quiet-button" aria-pressed="false"></button>
+    dialog.innerHTML=`<header class="viewer-heading"><h2 id="viewer-compare-title"></h2><div class="viewer-compare-tools" data-active="0"></div>
+      <div class="viewer-heading-actions"><label class="checkbox-field viewer-sync"><input id="viewer-sync-zoom" type="checkbox"><span></span></label>
       <button type="button" class="quiet-button viewer-icon-button viewer-compare-close"></button></div></header>
       <div class="viewer-compare-grid"><div class="viewer-compare-pane"></div><div class="viewer-compare-pane"></div></div>`;
     dialog.querySelector('h2').textContent=t('compareTitle');
     const sync=dialog.querySelector('#viewer-sync-zoom');
-    sync.textContent=t('sync');sync.title=t('syncHint');sync.setAttribute('aria-label',t('syncHint'));
+    sync.nextElementSibling.textContent=t('sync');sync.parentElement.title=t('syncHint');sync.setAttribute('aria-label',t('syncHint'));
     const close=dialog.querySelector('.viewer-compare-close');
     window.AstroArchiveIcons.mount(close,'close',t('close'));
     close.onclick=()=>dialog.close();
     let active=0,linked=false;
+    function markActive(){
+      const tools=dialog.querySelector('.viewer-compare-tools');tools.dataset.active=String(active);
+      for(const toolbar of tools.querySelectorAll('.viewer-toolbar'))toolbar.hidden=toolbar.dataset.pane!==String(active);
+      for(const host of dialog.querySelectorAll('.viewer-compare-pane'))host.classList.toggle('is-active',host.dataset.pane===String(active));
+    }
     function align(){
       if(!linked)return;
       const source=panes[active].viewport()?active:1-active;
@@ -329,18 +344,19 @@
       if(view)panes[1-source].syncViewport(view);
     }
     const panes=[...dialog.querySelectorAll('.viewer-compare-pane')].map((host,index)=>{
-      host.addEventListener('focusin',()=>{active=index;});
+      host.dataset.pane=String(index);host.classList.toggle('is-active',index===0);
+      host.addEventListener('focusin',()=>{active=index;markActive();});
+      host.addEventListener('pointerdown',()=>{active=index;markActive();});
       return createViewer(host,index?'compareRight':'compareLeft',{
         viewChanged(userMoved){
-          if(userMoved)active=index;
+          if(userMoved){active=index;markActive();}
           if(index===active)align();
         },
         ready:align
       });
     });
-    sync.onclick=()=>{
-      linked=!linked;
-      sync.setAttribute('aria-pressed',String(linked));
+    sync.onchange=()=>{
+      linked=sync.checked;
       align();
     };
     dialog.addEventListener('close',()=>{

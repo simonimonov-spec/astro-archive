@@ -1,0 +1,77 @@
+/* Beta 1.3 UI (в разработка, не е издание) · виж docs/BETA-1.3-UI.md */
+/* Image viewer layout (chosen Б1 + П1 + Р1).
+   Б1: one top row — file name, tools without group frames (thin separators), then
+       compare, panel and close. The picture gets the height of the former toolbar.
+   П1: side sections fold with the arrow and line (R2); the missing-plugin notice is a
+       small warning chip; open sections are remembered.
+   Р1: the comparison has one shared toolbar for the chosen frame (blue frame), the file
+       names sit on the pictures, and "Синхронизирай" is a switch. */
+
+/* ---------- Б1: one top row ---------- */
+.image-viewer.viewer-main[open] { grid-template-rows: auto minmax(0, 1fr) auto; }
+.image-viewer.viewer-main > .viewer-heading { gap: 14px; padding: 8px 14px; justify-content: flex-start; }
+.image-viewer.viewer-main > .viewer-heading > div:first-child { flex: 1 1 auto; min-width: 140px; }
+.image-viewer.viewer-main > .viewer-heading .eyebrow { display: none; }
+.image-viewer.viewer-main > .viewer-heading h2 { font-size: 14.5px; margin: 0; max-width: none; }
+.image-viewer.viewer-main > .viewer-heading p:not(.eyebrow) { font-size: 11px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.image-viewer.viewer-main > .viewer-heading > .viewer-toolbar,
+.image-compare .viewer-compare-tools > .viewer-toolbar {
+  flex: none; flex-wrap: nowrap; gap: 0; padding: 0; border: 0; background: none;
+}
+.image-viewer :is(.viewer-main > .viewer-heading, .viewer-compare-tools) .viewer-tool-group {
+  gap: 2px; padding: 0 8px; border: 0; border-radius: 0; background: none;
+}
+.image-viewer :is(.viewer-main > .viewer-heading, .viewer-compare-tools) .viewer-tool-group + .viewer-tool-group { border-left: 1px solid var(--border); }
+.image-viewer :is(.viewer-main > .viewer-heading, .viewer-compare-tools) .viewer-icon-button { width: 32px; height: 32px; }
+.image-viewer.viewer-main .viewer-heading-actions { padding-left: 10px; border-left: 1px solid var(--border); }
+.image-viewer.viewer-main .viewer-heading-actions #v-panel { margin-left: 0; }
+/* Narrow windows: the tools may shrink before the name disappears. */
+@media (max-width: 1000px) {
+  .image-viewer.viewer-main > .viewer-heading p:not(.eyebrow) { display: none; }
+  .image-viewer :is(.viewer-main > .viewer-heading, .viewer-compare-tools) .viewer-tool-group { padding: 0 4px; }
+  .image-viewer :is(.viewer-main > .viewer-heading, .viewer-compare-tools) .viewer-icon-button { width: 28px; height: 28px; }
+}
+@media (max-width: 720px) {
+  .image-viewer.viewer-main > .viewer-heading { flex-wrap: wrap; }
+  .image-viewer.viewer-main > .viewer-heading > .viewer-toolbar { order: 3; flex-basis: 100%; display: flex; }
+}
+
+/* ---------- П1: collapsible side sections ---------- */
+.viewer-sidebar details.viewer-section { padding: 10px 0 12px; border-bottom: 1px solid var(--border); }
+.viewer-sidebar details.viewer-section > summary { font-size: 12px; font-weight: 600; margin-bottom: 0; }
+.viewer-sidebar details.viewer-section[open] > summary { margin-bottom: 10px; }
+.viewer-sidebar .viewer-subsection { margin-top: 12px; padding-top: 12px; border-top: 1px dashed color-mix(in srgb, var(--text) 10%, transparent); }
+/* The missing-plugin notice: a small warning chip (two lines at most). */
+.viewer-sidebar #v-plugin-tools:not([hidden]),
+.viewer-sidebar [id$="-plugin-tools"]:not([hidden]) { padding-top: 10px; }
+.viewer-sidebar .viewer-plugin-tool > p.settings-note,
+.viewer-sidebar .viewer-plugin-tool .extension-control p:only-child {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  margin: 5px 10px; padding: 0; border: 0; outline: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border)); outline-offset: 5px;
+  border-radius: 4px; color: var(--warning); font-size: 11px; line-height: 1.4; max-height: 2.8em;
+}
+
+/* ---------- Р1: comparison with one shared toolbar ---------- */
+.image-compare > .viewer-heading { gap: 14px; padding: 8px 14px; justify-content: flex-start; }
+.image-compare > .viewer-heading > h2 { flex: 1 1 auto; font-size: 14.5px; margin: 0; }
+.image-compare .viewer-compare-tools { display: flex; align-items: center; flex: none; }
+.image-compare .viewer-compare-tools > .viewer-toolbar[hidden] { display: none !important; }
+.image-compare .viewer-heading-actions { padding-left: 10px; border-left: 1px solid var(--border); gap: 10px; }
+.image-compare .viewer-sync { font-size: 12.5px; white-space: nowrap; }
+/* Each pane: the picture only, with its name and arrows on top. */
+.viewer-compare-pane > .image-viewer[open] { grid-template-rows: minmax(0, 1fr); }
+.viewer-compare-pane .image-viewer > .viewer-heading {
+  position: absolute; z-index: 3; left: 8px; top: 8px; right: auto; max-width: calc(100% - 140px);
+  padding: 3px 4px 3px 9px; gap: 6px; border: 1px solid var(--border); border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(6px);
+}
+.viewer-compare-pane .image-viewer > .viewer-heading .eyebrow,
+.viewer-compare-pane .image-viewer > .viewer-heading [id$="-meta"] { display: none; }
+.viewer-compare-pane .image-viewer > .viewer-heading h2 { font-size: 12px; margin: 0; }
+.viewer-compare-pane .image-viewer > .viewer-heading .viewer-tool-group { order: -1; padding: 0; gap: 1px; }
+.viewer-compare-pane .image-viewer > .viewer-heading .viewer-icon-button { width: 24px; height: 24px; }
+.viewer-compare-pane .image-viewer > .viewer-heading .viewer-icon-button .app-icon { width: 15px; height: 15px; }
+.viewer-compare-pane .viewer-stage { box-shadow: inset 0 0 0 1px transparent; transition: box-shadow 240ms ease; }
+.viewer-compare-pane.is-active .viewer-stage { box-shadow: inset 0 0 0 1px var(--accent); }
+:root[data-animations="off"] .viewer-compare-pane .viewer-stage { transition: none; }
+@media (prefers-reduced-motion: reduce) { .viewer-compare-pane .viewer-stage { transition: none; } }

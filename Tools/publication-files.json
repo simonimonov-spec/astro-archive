@@ -239,6 +239,10 @@
         "destination": "UI/Analysis/Web/viewer.css"
       },
       {
+        "source": "UI/Analysis/Web/viewer-layout.css",
+        "destination": "UI/Analysis/Web/viewer-layout.css"
+      },
+      {
         "source": "UI/Analysis/Web/viewer.js",
         "destination": "UI/Analysis/Web/viewer.js"
       },
