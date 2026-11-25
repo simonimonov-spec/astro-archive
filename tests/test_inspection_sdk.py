@@ -4,6 +4,8 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
+
 from Bridge.Plugins.inspection_services import InspectionServices
 
 RID = 'a' * 32
@@ -99,6 +101,19 @@ class InspectionSdkTest(unittest.TestCase):
     def test_mark_rejects_unknown_report(self):
         with self.assertRaises(ValueError):
             self.sdk.invoke('p', 'mark', dict(reportId='b' * 32, ids=['a']))
+
+    def test_register_preserves_transform_with_more_than_forty_stars(self):
+        points = np.random.default_rng(98).uniform(30, 470, size=(48, 2))
+        frames = self.service.quality.results[RID]['frames']
+        for frame, positions in zip(frames, (points, points + [16, -9])):
+            frame.update(width=500, height=500,
+                         starList=[dict(x=x, y=y) for x, y in positions])
+
+        result = self.sdk.invoke('p', 'register', dict(reportId=RID, sourceId='a', targetId='b'))
+
+        self.assertEqual(result['matched'], len(points))
+        self.assertLess(result['rms'], 1e-8)
+        np.testing.assert_allclose(result['matrix'], [[1, 0, 16], [0, 1, -9], [0, 0, 1]], atol=1e-8)
 
 
 if __name__ == '__main__':

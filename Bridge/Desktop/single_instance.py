@@ -1,8 +1,8 @@
 """One running copy per installation and activation of its existing window."""
 from __future__ import annotations
-import ctypes, hashlib, os
+import ctypes, os
 from ctypes import wintypes
-from pathlib import Path
+from Bridge.Desktop.identity import installation_id
 
 TITLE = 'Astro Archive'
 _ERROR_ALREADY_EXISTS = 183
@@ -20,8 +20,7 @@ def _kernel():
 
 
 def mutex_name(root):
-    digest = hashlib.sha256(str(Path(root).resolve()).casefold().encode('utf-8')).hexdigest()[:32]
-    return 'Local\\AstroArchive-' + digest
+    return 'Local\\AstroArchive-' + installation_id(root)
 
 
 def acquire(root):

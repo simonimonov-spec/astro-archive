@@ -32,7 +32,7 @@ class PluginTests(unittest.TestCase):
         manager.events = events
         manager.folder = self.root/'Plugins'
         manager.folder.mkdir()
-        manager.gateway = PluginGateway(settings, events)
+        manager.gateway = PluginGateway(settings)
         manager.records = {}
         manager.live = {}
         manager.problems = []

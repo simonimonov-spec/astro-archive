@@ -48,10 +48,8 @@ def read_json(path:Path,default=None):
     with path.open(encoding='utf-8-sig') as stream:return json.load(stream)
 
 def digest(path:Path):
-    h=hashlib.sha256()
     with path.open('rb') as stream:
-        for block in iter(lambda:stream.read(4*1024*1024),b''):h.update(block)
-    return h.hexdigest()
+        return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 def within(root:Path,relative:str,existing=True):
     root=Path(root).resolve(strict=existing)

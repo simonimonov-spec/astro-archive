@@ -88,7 +88,7 @@ class PluginManager:
         self.archive_services=ArchiveServices(service)
         from Bridge.Plugins.inspection_services import InspectionServices
         self.inspection_services=InspectionServices(service)
-        self.gateway=PluginGateway(self.settings,self.events);self.records={};self.live={};self.problems=[];self.lock=threading.RLock()
+        self.gateway=PluginGateway(self.settings);self.records={};self.live={};self.problems=[];self.lock=threading.RLock()
     @staticmethod
     def command_name(plugin,name):
         if not isinstance(name,str):raise ValueError('Невалидна команда на плъгин.')
@@ -209,7 +209,7 @@ class PluginManager:
         except BaseException:self.unload(ident);state['enabled']=False;raise
     def unload(self,ident):
         live=self.live.pop(ident,None)
-        self.gateway.commands={k:v for k,v in self.gateway.commands.items() if v[0]!=ident};self.gateway.contributions.pop(ident,None)
+        self.gateway.commands={k:v for k,v in self.gateway.commands.items() if v[0]!=ident}
         self.settings.value['approvedPluginPermissions'][ident]=False
         if live:
             for task in live['tasks']:self.service.jobs.cancel(task)

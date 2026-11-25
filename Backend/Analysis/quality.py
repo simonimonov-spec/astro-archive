@@ -73,7 +73,7 @@ def measure_safe(argument):
     try:return measure(argument)
     except Exception as error:return dict(id=argument[0],error=str(error),warnings=[dict(type='unreadable',severity='high',confidence='confirmed',message=str(error))],starList=[],stars=0,transform=None)
 
-from Backend.Analysis.alignment import similarity,register,project,displayed_transform,warp
+from Backend.Analysis.alignment import similarity,register,displayed_transform
 
 def wcs_alignment(source,target):
     """Use existing celestial WCS; reject fields that need a nonlinear warp."""

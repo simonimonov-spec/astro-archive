@@ -200,8 +200,9 @@ class Request:
 
 class PluginGateway:
     VERSION=1
-    UI_TYPES=UI_TYPES
-    def __init__(self,settings,events):self.settings=settings;self.events=events;self.commands={};self.contributions={}
+    def __init__(self,settings):
+        self.settings=settings
+        self.commands={}
     def register(self,plugin:str,command:str,handler:Callable):
         if not plugin or not command.startswith(plugin+'.') or command in self.commands:raise ValueError('Невалидна или повторена команда на плъгин.')
         self.commands[command]=(plugin,handler)
@@ -211,19 +212,3 @@ class PluginGateway:
         record=self.commands.get(request.command)
         if not record or record[0]!=request.plugin:raise ValueError('Непозната команда на плъгин.')
         return record[1](request.parameters)
-    def contribute(self,plugin,section,elements):
-        if not self.settings.value['approvedPluginPermissions'].get(plugin):raise PermissionError('Необходимо е разрешение за добавяне на UI.')
-        if section not in ('archive','analysis','preparation'):raise ValueError('Непознат раздел.')
-        if len(elements)>100:raise ValueError('Твърде много UI елементи.')
-        for e in elements:
-            if e.get('type') not in self.UI_TYPES or not isinstance(e.get('id'),str):raise ValueError('Невалиден UI елемент.')
-            if any(k in e for k in ('html','script','onclick','src')):raise ValueError('Договорът приема данни, а не изпълним HTML/JavaScript.')
-        self.contributions[plugin]=dict(section=section,elements=elements)
-        self.events.emit('plugin.ui.changed',plugin=plugin,contribution=self.contributions[plugin])
-        return dict(accepted=True)
-    def input(self,plugin,element,value):
-        contribution=self.contributions.get(plugin)
-        if not contribution or not any(e['id']==element for e in contribution['elements']):raise ValueError('Непознат UI вход.')
-        if not self.settings.value['approvedPluginPermissions'].get(plugin):raise PermissionError('Отнето разрешение.')
-        self.events.emit('plugin.input',plugin=plugin,element=element,value=value)
-        return dict(accepted=True)

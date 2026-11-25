@@ -40,7 +40,7 @@ class DownloadTests(unittest.TestCase):
         m.service=types.SimpleNamespace(store=store,settings=settings,events=events,host_services=types.SimpleNamespace(owners=set()),jobs=types.SimpleNamespace(cancel=lambda _:None))
         m.service.workflow = Mock()
         m.service.workflow.open_sessions.return_value = []
-        m.settings=settings;m.events=events;m.folder=self.root/'Plugins';m.gateway=PluginGateway(settings,events)
+        m.settings=settings;m.events=events;m.folder=self.root/'Plugins';m.gateway=PluginGateway(settings)
         m.records={};m.live={};m.problems=[];m.lock=threading.RLock();self.manager=m
         self.downloads=Downloads(m)
         manifest=dict(id='sample',apiVersion=1,name='Sample',description='test',version='V-1',entry='main.py')

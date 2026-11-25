@@ -372,11 +372,9 @@ class Catalog:
                     if side.exists():archive.write(side,'metadata.json')
                 with zipfile.ZipFile(temporary) as archive:
                     if archive.testzip() is not None:raise OSError('Повредено копие в кошчето.')
-                    import hashlib
                     with archive.open(archive.namelist()[0]) as stream:
-                        h=hashlib.sha256()
-                        for block in iter(lambda:stream.read(4*1024*1024),b''):h.update(block)
-                    if h.hexdigest()!=original_hash:raise OSError('Кошчето не съвпада с оригинала.')
+                        if hashlib.file_digest(stream, 'sha256').hexdigest() != original_hash:
+                            raise OSError('Кошчето не съвпада с оригинала.')
                 os.replace(temporary,target)
                 with self.store.db() as db:db.execute('INSERT INTO trash VALUES(?,?,?)',(entry,json.dumps(manifest,ensure_ascii=False),'staged'))
                 if digest(source)!=original_hash:raise OSError('Кадърът е променен; запазен е оригиналът.')

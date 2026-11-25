@@ -37,24 +37,31 @@ def homography(source,target):
 
 
 def triangle_index(points):
-    values=[];indices=[]
-    for triplet in itertools.combinations(range(min(40,len(points))),3):
-        p=points[list(triplet)];sides=np.array([np.linalg.norm(p[1]-p[2]),np.linalg.norm(p[0]-p[2]),np.linalg.norm(p[0]-p[1])]);order=np.argsort(sides)
-        area=abs(np.linalg.det(np.column_stack((p[1]-p[0],p[2]-p[0]))))
-        if sides[order[0]]<7 or area<20:continue
-        values.append(sides[order[:2]]/sides[order[2]]);indices.append(np.array(triplet)[order])
-    return np.asarray(values),indices
+    if len(points) < 3:
+        return np.empty(0), []
+    triplets = np.array(list(itertools.combinations(range(min(40, len(points))), 3)))
+    a, b, c = points[triplets].transpose(1, 0, 2)
+    # Index each vertex by the length of the side opposite it.
+    edges = np.stack((b - c, a - c, a - b), axis=1)
+    sides = np.linalg.norm(edges, axis=2)
+    order = np.argsort(sides, axis=1)
+    sides = np.take_along_axis(sides, order, axis=1)
+    area = np.abs(np.linalg.det(np.stack((b - a, c - a), axis=-1)))
+    keep = ~((sides[:, 0] < 7) | (area < 20))
+    if not keep.any():
+        return np.empty(0), []
+    indices = np.take_along_axis(triplets[keep], order[keep], axis=1)
+    return sides[keep, :2] / sides[keep, 2, None], list(indices)
 
 
-def unique_pairs(points,reference,tree,matrix,limit):
+def unique_pairs(points,tree,matrix,limit):
     mapped=project(matrix,points)
     if not np.isfinite(mapped).all():return np.array([],int),np.array([],int)
     distance,nearest=tree.query(mapped);candidates=np.flatnonzero(distance<limit)
-    candidates=candidates[np.argsort(distance[candidates])];used=set();source=[];target=[]
-    for i in candidates:
-        j=int(nearest[i])
-        if j not in used:source.append(int(i));target.append(j);used.add(j)
-    return np.asarray(source,int),np.asarray(target,int)
+    candidates = candidates[np.argsort(distance[candidates])]
+    _, first = np.unique(nearest[candidates], return_index=True)
+    source = candidates[np.sort(first)]
+    return source, nearest[source]
 
 
 def register(source,target,min_pairs=10):
@@ -71,7 +78,7 @@ def register(source,target,min_pairs=10):
             if distance>.006:continue
             matrix=similarity(points[ids[index]],reference[ref_ids[int(neighbor)]])
             if not .8<np.linalg.det(matrix[:2,:2])<1.25:continue
-            a,b=unique_pairs(points,reference,tree,matrix,4)
+            a,b=unique_pairs(points,tree,matrix,4)
             if len(a)>=min_pairs:
                 error=float(np.mean(np.linalg.norm(project(matrix,points[a])-reference[b],axis=1)))
                 if best is None or (len(a),-error)>(len(best[1]),-best[3]):best=(matrix,a,b,error)
@@ -91,7 +98,7 @@ def register(source,target,min_pairs=10):
         if len(inliers)>len(best_inliers) or (len(inliers)==len(best_inliers) and error<best_error):
             matrix,best_inliers,best_error=candidate,inliers,error
     for _ in range(3):
-        a,b=unique_pairs(points,reference,tree,matrix,2.5)
+        a,b=unique_pairs(points,tree,matrix,2.5)
         if len(a)<min_pairs:return None
         matrix=homography(points[a],reference[b])
     residual=np.linalg.norm(project(matrix,points[a])-reference[b],axis=1)
