@@ -12,6 +12,10 @@
  tools.prepend(tabs,control,panels);
  const chart=$('q-chart-tools');views.chart.append(scope,chart);chart.querySelector('h3')?.remove();
  const warningToggle=$('q-plot-warnings').closest('label');warningToggle.classList.add('chart-warning-toggle');warningToggle.querySelector('span').textContent='Показвай знаците за проблеми';warningToggle.title='Показва или скрива стандартните и AI знаци върху диаграмата. Оценките и подборът се запазват.';plot.querySelector('.flow-view-buttons').append(warningToggle);
+ const wizardFile=node('input');wizardFile.id='q-wizard-csv';wizardFile.type='file';wizardFile.accept='.csv,text/csv';wizardFile.hidden=true;
+ const wizardImport=node('button','Внеси CSV от StackingWizard','quiet-button');wizardImport.type='button';wizardImport.title='Избери отчета от Save the grades за същите кадри';wizardImport.onclick=()=>wizardFile.click();
+ wizardFile.onchange=()=>{const file=wizardFile.files[0];wizardFile.value='';if(file)A.importWizard(file);};
+ chart.querySelector('#q-preset').closest('label').after(wizardImport,wizardFile);
  const advanced=node('label',null,'checkbox-field advanced-unlock'),check=node('input');check.type='checkbox';check.id='q-advanced';advanced.append(check,node('span','Разширени настройки · избор на осите'));chart.querySelector('#q-preset').closest('label').after(advanced);
  const description=node('p','','function-note');description.id='q-preset-description';advanced.before(description);
  function describe(){const x=$('q-x').selectedOptions[0]?.textContent||'№ кадър',y=$('q-metric').selectedOptions[0]?.textContent||'FWHM';description.textContent='Хоризонтално: '+x+'. Вертикално: '+y+'. Натисни „Разширени настройки“, за да избереш осите ръчно.';}

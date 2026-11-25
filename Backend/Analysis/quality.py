@@ -159,6 +159,31 @@ class Quality:
             self.results[ident]=result
         if compact:return dict(result,frames=[{k:v for k,v in row.items() if k not in ('starList','noiseMap')} for row in result['frames']])
         return result
+    def _stackingwizard_path(self, ident):
+        return self.reports / (ident + '.stackingwizard.json')
+
+    def display_result(self, ident, compact=False):
+        result = self.load(ident, compact)
+        imported = read_json(self._stackingwizard_path(result['id']), None)
+        return dict(result, stackingWizard=imported) if imported else result
+
+    def import_stackingwizard(self, ident, content):
+        from Backend.Analysis.stackingwizard_csv import match_grades
+        with self.history_guard:
+            report = self.load(ident)
+            imported = match_grades(content, report['frames'])
+            atomic_json(self._stackingwizard_path(report['id']), imported)
+        return imported
+
+    def _remove_report(self, ident):
+        with self.history_guard:
+            for path in (self.reports / (ident + '.json'), self._stackingwizard_path(ident)):
+                try:
+                    path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            self.results.pop(ident, None)
+
     def history(self):
         entries=self._entries();valid=[e for e in entries if (self.reports/(e['id']+'.json')).is_file()]
         if len(valid)!=len(entries):self._store_entries(valid)
@@ -178,18 +203,15 @@ class Quality:
         for entry in self._entries():
             if entry.get('id')==ident:continue
             if entry.get('auto'):
-                try:(self.reports/(entry['id']+'.json')).unlink(missing_ok=True)
-                except OSError:pass
-                self.results.pop(entry['id'],None)
+                self._remove_report(entry['id'])
                 continue
             entries.append(entry)
         entries.append(self._entry(result,name,True));self._store_entries(entries);return entries[-1]
     def delete(self,ident):
         ident=self._ident(ident);entries=[e for e in self._entries() if e.get('id')!=ident]
         self._store_entries(entries)
-        try:(self.reports/(ident+'.json')).unlink(missing_ok=True)
-        except OSError:pass
-        self.results.pop(ident,None);return dict(deleted=True,id=ident)
+        self._remove_report(ident)
+        return dict(deleted=True,id=ident)
     def run(self,ids,cancel,progress,force=False,kind='frames',detector=None):
         import numpy as np
         from Backend.Analysis.psf import detection_settings

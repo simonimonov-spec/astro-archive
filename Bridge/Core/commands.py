@@ -73,6 +73,7 @@ CORE_ROUTES = {
         'python.analysis.coverage.attach',
         'python.analysis.export',
         'python.analysis.result',
+        'python.analysis.stackingWizard.import',
     ),
     '_viewer_command': (
         'function.image',

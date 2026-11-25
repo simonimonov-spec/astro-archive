@@ -39,6 +39,10 @@
         "destination": "Backend/Analysis/quality.py"
       },
       {
+        "source": "Backend/Analysis/stackingwizard_csv.py",
+        "destination": "Backend/Analysis/stackingwizard_csv.py"
+      },
+      {
         "source": "Backend/Analysis/timeseries.py",
         "destination": "Backend/Analysis/timeseries.py"
       },
@@ -617,6 +621,10 @@
       {
         "source": "UI/Shared/Web/tags.css",
         "destination": "UI/Shared/Web/tags.css"
+      },
+      {
+        "source": "tests/test_stackingwizard_csv.py",
+        "destination": "tests/test_stackingwizard_csv.py"
       },
       {
         "source": "tests/test_standard_grading.py",

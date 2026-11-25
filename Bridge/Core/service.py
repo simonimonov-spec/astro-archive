@@ -534,7 +534,11 @@ class Service:
         if method=='python.analysis.coverage':return self.task('analysis','Маска на покритието',lambda c,r:self.quality.coverage(p['resultId'],c,r,p.get('ids')),'normal')
         if method=='python.analysis.coverage.attach':return self.quality.attach_coverage(p['resultId'],p['stackId'])
         if method=='python.analysis.export':return self.export_report(p)
-        if method=='python.analysis.result':return self.quality.load(p['id'],bool(p.get('compact')))
+        if method=='python.analysis.stackingWizard.import':
+            imported = self.quality.import_stackingwizard(p['id'], p['csv'])
+            self.events.emit('analysis.stackingWizard.changed', id=p['id'])
+            return imported
+        if method=='python.analysis.result':return self.quality.display_result(p['id'],bool(p.get('compact')))
         raise ValueError('Неподдържана команда: '+method)
 
     def open_viewer(self, p, comparison=False):
