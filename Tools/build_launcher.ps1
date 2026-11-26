@@ -4,7 +4,7 @@ param(
     [Parameter(ParameterSetName = 'Build')]
     [DateTimeOffset]$ReleaseCutoff = [DateTimeOffset]::UtcNow,
     [Parameter(ParameterSetName = 'Build')]
-    [string]$ReleaseTag = 'beta1.2.1-preview',
+    [string]$ReleaseTag = 'beta1.3-preview',
     [Parameter(ParameterSetName = 'Build')]
     [long]$ReleaseId = 0,
     [Parameter(Mandatory, ParameterSetName = 'Verify')]

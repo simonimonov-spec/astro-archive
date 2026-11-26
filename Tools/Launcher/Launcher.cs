@@ -229,7 +229,7 @@ internal sealed class Launcher : Form
     {
         bool preview = tag.EndsWith("-preview", StringComparison.OrdinalIgnoreCase);
         Version version = BetaVersion(preview ? tag.Substring(0, tag.Length - "-preview".Length) : tag);
-        if (version == null) return string.IsNullOrWhiteSpace(tag) ? "Beta 1.2.4" : tag;
+        if (version == null) return string.IsNullOrWhiteSpace(tag) ? "Beta 1.3" : tag;
         return "Beta " + version + (preview ? " Preview" : "");
     }
     void Update(string text, string sub, float value)

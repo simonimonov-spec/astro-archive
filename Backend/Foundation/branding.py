@@ -4,10 +4,10 @@ import re
 from pathlib import Path
 
 APP_NAME = 'Astro Archive'
-_RELEASE_TAG = os.environ.get('ASTRO_ARCHIVE_RELEASE_TAG', 'beta1.2.4').strip()
+_RELEASE_TAG = os.environ.get('ASTRO_ARCHIVE_RELEASE_TAG', 'beta1.3').strip()
 _VERSION_MATCH = re.fullmatch(r'beta(\d+(?:\.\d+){0,2})(-preview)?', _RELEASE_TAG, re.IGNORECASE)
 APP_VERSION = (f"Beta {_VERSION_MATCH.group(1)}{' Preview' if _VERSION_MATCH.group(2) else ''}"
-               if _VERSION_MATCH else _RELEASE_TAG or 'Beta 1.2.4')
+               if _VERSION_MATCH else _RELEASE_TAG or 'Beta 1.3')
 DATA_PREFIX = 'astroarchive'
 # These identifiers belong to saved data / the previous local bridge protocol.
 # Keeping them here lets an existing archive and unfinished session survive a rename.
